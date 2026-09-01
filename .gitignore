@@ -1,0 +1,55 @@
+# GENESIS cache
+cache/
+*.cache
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# GENESIS runtime data
+database/
+backups/
+
+# Python cache
+__pycache__/
+genesis/__pycache__/
+genesis/*.BEFORE_*
+genesis/*.BEFORE_*
+*.BACKUP_*
+*.BACKUP_TKINTER_FINAL
+
+# Local snapshots and recovery copies
+*.before_*
+*.BEFORE_*
+*.backup-*
+*.broken
+*.seed_backup
+*.vram_backup
+*.workflow_backup
+*.klein4b_final_backup
+
+# Generated/local development data
+gpu_test_outputs/
+dlib/
+To
+.pytest_cache/

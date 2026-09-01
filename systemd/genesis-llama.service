@@ -1,0 +1,15 @@
+[Unit]
+Description=GENESIS existing llama.cpp ROCm server
+ConditionPathExists=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server
+ConditionPathExists=/mnt/AI-Storage/LLM-Models/Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf
+
+[Service]
+Type=simple
+ExecStart=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server --model /mnt/AI-Storage/LLM-Models/Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf --host 127.0.0.1 --port 8081 --ctx-size 12288 --n-gpu-layers 99
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:%h/.local/state/genesis/llama-server.log
+StandardError=append:%h/.local/state/genesis/llama-server.log
+
+[Install]
+WantedBy=default.target
