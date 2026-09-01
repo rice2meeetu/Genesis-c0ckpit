@@ -421,8 +421,8 @@ class PhotoStudio(tk.Tk):
         super().__init__()
         self.withdraw()
         self.title(APP_NAME)
-        self.geometry("1380x860")
-        self.minsize(1100,700)
+        self.geometry("1600x960")
+        self.minsize(1280,760)
         self.settings = load_settings()
         self.files = []
         self.thumb_cache = {}
@@ -499,15 +499,15 @@ class PhotoStudio(tk.Tk):
         except Exception:
             pass
 
-        BG = "#050505"
-        PANEL = "#101010"
-        PANEL2 = "#181818"
-        BORDER = "#3a3a3a"
-        TEXT = "#f4ead5"
-        MUTED = "#9da9b8"
+        BG = "#080a0f"
+        PANEL = "#10141c"
+        PANEL2 = "#171d28"
+        BORDER = "#283142"
+        TEXT = "#f6f7fb"
+        MUTED = "#8f9bad"
         ACCENT = "#d4af37"
         ACCENT2 = "#8a6d1d"
-        SELECT = "#292929"
+        SELECT = "#202938"
 
         style.configure(
             ".",
@@ -706,7 +706,7 @@ class PhotoStudio(tk.Tk):
         # TOP COCKPIT HEADER
         # ============================================================
         top = ttk.Frame(self, style="Cockpit.TFrame")
-        top.pack(fill="x", padx=10, pady=(10, 6))
+        top.pack(fill="x", padx=18, pady=(16, 10))
 
         title_wrap = ttk.Frame(top, style="Cockpit.TFrame")
         title_wrap.pack(side="left", padx=12, pady=8)
@@ -721,7 +721,7 @@ class PhotoStudio(tk.Tk):
 
         ttk.Label(
             title_wrap,
-            text="  AI COCKPIT",
+            text="  CREATIVE STUDIO",
             font=(DISPLAY_FONT, 17, "bold"),
             foreground="#f4ead5",
             background="#101010"
@@ -729,7 +729,7 @@ class PhotoStudio(tk.Tk):
 
         ttk.Label(
             title_wrap,
-            text="   •   LINUX / ROCm",
+            text="   LOCAL WORKSPACE  /  LINUX ROCm",
             font=("DejaVu Sans", 9, "bold"),
             foreground="#9da9b8",
             background="#101010"
@@ -751,20 +751,20 @@ class PhotoStudio(tk.Tk):
         shell.pack(
             fill="both",
             expand=True,
-            padx=10,
-            pady=(0, 10)
+            padx=18,
+            pady=(0, 18)
         )
 
-        nav_shell = tk.Frame(shell, bg="#0b0b0b")
-        nav_shell.pack(side="left", fill="y", padx=(0, 16))
-        nav_canvas = tk.Canvas(nav_shell, bg="#0b0b0b", width=330,
+        nav_shell = tk.Frame(shell, bg="#0c1017")
+        nav_shell.pack(side="left", fill="y", padx=(0, 14))
+        nav_canvas = tk.Canvas(nav_shell, bg="#0c1017", width=286,
                                highlightthickness=0)
         nav_scroll = ttk.Scrollbar(nav_shell, orient="vertical", command=nav_canvas.yview)
         nav_scroll.pack(side="right", fill="y")
         nav_canvas.pack(side="left", fill="both", expand=True)
         nav_canvas.configure(yscrollcommand=nav_scroll.set)
-        self.nav_rail = tk.Frame(nav_canvas, bg="#0b0b0b", highlightthickness=1,
-                                 highlightbackground="#3a3a3a")
+        self.nav_rail = tk.Frame(nav_canvas, bg="#0c1017", highlightthickness=1,
+                                 highlightbackground="#283142")
         nav_window = nav_canvas.create_window((0, 0), window=self.nav_rail, anchor="nw")
         self.nav_rail.bind("<Configure>", lambda _e: nav_canvas.configure(
             scrollregion=nav_canvas.bbox("all")))
@@ -773,9 +773,9 @@ class PhotoStudio(tk.Tk):
 
         self.workspace = tk.Frame(
             shell,
-            bg="#050505",
+            bg="#080a0f",
             highlightthickness=1,
-            highlightbackground="#3a3a3a"
+            highlightbackground="#283142"
         )
         self.workspace.pack(
             side="left",
@@ -813,8 +813,8 @@ class PhotoStudio(tk.Tk):
         # ============================================================
         tk.Label(
             self.nav_rail,
-            text="CONTROL",
-            bg="#0b0b0b",
+            text="WORKSPACES",
+            bg="#0c1017",
             fg="#9da9b8",
             font=("DejaVu Sans", 9, "bold"),
             anchor="w"
@@ -827,42 +827,58 @@ class PhotoStudio(tk.Tk):
         self.nav_buttons = {}
 
         nav_items = [
-            ("home",       "⌂  COCKPIT HOME"),
-            ("ai",         "⚡  IMAGE / AI"),
-            ("poses",      "POSE LIBRARY"),
-            ("photos",     "▣  PHOTO ORGANIZER"),
-            ("enhance",    "✦  PHOTO TOOLS"),
-            ("canvas",     "▧  WALLPAPER STUDIO"),
-            ("media",      "▶  JELLYFIN"),
-            ("cameras",    "◉  CAMERA HUB"),
+            ("home", "Overview", "home"),
+            (None, "AI IMAGE STUDIO", None),
+            ("ai", "Generate", "ai"),
+            ("poses", "Pose Library", "poses"),
+            ("model-manager", "Models & LoRAs", "model-manager"),
+            ("prompt-manager", "Prompt Builder", "prompt-manager"),
+            (None, "PHOTO STUDIO", None),
+            ("photos", "Library & Faces", "photos"),
+            ("enhance", "Photo Tools", "enhance"),
+            ("canvas", "Create / Wallpaper", "canvas"),
+            (None, "CONNECTED", None),
+            ("cameras", "Camera Hub", "cameras"),
+            ("sillytavern", "AI Chat", "sillytavern"),
+            ("media", "Media / Jellyfin", "media"),
         ]
 
-        for key, label in nav_items:
+        for key, label, target in nav_items:
+            if key is None:
+                tk.Label(
+                    self.nav_rail,
+                    text=label,
+                    bg="#0c1017",
+                    fg="#667387",
+                    font=("DejaVu Sans", 8, "bold"),
+                    anchor="w",
+                ).pack(fill="x", padx=18, pady=(16, 5))
+                continue
             btn = tk.Button(
                 self.nav_rail,
                 text=label,
-                command=lambda k=key: (
+                command=lambda k=target: (
                     self._open_cockpit_target(k)
-                    if k in {"editor", "duplicates", "media"}
+                    if k in {"editor", "duplicates", "media", "model-manager", "prompt-manager", "sillytavern"}
                     else self._show_page(k)
                 ),
-                bg="#181818",
-                fg="#f4ead5",
-                activebackground="#292929",
+                bg="#111722",
+                fg="#e8edf5",
+                activebackground="#202938",
                 activeforeground="#ffffff",
                 relief="flat",
                 bd=0,
                 highlightthickness=0,
                 anchor="w",
-                padx=8,
-                pady=11,
-                font=("DejaVu Sans Condensed", 9, "bold"),
+                padx=14,
+                pady=10,
+                font=("DejaVu Sans", 9, "bold"),
                 cursor="hand2"
             )
             btn.pack(
                 fill="x",
                 padx=10,
-                pady=3
+                pady=2
             )
             self.nav_buttons[key] = btn
 
@@ -947,89 +963,13 @@ class PhotoStudio(tk.Tk):
         )
         self.nav_media_status.pack(fill="x", padx=16, pady=3)
 
-        # ------------------------------------------------------------
-        # QUICK CONTROLS — use the lower left rail productively
-        # ------------------------------------------------------------
-        tk.Frame(
-            self.nav_rail,
-            bg="#3a3a3a",
-            height=1
-        ).pack(
-            fill="x",
-            padx=12,
-            pady=(16, 12)
-        )
-
-        tk.Label(
-            self.nav_rail,
-            text="QUICK CONTROLS",
-            bg="#0b0b0b",
-            fg="#9da9b8",
-            font=("DejaVu Sans", 9, "bold"),
-            anchor="w"
-        ).pack(
-            fill="x",
-            padx=16,
-            pady=(0, 8)
-        )
-
-        camera_controls = tk.Frame(
-            self.nav_rail,
-            bg="#0b0b0b"
-        )
-        camera_controls.pack(
-            fill="x",
-            padx=10,
-            pady=(0, 6)
-        )
-
-        tk.Button(
-            camera_controls,
-            text="CAMERA ON",
-            command=self.start_cameras,
-            bg="#17130a",
-            fg="#d4af37",
-            activebackground="#2a210d",
-            activeforeground="#ffffff",
-            relief="flat",
-            bd=0,
-            font=("DejaVu Sans", 8, "bold"),
-            pady=8,
-            cursor="hand2"
-        ).pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=(0, 3)
-        )
-
-        tk.Button(
-            camera_controls,
-            text="CAMERA OFF",
-            command=self.stop_cameras,
-            bg="#181818",
-            fg="#f4ead5",
-            activebackground="#292929",
-            activeforeground="#d4af37",
-            relief="flat",
-            bd=0,
-            font=("DejaVu Sans", 8, "bold"),
-            pady=8,
-            cursor="hand2"
-        ).pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=(3, 0)
-        )
-
         tk.Button(
             self.nav_rail,
-            text="REFRESH SYSTEM STATUS",
+            text="Refresh status",
             command=self.refresh_system_statuses,
-            bg="#181818",
+            bg="#111722",
             fg="#9da9b8",
-            activebackground="#292929",
+            activebackground="#202938",
             activeforeground="#d4af37",
             relief="flat",
             bd=0,
@@ -1039,14 +979,14 @@ class PhotoStudio(tk.Tk):
         ).pack(
             fill="x",
             padx=10,
-            pady=(0, 8)
+            pady=(14, 8)
         )
 
         # Bottom cockpit identifier anchors the rail visually.
         tk.Label(
             self.nav_rail,
-            text="LOCAL  •  ROCm",
-            bg="#0b0b0b",
+            text="LOCAL  /  ROCm",
+            bg="#0c1017",
             fg="#574729",
             font=("DejaVu Sans", 8, "bold"),
             anchor="center"
@@ -1062,7 +1002,7 @@ class PhotoStudio(tk.Tk):
         # ------------------------------------------------------------
         self.system_art_wrap = tk.Frame(
             self.nav_rail,
-            bg="#0b0b0b"
+            bg="#0c1017"
         )
         self.system_art_wrap.pack(
             side="top",
@@ -1074,8 +1014,8 @@ class PhotoStudio(tk.Tk):
 
         tk.Label(
             self.system_art_wrap,
-            text="GENESIS IDENTITY",
-            bg="#0b0b0b",
+            text="GENESIS",
+            bg="#0c1017",
             fg="#9da9b8",
             font=("DejaVu Sans", 8, "bold")
         ).pack(
@@ -1087,7 +1027,7 @@ class PhotoStudio(tk.Tk):
         self.system_art_canvas = tk.Canvas(
             self.system_art_wrap,
             bg="#101010",
-            height=185,
+            height=96,
             highlightthickness=1,
             highlightbackground="#3a3a3a",
             cursor="hand2"
@@ -1121,46 +1061,10 @@ class PhotoStudio(tk.Tk):
         )
 
 
-        # ------------------------------------------------------------
-        # CAMERA HUB — directly below COCKPIT HOME
-        # ------------------------------------------------------------
-        camera_nav = self.nav_buttons.get("cameras")
-        if camera_nav is not None:
-            camera_nav.pack_forget()
-            camera_nav.configure(
-                text="CAMERA HUB",
-                bg="#181818",
-                fg="#f4ead5",
-                activebackground="#292929",
-                activeforeground="#d4af37",
-                highlightthickness=0,
-                relief="flat",
-                bd=0,
-                font=("DejaVu Sans", 9, "bold"),
-                cursor="hand2",
-            )
-
-            # Pack Camera Hub immediately before IMAGE / AI,
-            # which places it directly after COCKPIT HOME.
-            image_ai_nav = self.nav_buttons.get("ai")
-            if image_ai_nav is not None:
-                camera_nav.pack(
-                    fill="x",
-                    padx=10,
-                    pady=(5, 7),
-                    before=image_ai_nav,
-                )
-            else:
-                camera_nav.pack(
-                    fill="x",
-                    padx=10,
-                    pady=3,
-                )
-
         # Keep the rail wide enough for its labels at the active font/DPI size.
         self.nav_rail.update_idletasks()
         nav_canvas.configure(width=max(
-            330,
+            286,
             max(child.winfo_reqwidth() for child in self.nav_rail.winfo_children()) + 36,
         ))
 
@@ -1210,13 +1114,13 @@ class PhotoStudio(tk.Tk):
         for key, button in self.nav_buttons.items():
             if key == page_key:
                 button.configure(
-                    bg="#292929",
+                    bg="#202938",
                     fg="#d4af37"
                 )
             else:
                 button.configure(
-                    bg="#181818",
-                    fg="#f4ead5"
+                    bg="#111722",
+                    fg="#e8edf5"
                 )
 
     def _workspace_heading(self, parent, kicker, title, detail):
