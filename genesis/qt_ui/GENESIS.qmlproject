@@ -1,0 +1,14 @@
+import QmlProject 1.1
+
+Project {
+    mainFile: "Main.qml"
+    mainUiFile: "Main.qml"
+    QmlFiles { files: ["Main.qml"] }
+    ImageFiles {
+        files: [
+            "../assets/panel_backgrounds/genesis-cockpit-logo.jpg",
+            "../assets/panel_backgrounds/pose-library-banner-reference.png"
+        ]
+    }
+    FontFiles { files: ["../assets/fonts/Exo2-Black.ttf"] }
+}
