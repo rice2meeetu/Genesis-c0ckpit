@@ -10,9 +10,11 @@ import argparse
 import json
 import struct
 import sys
+import threading
+import time
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtCore import QObject, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtQml import QQmlApplicationEngine
 
@@ -26,6 +28,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 UI_ROOT = PROJECT_ROOT / "genesis" / "qt_ui"
 ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
+WORKFLOW_ROOT = Path.home() / "AI" / "ComfyUI" / "user" / "default" / "workflows"
+GENERATION_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUX2_KLEIN_9B_KV_OFFICIAL_T2I.json"
+EDIT_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUXUP_IMG2IMG_RX9060.json"
 
 
 def build_generation_profiles(
@@ -190,6 +195,215 @@ def load_runtime_status() -> dict:
         }
 
 
+class GenerationBridge(QObject):
+    """Asynchronous Qt boundary around the preserved local ComfyUI client."""
+
+    statusChanged = pyqtSignal()
+    busyChanged = pyqtSignal()
+    previewChanged = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._status = "Ready"
+        self._busy = False
+        self._preview = ""
+
+    @pyqtProperty(str, notify=statusChanged)
+    def status(self) -> str:
+        return self._status
+
+    @pyqtProperty(bool, notify=busyChanged)
+    def busy(self) -> bool:
+        return self._busy
+
+    @pyqtProperty(str, notify=previewChanged)
+    def previewUrl(self) -> str:
+        return self._preview
+
+    def _set_status(self, value: str) -> None:
+        self._status = value
+        self.statusChanged.emit()
+
+    def _set_busy(self, value: bool) -> None:
+        self._busy = value
+        self.busyChanged.emit()
+
+    def _set_preview(self, value: str) -> None:
+        self._preview = value
+        self.previewChanged.emit()
+
+    @pyqtSlot(str, int, int)
+    def queueGenerate(self, prompt_text: str, width: int, height: int) -> None:
+        if self._busy:
+            return
+        prompt_text = prompt_text.strip()
+        if not prompt_text:
+            self._set_status("Enter a prompt before generating.")
+            return
+        if not GENERATION_WORKFLOW.is_file():
+            self._set_status("The validated Klein generation workflow is unavailable.")
+            return
+        self._set_busy(True)
+        self._set_status("Preparing validated Klein 9B-KV generation…")
+        threading.Thread(
+            target=self._run_generate,
+            args=(prompt_text, int(width), int(height)),
+            daemon=True,
+        ).start()
+
+    @pyqtSlot(str, str, float, str)
+    def queueEdit(self, source_url: str, prompt_text: str, strength: float, model_name: str) -> None:
+        if self._busy:
+            return
+        source = Path(QUrl(source_url).toLocalFile())
+        prompt_text = prompt_text.strip()
+        if not source.is_file() or not prompt_text:
+            self._set_status("Choose a source image and enter edit instructions.")
+            return
+        if not EDIT_WORKFLOW.is_file():
+            self._set_status("The saved Klein image-edit workflow is unavailable.")
+            return
+        self._set_busy(True)
+        self._set_status("Preparing validated image-edit workflow…")
+        threading.Thread(
+            target=self._run_edit,
+            args=(source, prompt_text, float(strength), model_name),
+            daemon=True,
+        ).start()
+
+    def _run_generate(self, prompt_text: str, width: int, height: int) -> None:
+        try:
+            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
+            stats = client.system_stats()
+            if not workflow_lab.gpu_acceleration_available(stats):
+                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            info = client.object_info()
+            base = workflow_lab.workflow_to_prompt(GENERATION_WORKFLOW, info)
+            controls = workflow_lab.discover_workflow_controls(base)
+            overrides: dict[str, dict] = {}
+
+            def override(control: str, value) -> None:
+                target = controls.get(control)
+                if target:
+                    node_id, input_name = target
+                    overrides.setdefault(str(node_id), {})[input_name] = value
+
+            override("positive", prompt_text)
+            override("width", max(256, min(1536, width)))
+            override("height", max(256, min(1536, height)))
+            override("steps", 4)
+            override("cfg", 1.0)
+            prompt = workflow_lab.workflow_to_prompt(GENERATION_WORKFLOW, info, overrides)
+            validation = workflow_lab.validate_prompt(prompt, info)
+            if not validation["valid"]:
+                missing = validation["missing_nodes"] + validation["missing_inputs"]
+                raise workflow_lab.ComfyError("Workflow is not runnable: " + ", ".join(missing))
+
+            prompt_id = client.submit(prompt)
+            self._set_status(f"Queued {prompt_id[:8]}…")
+            result = client.wait(
+                prompt_id,
+                timeout=1800,
+                progress=lambda value: self._set_status(
+                    f"Generation {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
+                ),
+            )
+            if result.status != "completed":
+                raise workflow_lab.ComfyError(result.error or f"Generation ended: {result.status}")
+
+            output_dir = Path.home() / "GENESIS-Exports"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            saved: list[Path] = []
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            for index, output in enumerate(result.outputs, 1):
+                if output.get("kind") != "images":
+                    continue
+                suffix = Path(output.get("filename", "image.png")).suffix or ".png"
+                target = output_dir / f"GENESIS-Klein-{stamp}-{index}{suffix}"
+                target.write_bytes(client.view(output))
+                saved.append(target)
+            if not saved:
+                raise workflow_lab.ComfyError("ComfyUI completed without an image output.")
+            self._set_preview(QUrl.fromLocalFile(str(saved[-1])).toString())
+            self._set_status(f"Complete · {saved[-1].name}")
+        except Exception as exc:
+            self._set_status(f"Generation failed · {exc}")
+        finally:
+            self._set_busy(False)
+
+    def _run_edit(self, source: Path, prompt_text: str, strength: float, model_name: str) -> None:
+        try:
+            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
+            stats = client.system_stats()
+            if not workflow_lab.gpu_acceleration_available(stats):
+                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            info = client.object_info()
+            base = workflow_lab.workflow_to_prompt(EDIT_WORKFLOW, info)
+            controls = workflow_lab.discover_workflow_controls(base)
+            overrides: dict[str, dict] = {}
+
+            def override(control: str, value) -> None:
+                target = controls.get(control)
+                if target:
+                    node_id, input_name = target
+                    overrides.setdefault(str(node_id), {})[input_name] = value
+
+            override("positive", prompt_text)
+            override("denoise", max(0.05, min(0.95, strength)))
+            override("steps", 8)
+            override("encoder", "qwen_3_4b_fp4_flux2.safetensors")
+
+            uploaded = client.upload_image(source)
+            image_name = "/".join(
+                value for value in (uploaded.get("subfolder"), uploaded.get("name")) if value
+            )
+            load_nodes = [
+                str(node_id) for node_id, node in base.items()
+                if node.get("class_type") == "LoadImage"
+            ]
+            if not load_nodes:
+                raise workflow_lab.ComfyError("Image-edit workflow has no source-image input.")
+            overrides.setdefault(load_nodes[0], {})["image"] = image_name
+
+            prompt = workflow_lab.workflow_to_prompt(EDIT_WORKFLOW, info, overrides)
+            validation = workflow_lab.validate_prompt(prompt, info)
+            if not validation["valid"]:
+                missing = validation["missing_nodes"] + validation["missing_inputs"]
+                raise workflow_lab.ComfyError("Workflow is not runnable: " + ", ".join(missing))
+
+            prompt_id = client.submit(prompt)
+            self._set_status(f"Queued {prompt_id[:8]}…")
+            result = client.wait(
+                prompt_id,
+                timeout=3600,
+                progress=lambda value: self._set_status(
+                    f"Image edit {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
+                ),
+            )
+            if result.status != "completed":
+                raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")
+
+            output_dir = Path.home() / "GENESIS-Exports"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            saved: list[Path] = []
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            for index, output in enumerate(result.outputs, 1):
+                if output.get("kind") != "images":
+                    continue
+                suffix = Path(output.get("filename", "image.png")).suffix or ".png"
+                target = output_dir / f"GENESIS-Edit-{stamp}-{index}{suffix}"
+                target.write_bytes(client.view(output))
+                saved.append(target)
+            if not saved:
+                raise workflow_lab.ComfyError("ComfyUI completed without an image output.")
+            self._set_preview(QUrl.fromLocalFile(str(saved[-1])).toString())
+            self._set_status(f"Complete · {saved[-1].name}")
+        except Exception as exc:
+            self._set_status(f"Edit failed · {exc}")
+        finally:
+            self._set_busy(False)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--screenshot")
@@ -210,6 +424,8 @@ def main() -> int:
     context.setContextProperty("poseItems", load_pose_items())
     context.setContextProperty("generationProfiles", load_generation_profiles())
     context.setContextProperty("runtimeStatus", load_runtime_status())
+    generation_bridge = GenerationBridge(app)
+    context.setContextProperty("genesisBridge", generation_bridge)
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
     if not engine.rootObjects():
         return 1
@@ -221,8 +437,7 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            screen = window.screen() or app.primaryScreen()
-            image = screen.grabWindow(int(window.winId()))
+            image = window.grabWindow()
             if image.isNull() or not image.save(str(target)):
                 app.exit(2)
                 return

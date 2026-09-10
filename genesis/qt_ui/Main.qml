@@ -53,6 +53,15 @@ ApplicationWindow {
     property string editPrompt: ""
     property real editStrength: 0.4
     property string activeLoraTriggers: "None"
+    property int generationWidth: 512
+    property int generationHeight: 512
+    property string generationSpeed: "Fast"
+
+    function setGenerationSpeed(name, size) {
+        generationSpeed = name
+        generationWidth = size
+        generationHeight = size
+    }
 
     function syncLoraTriggers() {
         var triggerMap = selectedGenerationProfile.triggers || ({})
@@ -572,9 +581,10 @@ ApplicationWindow {
                                 Text { text: "Turn your ideas into reality."; color: appRoot.textDim; font.pixelSize: 14 }
                             }
                             Item { Layout.fillWidth: true }
-                            GoldButton { text: "Photoreal"; Layout.preferredWidth: 115; onClicked: appRoot.applyPhotorealPreset() }
-                            GoldButton { text: "Load Preset"; Layout.preferredWidth: 120 }
-                            GoldButton { text: "Save Preset"; Layout.preferredWidth: 120 }
+                            GoldButton { text: "Fast 512"; active: appRoot.generationSpeed === "Fast"; Layout.preferredWidth: 92; onClicked: appRoot.setGenerationSpeed("Fast", 512) }
+                            GoldButton { text: "Balanced 768"; active: appRoot.generationSpeed === "Balanced"; Layout.preferredWidth: 112; onClicked: appRoot.setGenerationSpeed("Balanced", 768) }
+                            GoldButton { text: "Quality 1024"; active: appRoot.generationSpeed === "Quality"; Layout.preferredWidth: 108; onClicked: appRoot.setGenerationSpeed("Quality", 1024) }
+                            GoldButton { text: "Photoreal"; Layout.preferredWidth: 105; onClicked: appRoot.applyPhotorealPreset() }
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -685,11 +695,17 @@ ApplicationWindow {
                                     Layout.maximumHeight: 88
                                     SmallLabel { x: 12; y: 8; text: "Output Settings" }
                                     Row { x: 12; y: 36; spacing: 8
-                                        Repeater { model: ["Width  768", "Height  1152", "Batch  1", "Format  PNG", "Save to  GENESIS/Output"]
+                                        Repeater { model: ["Width  " + appRoot.generationWidth, "Height  " + appRoot.generationHeight, "Steps  4", "CFG  1.0", "Save to  GENESIS-Exports"]
                                             FieldBox { width: index === 4 ? 210 : 112; height: 38; Text { anchors.centerIn: parent; text: modelData; color: appRoot.textMain; font.pixelSize: 12 } }
                                         }
                                     }
-                                    GoldButton { anchors.right: parent.right; anchors.rightMargin: 10; y: 28; width: 190; height: 50; text: "▶  Generate" }
+                                    GoldButton {
+                                        anchors.right: parent.right; anchors.rightMargin: 10; y: 28
+                                        width: 190; height: 50
+                                        text: genesisBridge.busy ? "Generating…" : "▶  Generate"
+                                        enabled: !genesisBridge.busy && appRoot.selectedPosePrompt.trim().length > 0
+                                        onClicked: genesisBridge.queueGenerate(appRoot.selectedPosePrompt, appRoot.generationWidth, appRoot.generationHeight)
+                                    }
                                 }
                             }
                             GoldPanel {
@@ -697,7 +713,8 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 SmallLabel { x: 12; y: 10; text: "Preview" }
                                 Rectangle { x: 10; y: 38; width: parent.width - 20; height: parent.height * 0.48; color: "#171a18"; border.color: appRoot.line
-                                    Text { anchors.centerIn: parent; text: "GENERATED IMAGE PREVIEW"; color: appRoot.textDim }
+                                    Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
+                                    Text { anchors.centerIn: parent; text: "GENERATED IMAGE PREVIEW"; color: appRoot.textDim; visible: genesisBridge.previewUrl.length === 0 }
                                 }
                                 Row { x: 10; y: parent.height * 0.52; spacing: 5
                                     Repeater { model: ["Open", "Save", "Send To"]
@@ -705,7 +722,7 @@ ApplicationWindow {
                                     }
                                 }
                                 SmallLabel { x: 12; y: parent.height * 0.62; text: "Generation Info" }
-                                Text { x: 12; y: parent.height * 0.67; width: parent.width - 24; text: "Model: " + appRoot.selectedGenerationProfile.label + "\nLoRA 1: " + appRoot.selectedLoraOne + "\nLoRA 2: " + appRoot.selectedLoraTwo + "\nSize: 768 × 1152\nStatus: " + (appRoot.selectedGenerationProfile.ready ? "Ready" : "Incomplete"); color: appRoot.textMain; font.pixelSize: 12; lineHeight: 1.35; elide: Text.ElideRight }
+                                Text { x: 12; y: parent.height * 0.67; width: parent.width - 24; text: "Engine: FLUX.2 Klein 9B-KV\nLoRA routing: model-safe\nSize: " + appRoot.generationWidth + " × " + appRoot.generationHeight + "\nPreset: " + appRoot.generationSpeed + "\nStatus: " + genesisBridge.status; color: appRoot.textMain; font.pixelSize: 12; lineHeight: 1.35; elide: Text.ElideRight }
                             }
                         }
                     }
@@ -968,18 +985,37 @@ ApplicationWindow {
                                         onTextChanged: if (activeFocus) appRoot.editPrompt = text
                                         background: Rectangle { color: "#111513"; border.color: appRoot.line; radius: 4 }
                                     }
-                                    SmallLabel { text: "Model & realism" }
-                                    ComboBox { Layout.fillWidth: true; model: appRoot.generationModel; textRole: "label"; currentIndex: appRoot.selectedGenerationIndex; onActivated: appRoot.selectedGenerationIndex = currentIndex }
-                                    GoldButton { Layout.fillWidth: true; text: "Apply Photoreal LoRAs"; onClicked: appRoot.applyPhotorealPreset() }
+                                    SmallLabel { text: "Fast edit engine" }
+                                    FieldBox {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 42
+                                        Text { anchors.centerIn: parent; text: "FluxUp Q4 · RX 9060 XT · Fast 8-step edit"; color: appRoot.textMain; font.pixelSize: 13 }
+                                    }
                                     SmallLabel { text: "Edit strength  " + appRoot.editStrength.toFixed(2) }
                                     Slider { Layout.fillWidth: true; from: 0.05; to: 0.95; stepSize: 0.05; value: appRoot.editStrength; onMoved: appRoot.editStrength = value }
                                     Text { Layout.fillWidth: true; text: "Lower values preserve identity and composition. Higher values allow broader changes."; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 105
+                                        color: "#151916"
+                                        border.color: appRoot.line
+                                        radius: 4
+                                        Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
+                                        Text { anchors.centerIn: parent; text: "EDIT PREVIEW"; color: appRoot.textDim; visible: genesisBridge.previewUrl.length === 0 }
+                                    }
+                                    Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
                                     Item { Layout.fillHeight: true }
                                     GoldButton {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 54
-                                        text: "▶  Queue Image Edit"
-                                        enabled: appRoot.editSource.toString().length > 0 && appRoot.editPrompt.trim().length > 0 && appRoot.selectedGenerationProfile.ready
+                                        text: genesisBridge.busy ? "Working…" : "▶  Queue Image Edit"
+                                        enabled: !genesisBridge.busy && appRoot.editSource.toString().length > 0 && appRoot.editPrompt.trim().length > 0 && appRoot.selectedGenerationProfile.ready
+                                        onClicked: genesisBridge.queueEdit(
+                                            appRoot.editSource.toString(),
+                                            appRoot.editPrompt,
+                                            appRoot.editStrength,
+                                            appRoot.selectedGenerationProfile.model
+                                        )
                                     }
                                 }
                             }
