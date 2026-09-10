@@ -1,6 +1,6 @@
 import unittest
 
-from qt_cockpit import build_generation_profiles
+from qt_cockpit import build_generation_profiles, insert_model_only_loras
 
 
 class QtGenerationProfileTests(unittest.TestCase):
@@ -28,6 +28,8 @@ class QtGenerationProfileTests(unittest.TestCase):
             "None", "Flux Klein - NSFW v2.safetensors", "Klein_Anatomy_Revamped.safetensors",
         ])
         self.assertEqual(profiles[1]["loras"], ["None"])
+        self.assertTrue(profiles[0]["runnable"])
+        self.assertTrue(profiles[1]["runnable"])
 
     def test_unavailable_models_are_not_exposed(self):
         report = {"profiles": [{"name": "Missing", "ready": False, "evidence": {"MODEL": None}}]}
@@ -50,6 +52,32 @@ class QtGenerationProfileTests(unittest.TestCase):
             profiles[0]["triggers"]["flux2klein_body_version_a.safetensors"],
             ["woman"],
         )
+
+    def test_unvalidated_inventory_model_is_visible_but_not_runnable(self):
+        report = {"profiles": [{
+            "name": "Aisha 9B",
+            "ready": True,
+            "evidence": {"MODEL": "/models/aisha-9b.safetensors"},
+        }]}
+        profile = build_generation_profiles(report, [])[0]
+        self.assertTrue(profile["ready"])
+        self.assertFalse(profile["runnable"])
+        self.assertIn("not yet validated", profile["note"])
+
+    def test_single_lora_is_inserted(self):
+        prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
+        insert_model_only_loras(
+            prompt, "model", "sampler", "model", ["one.safetensors"]
+        )
+        self.assertEqual(prompt["genesis_lora_1"]["inputs"]["model"], ["model", 0])
+        self.assertEqual(prompt["sampler"]["inputs"]["model"], ["genesis_lora_1", 0])
+
+    def test_lora_stacking_is_rejected(self):
+        prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
+        with self.assertRaisesRegex(Exception, "stacking is blocked"):
+            insert_model_only_loras(
+                prompt, "model", "sampler", "model", ["one.safetensors", "two.safetensors"]
+            )
 
 
 if __name__ == "__main__":

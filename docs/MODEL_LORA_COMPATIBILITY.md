@@ -1,6 +1,6 @@
 # GENESIS model and LoRA compatibility
 
-Verified against the live ComfyUI inventory on 2026-09-06. “Metadata” means
+Verified against the live ComfyUI inventory through 2026-09-11. “Metadata” means
 the adapter identifies its training architecture internally. “Render” means a
 complete local GPU image was produced with the current GENESIS profile.
 
@@ -9,6 +9,7 @@ complete local GPU image was produced with the current GENESIS profile.
 | Family | Installed models | LoRA policy |
 | --- | --- | --- |
 | FLUX.2 Klein 4B | `flux-2-klein-4b.safetensors` | Offer metadata-confirmed 4B adapters |
+| FLUX.2 Klein 9B Base | `flux-2-klein-base-9b-Q4_K_M.gguf` | Baseline and three regular-9B LoRAs render verified |
 | FLUX.2 Klein 9B-KV | `flux-2-klein-9b-kv-fp8.safetensors` | Baseline render verified; LoRAs blocked |
 | Aisha 9B | `aisha_nsfw_beta_v8_fp8.safetensors` | LoRAs blocked |
 | FLUX.1 | `flux1-dev-kontext_fp8_scaled.safetensors`, `fluxedUpFluxNSFW_40DevFp8.safetensors` | Offer known FLUX.1 adapters |
@@ -27,12 +28,29 @@ its filename says 4B but its embedded metadata does not identify a base model.
 
 ### FLUX.2 Klein 9B Base
 
-The following identify as ordinary `flux2_klein_9b` adapters. They require the
-separate undistilled Klein 9B Base checkpoint, which is not installed:
+The regular Klein 9B Base Q4_K_M GGUF is installed. Its baseline completed at
+512×512 twice, 768×768, and 1024×1024. The following adapters identify as
+ordinary `flux2_klein_9b` and completed controlled 512×512 renders at strength
+0.65 on the RX 9060 XT:
 
-- `Flux Klein - NSFW v2.safetensors`
-- `Klein_Anatomy_Revamped.safetensors`
-- `flux2klein_body_version_a.safetensors`
+- `Flux Klein - NSFW v2.safetensors` — render verified, 56.5 s
+- `Klein_Anatomy_Revamped.safetensors` — render verified, 44.4 s
+- `flux2klein_body_version_a.safetensors` — render verified, 95.3 s
+
+The test used `qwen_3_8b_fp8mixed.safetensors`, a fixed neutral prompt, seed
+390829, 512×512, four steps, CFG 1, Euler/simple, and model-only LoRA loading.
+Reports and images are saved under
+`gpu_test_outputs/klein9b-lora-benchmark/`.
+
+Use one adapter at a time. A cockpit-path render stacking
+`flux2klein_body_version_a` with `Klein_Anatomy_Revamped` completed at both
+0.65 and 0.35 strength per adapter, but visual inspection found severe
+structural streaking at both strengths. The Qt cockpit therefore blocks LoRA
+stacking even though each adapter is individually render-verified.
+
+These additional regular-9B adapters are metadata-compatible but still lack a
+completed controlled render in the current matrix:
+
 - `flux2klein_tocowgirl.safetensors`
 - `FK_sloppydeepthroat_epoch_10.safetensors`
 - `FK_teeththroat.safetensors`
