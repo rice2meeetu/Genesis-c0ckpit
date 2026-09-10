@@ -154,7 +154,8 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            image = window.grabWindow()
+            screen = window.screen() or app.primaryScreen()
+            image = screen.grabWindow(int(window.winId()))
             if image.isNull() or not image.save(str(target)):
                 app.exit(2)
                 return

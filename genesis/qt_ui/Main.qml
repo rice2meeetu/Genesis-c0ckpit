@@ -18,7 +18,8 @@ ApplicationWindow {
     readonly property color brightGold: "#ffd978"
     readonly property color panel: "#090c0b"
     readonly property color panelSoft: "#101412"
-    readonly property color line: "#020201"
+    readonly property color line: "#4a3a1a"
+    readonly property color lineSoft: "#29251b"
     readonly property color textMain: "#f4e8c8"
     readonly property color textDim: "#aaa99f"
     FontLoader { id: genesisDisplayFont; source: "../assets/fonts/Exo2-Black.ttf" }
@@ -57,21 +58,23 @@ ApplicationWindow {
 
     component GoldButton: Button {
         id: control
+        property bool active: false
         implicitHeight: 40
         font.pixelSize: 14
         contentItem: Text {
             text: control.text
-            color: control.down ? "#171006" : appRoot.textMain
+            color: control.down ? "#171006" : (control.active ? "#1b1305" : appRoot.textMain)
             font: control.font
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
         background: Rectangle {
             radius: 5
-            border.color: control.hovered ? appRoot.brightGold : appRoot.line
+            border.color: control.active || control.hovered ? appRoot.brightGold : appRoot.line
+            border.width: control.active ? 2 : 1
             gradient: Gradient {
-                GradientStop { position: 0; color: control.down ? "#efc45b" : "#221b0d" }
-                GradientStop { position: 1; color: control.down ? "#a97b22" : "#0b0d0c" }
+                GradientStop { position: 0; color: control.down ? "#efc45b" : (control.active ? "#e5b94f" : "#221b0d") }
+                GradientStop { position: 1; color: control.down ? "#a97b22" : (control.active ? "#9f731e" : "#0b0d0c") }
             }
         }
     }
@@ -317,7 +320,7 @@ ApplicationWindow {
                 width: 455
                 height: 145
                 radius: 0
-                color: "transparent"
+                color: "#c0050706"
                 border.color: appRoot.line
                 Item {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -383,14 +386,16 @@ ApplicationWindow {
                 spacing: 6
                 Repeater {
                     model: [
-                        {label:"Image Gen", page:0},
-                        {label:"Media Tools", page:3}, {label:"Photo Library", page:4},
-                        {label:"Cam Hub", page:5}, {label:"Entertainment", page:6},
-                        {label:"System", page:7}
+                        {label:"Create", page:0}, {label:"Poses", page:1},
+                        {label:"Workflows", page:2}, {label:"Media", page:3},
+                        {label:"Photos", page:4}, {label:"Cameras", page:5},
+                        {label:"Entertainment", page:6}, {label:"System", page:7}
                     ]
                     GoldButton {
                         text: modelData.label
-                        Layout.preferredWidth: index === 1 ? 145 : 130
+                        active: appRoot.pageIndex === modelData.page
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 78
                         onClicked: appRoot.pageIndex = modelData.page
                     }
                 }
@@ -410,14 +415,14 @@ ApplicationWindow {
             spacing: 6
 
             GoldPanel {
-                Layout.preferredWidth: 132
+                Layout.preferredWidth: 148
                 Layout.fillHeight: true
                 Column {
                     anchors.fill: parent
                     anchors.margins: 8
                     spacing: 8
                     Item {
-                        width: 108; height: 108
+                        width: 124; height: 108
                         anchors.horizontalCenter: parent.horizontalCenter
                         Image {
                             id: sidebarLogoSource
@@ -453,12 +458,18 @@ ApplicationWindow {
                     }
                     Repeater {
                         model: [
-                            {label:"▣  Image Gen", page:0}, {label:"▣  Video Gen", page:3},
-                            {label:"Ps  Photoshop", page:3}, {label:"✂  Media Tools", page:3},
+                            {label:"▣  Image Gen", page:0}, {label:"♟  Pose Library", page:1},
+                            {label:"◇  Workflows", page:2}, {label:"✂  Media Tools", page:3},
                             {label:"▧  Photo Library", page:4}, {label:"●  Cam Hub", page:5},
                             {label:"▷  Entertainment", page:6}, {label:"⚙  System", page:7}
                         ]
-                        GoldButton { width: 116; height: 44; text: modelData.label; onClicked: appRoot.pageIndex = modelData.page }
+                        GoldButton {
+                            width: 132
+                            height: 44
+                            text: modelData.label
+                            active: appRoot.pageIndex === modelData.page
+                            onClicked: appRoot.pageIndex = modelData.page
+                        }
                     }
                 }
                 Rectangle {
@@ -527,8 +538,14 @@ ApplicationWindow {
                                 model: ["Create", "Pose Library", "Workflow", "Advanced", "ControlNet", "Inpaint / Edit", "Batch", "Settings"]
                                 GoldButton {
                                     text: modelData
+                                    active: index === 0
                                     Layout.fillWidth: true
-                                    onClicked: { if (index === 1) appRoot.pageIndex = 1; else if (index === 2) appRoot.pageIndex = 2 }
+                                    onClicked: {
+                                        if (index === 1)
+                                            appRoot.pageIndex = 1
+                                        else if (index === 2)
+                                            appRoot.pageIndex = 2
+                                    }
                                 }
                             }
                         }
