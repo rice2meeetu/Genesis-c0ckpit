@@ -42,6 +42,11 @@ ApplicationWindow {
     property string selectedPoseNegativePrompt: poseModel.length ? poseModel[0].negativePrompt : ""
     property string selectedPosePromptSource: poseModel.length ? poseModel[0].promptSource : "AUTO_FALLBACK"
     property string selectedPoseTemplateId: poseModel.length ? poseModel[0].promptTemplateId : ""
+    property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
+    property int selectedGenerationIndex: 0
+    readonly property var selectedGenerationProfile: generationModel.length ? generationModel[selectedGenerationIndex] : ({label:"No local model", model:"", note:"No compatible local model found", loras:["None"], ready:false})
+    property string selectedLoraOne: "None"
+    property string selectedLoraTwo: "None"
 
     component GoldPanel: Rectangle {
         color: appRoot.panel
@@ -556,10 +561,33 @@ ApplicationWindow {
                                     GoldButton { x: 12; y: 38; width: 185; text: "Select from Pose Library"; onClicked: appRoot.pageIndex = 1 }
                                     SmallLabel { x: 220; y: 10; text: "Model & LoRA Selection (Auto-filtered)" }
                                     Row { x: 220; y: 40; spacing: 10
-                                        Repeater { model: ["AUTO / Recommended", "LoRA 1: Compatible only", "LoRA 2: Compatible only"]
-                                            FieldBox { width: 185; height: 42; Text { anchors.centerIn: parent; text: modelData + " ⌄"; color: appRoot.textMain; font.pixelSize: 12 } }
+                                        ComboBox {
+                                            id: generationModelPicker
+                                            width: 210; height: 42
+                                            model: appRoot.generationModel
+                                            textRole: "label"
+                                            onActivated: {
+                                                appRoot.selectedGenerationIndex = currentIndex
+                                                appRoot.selectedLoraOne = "None"
+                                                appRoot.selectedLoraTwo = "None"
+                                                loraOnePicker.currentIndex = 0
+                                                loraTwoPicker.currentIndex = 0
+                                            }
+                                        }
+                                        ComboBox {
+                                            id: loraOnePicker
+                                            width: 185; height: 42
+                                            model: appRoot.selectedGenerationProfile.loras
+                                            onActivated: appRoot.selectedLoraOne = currentText
+                                        }
+                                        ComboBox {
+                                            id: loraTwoPicker
+                                            width: 185; height: 42
+                                            model: appRoot.selectedGenerationProfile.loras
+                                            onActivated: appRoot.selectedLoraTwo = currentText
                                         }
                                     }
+                                    Text { x: 220; y: 86; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note; color: appRoot.textDim; font.pixelSize: 11; elide: Text.ElideRight }
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -606,7 +634,7 @@ ApplicationWindow {
                                     }
                                 }
                                 SmallLabel { x: 12; y: parent.height * 0.62; text: "Generation Info" }
-                                Text { x: 12; y: parent.height * 0.67; text: "Model: Dynamic inventory\nSize: 768 × 1152\nStages: 1 / 2 / 3\nStatus: Ready"; color: appRoot.textMain; font.pixelSize: 13; lineHeight: 1.5 }
+                                Text { x: 12; y: parent.height * 0.67; width: parent.width - 24; text: "Model: " + appRoot.selectedGenerationProfile.label + "\nLoRA 1: " + appRoot.selectedLoraOne + "\nLoRA 2: " + appRoot.selectedLoraTwo + "\nSize: 768 × 1152\nStatus: " + (appRoot.selectedGenerationProfile.ready ? "Ready" : "Incomplete"); color: appRoot.textMain; font.pixelSize: 12; lineHeight: 1.35; elide: Text.ElideRight }
                             }
                         }
                     }

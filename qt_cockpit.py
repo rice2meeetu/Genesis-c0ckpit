@@ -15,6 +15,8 @@ from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtQml import QQmlApplicationEngine
 
+from genesis.model_compatibility import compatibility_note, compatible_loras
+from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.pose_prompt_profiles import PosePromptMap
 
 
@@ -22,6 +24,42 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 UI_ROOT = PROJECT_ROOT / "genesis" / "qt_ui"
 ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
+
+
+def build_generation_profiles(report: dict, installed_loras: list[str]) -> list[dict]:
+    """Convert filesystem readiness evidence into QML-safe model choices."""
+    profiles = []
+    for profile in report.get("profiles", []):
+        evidence = profile.get("evidence") or {}
+        model_path = evidence.get("MODEL")
+        if model_path is None:
+            continue
+        model_name = Path(model_path).name
+        profiles.append({
+            "label": str(profile.get("name") or model_name),
+            "model": model_name,
+            "note": compatibility_note(model_name),
+            "loras": ["None", *compatible_loras(model_name, installed_loras)],
+            "ready": bool(profile.get("ready")),
+        })
+    profiles.sort(key=lambda item: ("Klein 9B Base" not in item["label"], item["label"].casefold()))
+    return profiles
+
+
+def load_generation_profiles() -> list[dict]:
+    """Read installed model/LoRA names without loading any model tensors."""
+    loras: set[str] = set()
+    for root in MODEL_ROOTS:
+        lora_root = root / "loras"
+        if not lora_root.is_dir():
+            continue
+        try:
+            for path in lora_root.rglob("*"):
+                if path.is_file() and path.suffix.lower() in {".safetensors", ".pt"}:
+                    loras.add(path.name)
+        except OSError:
+            continue
+    return build_generation_profiles(readiness_report(), sorted(loras, key=str.casefold))
 
 
 def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
@@ -104,6 +142,7 @@ def main() -> int:
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
     context.setContextProperty("poseItems", load_pose_items())
+    context.setContextProperty("generationProfiles", load_generation_profiles())
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
     if not engine.rootObjects():
         return 1
