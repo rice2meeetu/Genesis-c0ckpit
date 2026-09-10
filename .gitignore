@@ -53,3 +53,6 @@ gpu_test_outputs/
 dlib/
 To
 .pytest_cache/
+
+# Track schema, keep runtime database ignored
+!database/face_schema.sql
