@@ -33,6 +33,24 @@ class QtGenerationProfileTests(unittest.TestCase):
         report = {"profiles": [{"name": "Missing", "ready": False, "evidence": {"MODEL": None}}]}
         self.assertEqual(build_generation_profiles(report, []), [])
 
+    def test_compatible_lora_trigger_words_are_exposed_to_qml(self):
+        report = {
+            "profiles": [{
+                "name": "FLUX.2 Klein 9B Base",
+                "ready": True,
+                "evidence": {"MODEL": "/models/flux-2-klein-base-9b-Q4_K_M.gguf"},
+            }]
+        }
+        profiles = build_generation_profiles(
+            report,
+            ["flux2klein_body_version_a.safetensors"],
+            {"flux2klein_body_version_a.safetensors": ["woman"]},
+        )
+        self.assertEqual(
+            profiles[0]["triggers"]["flux2klein_body_version_a.safetensors"],
+            ["woman"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

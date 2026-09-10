@@ -25,7 +25,7 @@ ApplicationWindow {
     FontLoader { id: genesisDisplayFont; source: "../assets/fonts/Exo2-Black.ttf" }
     property bool privacyMode: false
     property int pageIndex: 0
-    readonly property var pageNames: ["IMAGE GENERATION", "POSE LIBRARY", "WORKFLOW EDITOR", "MEDIA TOOLS", "PHOTO LIBRARY", "CAM HUB", "ENTERTAINMENT", "SYSTEM"]
+    readonly property var pageNames: ["IMAGE GENERATION", "POSE LIBRARY", "WORKFLOW EDITOR", "MEDIA TOOLS", "PHOTO LIBRARY", "CAM HUB", "ENTERTAINMENT", "SYSTEM", "INPAINT / EDIT"]
     // Editable in Qt Design Studio. Leave blank to show a framed placeholder.
     property url photoOneSource: ""
     property url photoTwoSource: ""
@@ -48,6 +48,51 @@ ApplicationWindow {
     readonly property var selectedGenerationProfile: generationModel.length ? generationModel[selectedGenerationIndex] : ({label:"No local model", model:"", note:"No compatible local model found", loras:["None"], ready:false})
     property string selectedLoraOne: "None"
     property string selectedLoraTwo: "None"
+    property url editSource: ""
+    property url editMask: ""
+    property string editPrompt: ""
+    property real editStrength: 0.4
+    property string activeLoraTriggers: "None"
+
+    function syncLoraTriggers() {
+        var triggerMap = selectedGenerationProfile.triggers || ({})
+        var selected = [selectedLoraOne, selectedLoraTwo]
+        var words = []
+        for (var i = 0; i < selected.length; ++i) {
+            var triggers = triggerMap[selected[i]] || []
+            for (var j = 0; j < triggers.length; ++j) {
+                var word = String(triggers[j]).trim()
+                if (word.length && words.indexOf(word) < 0)
+                    words.push(word)
+            }
+        }
+        activeLoraTriggers = words.length ? words.join(", ") : "Natural-language activation"
+        var promptLower = selectedPosePrompt.toLowerCase()
+        for (var k = 0; k < words.length; ++k) {
+            if (promptLower.indexOf(words[k].toLowerCase()) < 0) {
+                selectedPosePrompt = words[k] + (selectedPosePrompt.length ? ", " + selectedPosePrompt : "")
+                promptLower = selectedPosePrompt.toLowerCase()
+            }
+        }
+    }
+
+    function applyPhotorealPreset() {
+        var loras = selectedGenerationProfile.loras || []
+        var first = -1
+        var second = -1
+        for (var i = 0; i < loras.length; ++i) {
+            var name = String(loras[i]).toLowerCase()
+            if (first < 0 && name.indexOf("snofs") >= 0)
+                first = i
+            if (second < 0 && (name.indexOf("anatomy") >= 0 || name.indexOf("reality") >= 0))
+                second = i
+        }
+        loraOnePicker.currentIndex = first >= 0 ? first : 0
+        loraTwoPicker.currentIndex = second >= 0 ? second : 0
+        selectedLoraOne = loraOnePicker.currentText
+        selectedLoraTwo = loraTwoPicker.currentText
+        syncLoraTriggers()
+    }
 
     component GoldPanel: Rectangle {
         color: appRoot.panel
@@ -172,7 +217,7 @@ ApplicationWindow {
                         anchors.fill: parent; anchors.margins: 14; spacing: 10
                         SmallLabel { text: "GENESIS STATUS" }
                         FieldBox { Layout.fillWidth: true; Layout.preferredHeight: 110
-                            Text { anchors.centerIn: parent; text: "SYSTEM READY"; color: "#59d66f"; font.pixelSize: 18; font.bold: true }
+                            Text { anchors.centerIn: parent; text: runtimeStatus.ready ? "SYSTEM READY" : "CHECK REQUIRED"; color: runtimeStatus.ready ? "#59d66f" : "#e5b94f"; font.pixelSize: 18; font.bold: true }
                         }
                         SmallLabel { text: "Recent Activity" }
                         Repeater {
@@ -527,6 +572,7 @@ ApplicationWindow {
                                 Text { text: "Turn your ideas into reality."; color: appRoot.textDim; font.pixelSize: 14 }
                             }
                             Item { Layout.fillWidth: true }
+                            GoldButton { text: "Photoreal"; Layout.preferredWidth: 115; onClicked: appRoot.applyPhotorealPreset() }
                             GoldButton { text: "Load Preset"; Layout.preferredWidth: 120 }
                             GoldButton { text: "Save Preset"; Layout.preferredWidth: 120 }
                         }
@@ -545,6 +591,8 @@ ApplicationWindow {
                                             appRoot.pageIndex = 1
                                         else if (index === 2)
                                             appRoot.pageIndex = 2
+                                        else if (index === 5)
+                                            appRoot.pageIndex = 8
                                     }
                                 }
                             }
@@ -595,16 +643,22 @@ ApplicationWindow {
                                             id: loraOnePicker
                                             width: 185; height: 42
                                             model: appRoot.selectedGenerationProfile.loras
-                                            onActivated: appRoot.selectedLoraOne = currentText
+                                            onActivated: {
+                                                appRoot.selectedLoraOne = currentText
+                                                appRoot.syncLoraTriggers()
+                                            }
                                         }
                                         ComboBox {
                                             id: loraTwoPicker
                                             width: 185; height: 42
                                             model: appRoot.selectedGenerationProfile.loras
-                                            onActivated: appRoot.selectedLoraTwo = currentText
+                                            onActivated: {
+                                                appRoot.selectedLoraTwo = currentText
+                                                appRoot.syncLoraTriggers()
+                                            }
                                         }
                                     }
-                                    Text { x: 220; y: 86; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note; color: appRoot.textDim; font.pixelSize: 11; elide: Text.ElideRight }
+                                    Text { x: 220; y: 84; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note + "  ·  Triggers: " + appRoot.activeLoraTriggers; color: appRoot.textDim; font.pixelSize: 11; elide: Text.ElideRight }
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -843,6 +897,95 @@ ApplicationWindow {
                         {icon:"⚙", title:"Application Settings", detail:"Appearance, privacy, startup, and integrations.", action:"Open Settings"}
                     ]
                 }
+
+                Item {
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 8
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 58
+                            Text { text: "◐"; color: appRoot.gold; font.pixelSize: 34 }
+                            Column {
+                                Text { text: "Inpaint / Edit"; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
+                                Text { text: "Change part of an image while preserving everything else."; color: appRoot.textDim; font.pixelSize: 14 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            GoldButton { text: "Back to Create"; Layout.preferredWidth: 130; onClicked: appRoot.pageIndex = 0 }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 8
+                            GoldPanel {
+                                Layout.preferredWidth: 330
+                                Layout.fillHeight: true
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.margins: 12; spacing: 8
+                                    SmallLabel { text: "1. Source Image" }
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.fillHeight: true
+                                        color: "#151916"; border.color: appRoot.line; radius: 5
+                                        Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editSource; fillMode: Image.PreserveAspectFit }
+                                        Text { anchors.centerIn: parent; text: "DROP SOURCE IMAGE"; color: appRoot.textDim; visible: appRoot.editSource.toString().length === 0 }
+                                        DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.editSource = drop.urls[0] } }
+                                    }
+                                    GoldButton { Layout.fillWidth: true; text: "Use Current Preview" }
+                                }
+                            }
+                            GoldPanel {
+                                Layout.preferredWidth: 330
+                                Layout.fillHeight: true
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.margins: 12; spacing: 8
+                                    SmallLabel { text: "2. Mask / Reference" }
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.fillHeight: true
+                                        color: "#151916"; border.color: appRoot.line; radius: 5
+                                        Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editMask; fillMode: Image.PreserveAspectFit }
+                                        Text { anchors.centerIn: parent; text: "DROP MASK OR REFERENCE"; color: appRoot.textDim; visible: appRoot.editMask.toString().length === 0 }
+                                        DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.editMask = drop.urls[0] } }
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        GoldButton { Layout.fillWidth: true; text: "Paint Mask" }
+                                        GoldButton { Layout.fillWidth: true; text: "Clear"; onClicked: appRoot.editMask = "" }
+                                    }
+                                }
+                            }
+                            GoldPanel {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.margins: 12; spacing: 9
+                                    SmallLabel { text: "3. Edit Instructions" }
+                                    TextArea {
+                                        Layout.fillWidth: true; Layout.preferredHeight: 150
+                                        text: appRoot.editPrompt
+                                        placeholderText: "Describe only the change you want. Include lighting and camera continuity."
+                                        wrapMode: TextEdit.Wrap
+                                        color: appRoot.textMain
+                                        onTextChanged: if (activeFocus) appRoot.editPrompt = text
+                                        background: Rectangle { color: "#111513"; border.color: appRoot.line; radius: 4 }
+                                    }
+                                    SmallLabel { text: "Model & realism" }
+                                    ComboBox { Layout.fillWidth: true; model: appRoot.generationModel; textRole: "label"; currentIndex: appRoot.selectedGenerationIndex; onActivated: appRoot.selectedGenerationIndex = currentIndex }
+                                    GoldButton { Layout.fillWidth: true; text: "Apply Photoreal LoRAs"; onClicked: appRoot.applyPhotorealPreset() }
+                                    SmallLabel { text: "Edit strength  " + appRoot.editStrength.toFixed(2) }
+                                    Slider { Layout.fillWidth: true; from: 0.05; to: 0.95; stepSize: 0.05; value: appRoot.editStrength; onMoved: appRoot.editStrength = value }
+                                    Text { Layout.fillWidth: true; text: "Lower values preserve identity and composition. Higher values allow broader changes."; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Item { Layout.fillHeight: true }
+                                    GoldButton {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 54
+                                        text: "▶  Queue Image Edit"
+                                        enabled: appRoot.editSource.toString().length > 0 && appRoot.editPrompt.trim().length > 0 && appRoot.selectedGenerationProfile.ready
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -853,9 +996,9 @@ ApplicationWindow {
             RowLayout {
                 anchors.fill: parent; anchors.margins: 10; spacing: 18
                 Text { text: Qt.formatDateTime(new Date(), "ddd, d MMM yyyy   hh:mm"); color: appRoot.textMain; font.pixelSize: 12 }
-                Text { text: "ComfyUI:  ● Online"; color: "#66dd78"; font.pixelSize: 12 }
-                Text { text: "GPU: RX 9060 XT (16 GB)"; color: appRoot.textMain; font.pixelSize: 12 }
-                Text { text: "VRAM: 3.2 / 16 GB"; color: appRoot.textMain; font.pixelSize: 12 }
+                Text { text: runtimeStatus.comfyOnline ? "ComfyUI:  ● Online" : "ComfyUI:  ○ Offline"; color: runtimeStatus.comfyOnline ? "#66dd78" : "#e5b94f"; font.pixelSize: 12 }
+                Text { text: "GPU: " + runtimeStatus.gpuName; color: appRoot.textMain; font.pixelSize: 12 }
+                Text { text: "VRAM: " + runtimeStatus.vramUsedGiB + " / " + runtimeStatus.vramTotalGiB + " GB"; color: appRoot.textMain; font.pixelSize: 12 }
                 Item { Layout.fillWidth: true }
                 Text { text: "GENESIS v1.0.0"; color: appRoot.gold; font.pixelSize: 12 }
                 Text { text: "Keep walking Allan…"; color: appRoot.brightGold; font.pixelSize: 16; font.italic: true }

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.pose_prompt_profiles import PosePromptMap
+from genesis import workflow_lab
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -26,8 +28,13 @@ ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
 
 
-def build_generation_profiles(report: dict, installed_loras: list[str]) -> list[dict]:
+def build_generation_profiles(
+    report: dict,
+    installed_loras: list[str],
+    lora_triggers: dict[str, list[str]] | None = None,
+) -> list[dict]:
     """Convert filesystem readiness evidence into QML-safe model choices."""
+    lora_triggers = lora_triggers or {}
     profiles = []
     for profile in report.get("profiles", []):
         evidence = profile.get("evidence") or {}
@@ -35,20 +42,51 @@ def build_generation_profiles(report: dict, installed_loras: list[str]) -> list[
         if model_path is None:
             continue
         model_name = Path(model_path).name
+        compatible = compatible_loras(model_name, installed_loras)
         profiles.append({
             "label": str(profile.get("name") or model_name),
             "model": model_name,
             "note": compatibility_note(model_name),
-            "loras": ["None", *compatible_loras(model_name, installed_loras)],
+            "loras": ["None", *compatible],
+            "triggers": {name: lora_triggers.get(name, []) for name in compatible},
             "ready": bool(profile.get("ready")),
         })
     profiles.sort(key=lambda item: ("Klein 9B Base" not in item["label"], item["label"].casefold()))
     return profiles
 
 
+def lora_trigger_words(path: Path) -> list[str]:
+    """Extract explicit activation terms without loading LoRA tensor data."""
+    try:
+        with path.open("rb") as handle:
+            header_size = struct.unpack("<Q", handle.read(8))[0]
+            if header_size > 16 * 1024 * 1024:
+                return []
+            metadata = json.loads(handle.read(header_size)).get("__metadata__", {})
+    except (OSError, ValueError, json.JSONDecodeError, struct.error):
+        return []
+
+    words: list[str] = []
+    for key in ("modelspec.trigger_phrase", "trigger_words", "activation text"):
+        value = metadata.get(key)
+        if isinstance(value, str):
+            words.extend(part.strip() for part in value.split(",") if part.strip())
+    tag_frequency = metadata.get("ss_tag_frequency")
+    if isinstance(tag_frequency, str):
+        try:
+            groups = json.loads(tag_frequency)
+            for tags in groups.values():
+                if isinstance(tags, dict):
+                    words.extend(str(tag).strip() for tag in tags if str(tag).strip())
+        except json.JSONDecodeError:
+            pass
+    return list(dict.fromkeys(words))[:12]
+
+
 def load_generation_profiles() -> list[dict]:
     """Read installed model/LoRA names without loading any model tensors."""
     loras: set[str] = set()
+    triggers: dict[str, list[str]] = {}
     for root in MODEL_ROOTS:
         lora_root = root / "loras"
         if not lora_root.is_dir():
@@ -57,9 +95,14 @@ def load_generation_profiles() -> list[dict]:
             for path in lora_root.rglob("*"):
                 if path.is_file() and path.suffix.lower() in {".safetensors", ".pt"}:
                     loras.add(path.name)
+                    triggers[path.name] = lora_trigger_words(path)
         except OSError:
             continue
-    return build_generation_profiles(readiness_report(), sorted(loras, key=str.casefold))
+    return build_generation_profiles(
+        readiness_report(),
+        sorted(loras, key=str.casefold),
+        triggers,
+    )
 
 
 def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
@@ -124,12 +167,35 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
     return result
 
 
+def load_runtime_status() -> dict:
+    """Read live local service/GPU state without starting or stopping anything."""
+    try:
+        stats = workflow_lab.system_stats()
+        metrics = workflow_lab.gpu_metrics(stats)
+        gib = 1024 ** 3
+        return {
+            "comfyOnline": True,
+            "gpuName": metrics["name"],
+            "vramUsedGiB": round(metrics["vram_used"] / gib, 1),
+            "vramTotalGiB": round(metrics["vram_total"] / gib, 1),
+            "ready": workflow_lab.gpu_acceleration_available(stats),
+        }
+    except Exception:
+        return {
+            "comfyOnline": False,
+            "gpuName": "Unavailable",
+            "vramUsedGiB": 0,
+            "vramTotalGiB": 0,
+            "ready": False,
+        }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--screenshot")
     page_indexes = {
         "create": 0, "poses": 1, "workflow": 2, "media": 3,
-        "photos": 4, "cameras": 5, "entertainment": 6, "system": 7,
+        "photos": 4, "cameras": 5, "entertainment": 6, "system": 7, "edit": 8,
     }
     parser.add_argument("--page", choices=tuple(page_indexes), default="create")
     parser.add_argument("--banner", choices=("video", "photos"), default="video")
@@ -143,6 +209,7 @@ def main() -> int:
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
     context.setContextProperty("poseItems", load_pose_items())
     context.setContextProperty("generationProfiles", load_generation_profiles())
+    context.setContextProperty("runtimeStatus", load_runtime_status())
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
     if not engine.rootObjects():
         return 1
