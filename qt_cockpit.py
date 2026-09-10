@@ -14,7 +14,8 @@ from pathlib import Path
 from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtQml import QQmlApplicationEngine
-from PyQt6.QtQuick import QQuickWindow
+
+from genesis.pose_prompt_profiles import PosePromptMap
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -38,15 +39,32 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
     except (OSError, json.JSONDecodeError):
         return []
 
+    try:
+        prompt_map = PosePromptMap.load()
+    except (OSError, ValueError, json.JSONDecodeError):
+        prompt_map = None
+
     categories: dict[str, list[dict]] = {}
     for item in indexed if isinstance(indexed, list) else []:
         if not isinstance(item, dict) or not item.get("path"):
             continue
         source = library_root / str(item["path"])
         if source.is_file():
-            categories.setdefault(str(item.get("category", "Pose")), []).append(
-                {**item, "source": QUrl.fromLocalFile(str(source)).toString()}
-            )
+            category = str(item.get("category", "Pose"))
+            resolution = str(item.get("resolution", ""))
+            raw_name = str(item.get("name", source.stem))
+            pose_id = f"{category}/{resolution}/{raw_name}"
+            record = prompt_map.records.get(pose_id) if prompt_map is not None else None
+            categories.setdefault(category, []).append({
+                **item,
+                "source": QUrl.fromLocalFile(str(source)).toString(),
+                "poseId": pose_id,
+                "prompt": record.prompt if record else "",
+                "negativePrompt": record.negative_prompt if record else "",
+                "promptSource": record.source if record else "AUTO_FALLBACK",
+                "promptTemplateId": record.prompt_template_id if record else "",
+                "promptMapped": bool(record),
+            })
 
     result: list[dict[str, str]] = []
     while len(result) < limit and any(categories.values()):
@@ -58,6 +76,12 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
                     "category": category.replace("NSFW_", "").replace("_", " ").title(),
                     "resolution": str(item.get("resolution", "")),
                     "source": str(item["source"]),
+                    "poseId": str(item.get("poseId", "")),
+                    "prompt": str(item.get("prompt", "")),
+                    "negativePrompt": str(item.get("negativePrompt", "")),
+                    "promptSource": str(item.get("promptSource", "AUTO_FALLBACK")),
+                    "promptTemplateId": str(item.get("promptTemplateId", "")),
+                    "promptMapped": bool(item.get("promptMapped", False)),
                 })
     return result
 
@@ -91,7 +115,7 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            image = QQuickWindow.grabWindow(window)
+            image = window.grabWindow()
             if image.isNull() or not image.save(str(target)):
                 app.exit(2)
                 return

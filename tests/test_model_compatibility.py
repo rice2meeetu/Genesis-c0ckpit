@@ -3,6 +3,7 @@ import unittest
 from genesis.model_compatibility import (
     compatible_loras,
     is_compatible,
+    lora_family,
     model_family,
 )
 
@@ -11,7 +12,7 @@ class ModelCompatibilityTests(unittest.TestCase):
     def test_model_families_are_distinct(self):
         self.assertEqual(model_family("flux-2-klein-4b.safetensors"), "flux2_klein_4b")
         self.assertEqual(model_family("flux-2-klein-9b-kv-fp8.safetensors"), "flux2_klein_9b_kv")
-        self.assertEqual(model_family("flux-2-klein-base-9b.safetensors"), "flux2_klein_9b_base")
+        self.assertEqual(model_family("flux-2-klein-base-9b-Q4_K_M.gguf"), "flux2_klein_9b_base")
 
     def test_four_b_and_nine_b_loras_do_not_cross(self):
         model = "flux-2-klein-4b.safetensors"
@@ -27,16 +28,29 @@ class ModelCompatibilityTests(unittest.TestCase):
         self.assertTrue(is_compatible("unknown", "Use workflow default"))
 
     def test_aisha_has_no_implicitly_compatible_klein_lora(self):
-        self.assertFalse(is_compatible(
-            "aisha_nsfw_beta_v8_fp8.safetensors",
-            "Flux Klein - NSFW v2.safetensors",
-        ))
+        self.assertFalse(is_compatible("aisha_nsfw_beta_v8_fp8.safetensors", "Flux Klein - NSFW v2.safetensors"))
 
     def test_known_sdxl_checkpoint_accepts_sdxl_adapter(self):
-        self.assertTrue(is_compatible(
-            "juggernautXL_ragnarokBy.safetensors",
-            "add-detail-xl.safetensors",
-        ))
+        self.assertTrue(is_compatible("juggernautXL_ragnarokBy.safetensors", "add-detail-xl.safetensors"))
+
+    def test_local_krea2_loras_are_not_klein9b(self):
+        model = "flux-2-klein-base-9b-Q4_K_M.gguf"
+        for name in ("snofs_krea_v1_3D.safetensors", "lenovo_krea2_2.safetensors"):
+            self.assertEqual(lora_family(name), "krea2")
+            self.assertFalse(is_compatible(model, name))
+
+    def test_only_metadata_verified_regular_9b_loras_are_enabled(self):
+        model = "flux-2-klein-base-9b-Q4_K_M.gguf"
+        verified = [
+            "Flux Klein - NSFW v2.safetensors",
+            "Klein_Anatomy_Revamped.safetensors",
+            "flux2klein_body_version_a.safetensors",
+        ]
+        self.assertEqual(compatible_loras(model, verified), verified)
+
+    def test_explicit_unverified_names_stay_blocked_even_if_filename_matches(self):
+        self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "FLUX2_KLEIN_UNLOCKED_V1.safetensors"))
+        self.assertFalse(is_compatible("flux-2-klein-4b.safetensors", "klein4b-deepthroat-22epoc-k3nk.safetensors"))
 
 
 if __name__ == "__main__":

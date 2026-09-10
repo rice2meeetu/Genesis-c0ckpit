@@ -20,12 +20,14 @@ BLUE = "#1c3656"
 
 
 MODEL_ROOTS = (
+    Path("/mnt/AI-Storage/ComfyUI/models"),
     Path.home() / "AI" / "ComfyUI" / "models",
     Path.home() / "AI" / "AI-Models",
     Path("/run/media") / getpass.getuser() / "Ai" / "AI-Models",
 )
 
 WORKFLOW_ROOTS = (
+    Path("/mnt/AI-Storage/ComfyUI/workflows"),
     Path.home() / "AI" / "ComfyUI" / "user" / "default" / "workflows",
     Path.home() / "AI" / "GENESIS_POSE_MAKER" / "workflows",
     Path(__file__).resolve().parent / "reference" / "pose_workflows",
@@ -41,12 +43,20 @@ MODEL_PROFILES = (
         "workflow": ("aisha",),
     },
     {
-        "name": "FLUX.2 Klein 9B-KV FP8",
-        "model": ("klein-9b", "klein_9b", "klein 9b"),
-        "lora": ("klein",),
+        "name": "FLUX.2 Klein 9B Base",
+        "model": ("flux-2-klein-base-9b", "klein-base-9b"),
+        "lora": ("Flux Klein - NSFW v2", "Klein_Anatomy_Revamped", "flux2klein_body_version_a"),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_8b", "qwen3_8b"),
-        "workflow": ("klein_9b", "klein-9b", "klein 9b"),
+        "workflow": ("Flux.2 Klein 9b Text To Image", "klein-base-9b"),
+    },
+    {
+        "name": "FLUX.2 Klein 9B-KV FP8",
+        "model": ("klein9bkv", "klein-9b-kv", "klein_9b_kv"),
+        "lora": (),
+        "vae": ("flux2-vae", "ae.safetensors"),
+        "encoder": ("qwen_3_8b", "qwen3_8b"),
+        "workflow": ("KLEIN_9B_KV", "klein9bkv", "klein-9b-kv", "klein_9b_kv"),
     },
     {
         "name": "FLUX.2 Klein 4B",

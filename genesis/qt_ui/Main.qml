@@ -37,6 +37,11 @@ ApplicationWindow {
     property url selectedPoseSource: poseModel.length ? poseModel[0].source : ""
     property string selectedPoseName: poseModel.length ? poseModel[0].name : "Standing 001"
     property string selectedPoseCategory: poseModel.length ? poseModel[0].category : "Standing"
+    property string selectedPoseId: poseModel.length ? poseModel[0].poseId : ""
+    property string selectedPosePrompt: poseModel.length ? poseModel[0].prompt : ""
+    property string selectedPoseNegativePrompt: poseModel.length ? poseModel[0].negativePrompt : ""
+    property string selectedPosePromptSource: poseModel.length ? poseModel[0].promptSource : "AUTO_FALLBACK"
+    property string selectedPoseTemplateId: poseModel.length ? poseModel[0].promptTemplateId : ""
 
     component GoldPanel: Rectangle {
         color: appRoot.panel
@@ -373,7 +378,7 @@ ApplicationWindow {
                 spacing: 6
                 Repeater {
                     model: [
-                        {label:"Image Gen", page:0}, {label:"Workflow Editor", page:2},
+                        {label:"Image Gen", page:0},
                         {label:"Media Tools", page:3}, {label:"Photo Library", page:4},
                         {label:"Cam Hub", page:5}, {label:"Entertainment", page:6},
                         {label:"System", page:7}
@@ -508,19 +513,17 @@ ApplicationWindow {
                             Item { Layout.fillWidth: true }
                             GoldButton { text: "Load Preset"; Layout.preferredWidth: 120 }
                             GoldButton { text: "Save Preset"; Layout.preferredWidth: 120 }
-                            GoldButton { text: "Compare / Test"; Layout.preferredWidth: 145 }
-                            GoldButton { text: "History"; Layout.preferredWidth: 100 }
                         }
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
                             Layout.maximumHeight: 40
                             Repeater {
-                                model: ["Create", "Pose Library", "Advanced", "ControlNet", "Inpaint / Edit", "Batch", "Settings"]
+                                model: ["Create", "Pose Library", "Workflow", "Advanced", "ControlNet", "Inpaint / Edit", "Batch", "Settings"]
                                 GoldButton {
                                     text: modelData
                                     Layout.fillWidth: true
-                                    onClicked: if (index === 1) appRoot.pageIndex = 1
+                                    onClicked: { if (index === 1) appRoot.pageIndex = 1; else if (index === 2) appRoot.pageIndex = 2 }
                                 }
                             }
                         }
@@ -538,12 +541,12 @@ ApplicationWindow {
                                     GoldPanel {
                                         Layout.fillWidth: true; Layout.fillHeight: true
                                         SmallLabel { x: 10; y: 8; text: "Prompt" }
-                                        Text { x: 10; y: 34; width: parent.width - 20; wrapMode: Text.Wrap; color: appRoot.textMain; font.pixelSize: 13; text: "A highly detailed cinematic image, beautiful lighting, realistic textures..." }
+                                        TextArea { x: 8; y: 28; width: parent.width - 16; height: parent.height - 34; wrapMode: TextEdit.Wrap; color: appRoot.textMain; font.pixelSize: 13; background: Rectangle { color: "transparent" } text: appRoot.selectedPosePrompt; placeholderText: "Select a pose or enter a prompt"; onTextChanged: if (activeFocus) appRoot.selectedPosePrompt = text }
                                     }
                                     GoldPanel {
                                         Layout.fillWidth: true; Layout.fillHeight: true
                                         SmallLabel { x: 10; y: 8; text: "Negative Prompt" }
-                                        Text { x: 10; y: 34; width: parent.width - 20; wrapMode: Text.Wrap; color: appRoot.textDim; font.pixelSize: 13; text: "low quality, blurry, bad anatomy, extra fingers, text, watermark" }
+                                        TextArea { x: 8; y: 28; width: parent.width - 16; height: parent.height - 34; wrapMode: TextEdit.Wrap; color: appRoot.textDim; font.pixelSize: 13; background: Rectangle { color: "transparent" } text: appRoot.selectedPoseNegativePrompt; placeholderText: "Model-aware negative prompt"; onTextChanged: if (activeFocus) appRoot.selectedPoseNegativePrompt = text }
                                     }
                                 }
                                 GoldPanel {
@@ -553,7 +556,7 @@ ApplicationWindow {
                                     GoldButton { x: 12; y: 38; width: 185; text: "Select from Pose Library"; onClicked: appRoot.pageIndex = 1 }
                                     SmallLabel { x: 220; y: 10; text: "Model & LoRA Selection (Auto-filtered)" }
                                     Row { x: 220; y: 40; spacing: 10
-                                        Repeater { model: ["Flux.1 (Recommended)", "LoRA 1: None", "LoRA 2: None"]
+                                        Repeater { model: ["AUTO / Recommended", "LoRA 1: Compatible only", "LoRA 2: Compatible only"]
                                             FieldBox { width: 185; height: 42; Text { anchors.centerIn: parent; text: modelData + " ⌄"; color: appRoot.textMain; font.pixelSize: 12 } }
                                         }
                                     }
@@ -621,13 +624,12 @@ ApplicationWindow {
                                 Text { text: "Find the perfect pose for your vision."; color: appRoot.textDim; font.pixelSize: 14 }
                             }
                             Item { Layout.fillWidth: true }
-                            GoldButton { text: "☆  Favorites"; Layout.preferredWidth: 120 }
                             GoldButton { text: "▦  Grid"; Layout.preferredWidth: 90 }
                         }
                         RowLayout {
                             Layout.fillWidth: true; Layout.preferredHeight: 42
                             Layout.maximumHeight: 42
-                            Repeater { model: ["⌕  Search poses…", "Category  All ⌄", "Style  All ⌄", "Body Focus  All ⌄", "Perspective  All ⌄", "Sort  Newest ⌄"]
+                            Repeater { model: ["⌕  Search poses…", "Category  All ⌄", "Resolution  All ⌄", "Prompt  Mapped/All ⌄", "Model  AUTO ⌄", "Sort  Name ⌄"]
                                 FieldBox { Layout.fillWidth: true; Layout.fillHeight: true; Text { anchors.centerIn: parent; text: modelData; color: appRoot.textMain; font.pixelSize: 12 } }
                             }
                         }
@@ -637,7 +639,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: 195; Layout.fillHeight: true
                                 SmallLabel { x: 12; y: 12; text: "Categories" }
                                 Column { x: 10; y: 42; spacing: 5
-                                    Repeater { model: ["All Poses       1,284", "Favorites            42", "Standing            186", "Sitting                 210", "Kneeling             142", "Lying                    198", "Bending                96", "Action                    88", "Portrait                  74", "Couples                  64", "Artistic                 102"]
+                                    Repeater { model: ["All Poses          486", "Standing             172", "Sitting                  76", "Suspended           42", "Lying                    79", "Squatting            36", "Kneeling             33", "Split Leg              30", "All Fours             13", "Metal Stocks          5"]
                                         GoldButton { width: 175; height: 34; text: modelData }
                                     }
                                 }
@@ -662,6 +664,11 @@ ApplicationWindow {
                                                 appRoot.selectedPoseSource = modelData.source
                                                 appRoot.selectedPoseName = modelData.name
                                                 appRoot.selectedPoseCategory = modelData.category
+                                                appRoot.selectedPoseId = modelData.poseId
+                                                appRoot.selectedPosePrompt = modelData.prompt
+                                                appRoot.selectedPoseNegativePrompt = modelData.negativePrompt
+                                                appRoot.selectedPosePromptSource = modelData.promptSource
+                                                appRoot.selectedPoseTemplateId = modelData.promptTemplateId
                                             }
                                         }
                                     }
@@ -675,10 +682,9 @@ ApplicationWindow {
                                     Text { anchors.centerIn: parent; text: "SELECTED POSE PREVIEW"; color: appRoot.textDim; visible: appRoot.selectedPoseSource.toString().length === 0 }
                                 }
                                 SmallLabel { x: 12; y: parent.height * 0.43; text: "Pose Information" }
-                                Text { x: 12; y: parent.height * 0.48; text: "Category:        " + appRoot.selectedPoseCategory + "\nStyle:               Pose Guide\nPerspective:      Indexed\nBody Focus:      Full Body\nSource:              Local Pose Maker\n\nCompatible With\n● Stable Diffusion 1.5 / XL\n● SDXL\n● Flux.1\n● ControlNet (OpenPose)\n● ComfyUI"; color: appRoot.textMain; font.pixelSize: 11; lineHeight: 1.2 }
+                                Text { x: 12; y: parent.height * 0.48; width: parent.width - 24; text: "Category:        " + appRoot.selectedPoseCategory + "\nPose ID:            " + appRoot.selectedPoseId + "\nPrompt source:  " + appRoot.selectedPosePromptSource + "\n\nModel routing\n● AUTO / Recommended\n● Phr00t / Qwen reference baseline\n● Klein 9B quality profile\n● Klein 4B quick profile\n\nLoRAs are filtered by model family."; color: appRoot.textMain; font.pixelSize: 11; lineHeight: 1.2; wrapMode: Text.Wrap }
                                 Row { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.margins: 10; spacing: 8
-                                    GoldButton { width: 150; text: "♟  Use Pose" }
-                                    GoldButton { width: 155; text: "☆  Add to Favorites" }
+                                    GoldButton { width: 150; text: "♟  Use Pose"; onClicked: appRoot.pageIndex = 0 }
                                 }
                             }
                         }
@@ -692,7 +698,7 @@ ApplicationWindow {
                             GoldButton { text: "3"; Layout.preferredWidth: 42 }
                             GoldButton { text: "›"; Layout.preferredWidth: 42 }
                             Item { Layout.fillWidth: true }
-                            Text { text: "Showing 1–20 of 1,284 poses"; color: appRoot.textDim; font.pixelSize: 12 }
+                            Text { text: "486 indexed poses · 485 Grok Klein mappings · 1 AUTO fallback"; color: appRoot.textDim; font.pixelSize: 12 }
                         }
                     }
                 }
