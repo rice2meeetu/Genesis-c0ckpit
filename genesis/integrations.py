@@ -20,6 +20,7 @@ from pathlib import Path
 
 JELLYFIN_URL = "http://127.0.0.1:8096"
 LLAMA_URL = "http://127.0.0.1:8081"
+QWEN_URL = "http://127.0.0.1:8082"
 SILLYTAVERN_URL = "http://127.0.0.1:8000"
 COMFYUI_URL = "http://127.0.0.1:8188"
 GO2RTC_URL = "http://127.0.0.1:1984"
@@ -28,6 +29,7 @@ FACEFUSION_URL = "http://127.0.0.1:7860"
 SWARMUI_URL = "http://127.0.0.1:7801"
 
 LLAMA_SERVICE = "genesis-llama.service"
+QWEN_SERVICE = "genesis-qwen.service"
 SILLYTAVERN_SERVICE = "genesis-sillytavern.service"
 COMFYUI_SERVICE = "genesis-comfyui.service"
 
@@ -37,6 +39,10 @@ LLAMA_BINARY = Path(
 LLAMA_MODEL = Path(
     "/mnt/AI-Storage/LLM-Models/"
     "Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf"
+)
+QWEN_MODEL = Path(
+    "/mnt/AI-Storage/GENESIS-LLM/"
+    "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf"
 )
 SILLYTAVERN_ROOT = Path("/mnt/C/Users/p4uln/SillyTavern")
 COMFYUI_ROOT = Path.home() / "AI" / "ComfyUI"
@@ -213,6 +219,7 @@ def launch_jellyfin_desktop():
 def integration_diagnostics():
     """Return structured, non-mutating diagnostics for the local AI stack."""
     llama_online = endpoint_online(LLAMA_URL, "/health")
+    qwen_online = endpoint_online(QWEN_URL, "/health")
     silly_online = endpoint_online(SILLYTAVERN_URL, "/")
     comfy_online = endpoint_online(COMFYUI_URL, "/system_stats")
     jellyfin_online = endpoint_online(JELLYFIN_URL, "/System/Info/Public")
@@ -244,6 +251,15 @@ def integration_diagnostics():
                 LLAMA_SERVICE,
                 service_state(LLAMA_SERVICE),
                 str(LLAMA_BINARY),
+            ),
+            IntegrationDiagnostic(
+                "Qwen Assistant",
+                LLAMA_BINARY.is_file() and QWEN_MODEL.is_file(),
+                qwen_online,
+                QWEN_URL,
+                QWEN_SERVICE,
+                service_state(QWEN_SERVICE),
+                str(QWEN_MODEL),
             ),
             IntegrationDiagnostic(
                 "SillyTavern",
@@ -302,6 +318,7 @@ def integration_diagnostics():
 def status_snapshot():
     diagnostics = integration_diagnostics()
     llama_online = diagnostics["llama.cpp"]["online"]
+    qwen_online = diagnostics["Qwen Assistant"]["online"]
     silly_online = diagnostics["SillyTavern"]["online"]
     comfy_online = diagnostics["ComfyUI"]["online"]
     jellyfin_server = diagnostics["Jellyfin"]["online"]
@@ -326,6 +343,12 @@ def status_snapshot():
         "llama_model": LLAMA_MODEL.name,
         "llama_endpoint": LLAMA_URL,
         "llama_context": 12288,
+        "qwen_online": qwen_online,
+        "qwen_installed": LLAMA_BINARY.is_file() and QWEN_MODEL.is_file(),
+        "qwen_service": service_state(QWEN_SERVICE),
+        "qwen_model": QWEN_MODEL.name,
+        "qwen_endpoint": QWEN_URL,
+        "qwen_context": 8192,
         "silly_online": silly_online,
         "silly_installed": (SILLYTAVERN_ROOT / "server.js").is_file(),
         "silly_writable": mount_is_writable(SILLYTAVERN_ROOT),

@@ -1,5 +1,6 @@
 [Unit]
 Description=GENESIS existing llama.cpp ROCm server
+Conflicts=genesis-qwen.service
 ConditionPathExists=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server
 ConditionPathExists=/mnt/AI-Storage/LLM-Models/Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf
 

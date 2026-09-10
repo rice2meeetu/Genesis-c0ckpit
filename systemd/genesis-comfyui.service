@@ -6,7 +6,7 @@ ConditionPathExists=%h/AI/ComfyUI/main.py
 [Service]
 Type=simple
 WorkingDirectory=%h/AI/ComfyUI
-ExecStart=%h/miniforge3/envs/comfyui-reactor-rocm/bin/python %h/AI/ComfyUI/main.py --lowvram --async-offload --force-fp16 --listen 127.0.0.1 --port 8188
+ExecStart=%h/miniforge3/envs/comfyui-reactor-rocm/bin/python %h/AI/ComfyUI/main.py --lowvram --force-fp16 --preview-method none --cache-none --listen 127.0.0.1 --port 8188
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:%h/.local/state/genesis/comfyui.log

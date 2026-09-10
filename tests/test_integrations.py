@@ -45,6 +45,7 @@ class IntegrationTests(unittest.TestCase):
             {
                 "ComfyUI",
                 "llama.cpp",
+                "Qwen Assistant",
                 "SillyTavern",
                 "Jellyfin",
                 "go2rtc",
@@ -78,6 +79,7 @@ class IntegrationTests(unittest.TestCase):
             for name in (
                 "ComfyUI",
                 "llama.cpp",
+                "Qwen Assistant",
                 "SillyTavern",
                 "Jellyfin",
                 "go2rtc",
@@ -87,6 +89,7 @@ class IntegrationTests(unittest.TestCase):
         required = {
             "jellyfin_server",
             "llama_online",
+            "qwen_online",
             "silly_online",
             "comfy_online",
             "go2rtc_online",
