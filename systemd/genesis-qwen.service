@@ -1,0 +1,16 @@
+[Unit]
+Description=GENESIS Qwen3 local assistant
+Conflicts=genesis-llama.service
+ConditionPathExists=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server
+ConditionPathExists=/mnt/AI-Storage/GENESIS-LLM/Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf
+
+[Service]
+Type=simple
+ExecStart=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server --model /mnt/AI-Storage/GENESIS-LLM/Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf --alias genesis-qwen --host 127.0.0.1 --port 8082 --ctx-size 8192 --n-gpu-layers 99
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:%h/.local/state/genesis/qwen-assistant.log
+StandardError=append:%h/.local/state/genesis/qwen-assistant.log
+
+[Install]
+WantedBy=default.target
