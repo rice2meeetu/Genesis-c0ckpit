@@ -525,6 +525,8 @@ class GenerationBridge(QObject):
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--screenshot")
+    parser.add_argument("--width", type=int)
+    parser.add_argument("--height", type=int)
     page_indexes = {
         "create": 0, "poses": 1, "workflow": 2, "media": 3,
         "photos": 4, "cameras": 5, "entertainment": 6, "system": 7, "edit": 8,
@@ -550,6 +552,10 @@ def main() -> int:
     window = engine.rootObjects()[0]
     window.setProperty("pageIndex", page_indexes[args.page])
     window.setProperty("bannerMode", 1 if args.banner == "photos" else 0)
+    if args.width or args.height:
+        window.resize(max(900, args.width or window.width()), max(600, args.height or window.height()))
+    if not args.screenshot:
+        window.showMaximized()
     if args.screenshot:
         target = Path(args.screenshot).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)

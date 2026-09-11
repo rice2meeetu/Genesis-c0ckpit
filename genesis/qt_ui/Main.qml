@@ -9,22 +9,29 @@ ApplicationWindow {
     visible: true
     width: 1536
     height: 960
-    minimumWidth: 1280
-    minimumHeight: 760
+    minimumWidth: 900
+    minimumHeight: 600
     title: "GENESIS COCKPIT"
-    color: "#02040a"
-    font.family: "Noto Sans"
-    font.pixelSize: 14
+    color: "#000000"
+    font.family: "Noto Sans Display"
+    font.pixelSize: 15
 
-    readonly property color gold: "#e5b94f"
-    readonly property color brightGold: "#ffd978"
-    readonly property color panel: "#060b14"
-    readonly property color panelSoft: "#0b1320"
-    readonly property color panelRaised: "#101b2a"
-    readonly property color line: "#4a3a1a"
-    readonly property color lineSoft: "#29251b"
-    readonly property color textMain: "#f4e8c8"
-    readonly property color textDim: "#aaa99f"
+    readonly property color gold: "#ffd400"
+    readonly property color brightGold: "#fff176"
+    readonly property color blue: "#0b63f6"
+    readonly property color brightBlue: "#4da3ff"
+    readonly property color panel: "#030303"
+    readonly property color panelSoft: "#070b12"
+    readonly property color panelRaised: "#0a1426"
+    readonly property color line: "#1659b7"
+    readonly property color lineSoft: "#14233d"
+    readonly property color textMain: "#eef5ff"
+    readonly property color textDim: "#8fa8cc"
+    property real uiZoom: 1.0
+    readonly property real fittedScale: Math.min(
+        Math.max(1, width - 20) / 1516,
+        Math.max(1, height - 20) / 940
+    )
     FontLoader { id: genesisDisplayFont; source: "../assets/fonts/Exo2-Black.ttf" }
     property bool privacyMode: false
     property int pageIndex: 0
@@ -84,6 +91,10 @@ ApplicationWindow {
     property url photoThreeSource: ""
     property url photoFourSource: ""
     property url sideColumnImageSource: ""
+    property url bannerLeftInput: "../assets/panel_backgrounds/genesis-cockpit-banner.mp4"
+    property url bannerRightInput: "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4"
+    property url bannerLeftPoster: "../assets/panel_backgrounds/genesis-cockpit-banner-left-poster.jpg"
+    property url bannerRightPoster: "../assets/panel_backgrounds/genesis-cockpit-banner-right-poster.jpg"
     readonly property var photoBannerSources: [photoOneSource, photoTwoSource, photoThreeSource, photoFourSource]
     readonly property int bannerMode: 0 // Full-width MP4 banner
     property var poseModel: typeof poseItems !== "undefined" ? poseItems : []
@@ -169,8 +180,8 @@ ApplicationWindow {
         id: presetPopup
         x: Math.round((appRoot.width - width) / 2)
         y: Math.round((appRoot.height - height) / 2)
-        width: 780
-        height: 650
+        width: Math.min(780, appRoot.width - 40)
+        height: Math.min(650, appRoot.height - 40)
         padding: 18
         modal: true
         focus: true
@@ -265,9 +276,19 @@ ApplicationWindow {
 
     component GoldPanel: Rectangle {
         color: appRoot.panel
-        border.color: appRoot.lineSoft
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#08162e" }
+            GradientStop { position: 0.10; color: "#03070d" }
+            GradientStop { position: 1.0; color: "#000000" }
+        }
+        border.color: appRoot.line
         border.width: 1
         radius: 8
+        Rectangle { z: 40; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.leftMargin: 12; anchors.rightMargin: 12; height: 1; color: "#804da3ff" }
+        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 4; anchors.topMargin: 4; width: 18; height: 2; color: appRoot.gold }
+        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 4; anchors.topMargin: 4; width: 2; height: 18; color: appRoot.gold }
+        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 4; anchors.bottomMargin: 4; width: 18; height: 2; color: appRoot.brightBlue }
+        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 4; anchors.bottomMargin: 4; width: 2; height: 18; color: appRoot.brightBlue }
     }
 
     component GoldButton: Button {
@@ -278,14 +299,29 @@ ApplicationWindow {
         rightPadding: 12
         font.pixelSize: 14
         font.weight: active ? Font.DemiBold : Font.Medium
+        font.letterSpacing: 0.25
         contentItem: Text {
             text: control.text
-            color: !control.enabled ? "#68675f" : (control.down || control.active ? "#171006" : (control.hovered ? appRoot.brightGold : appRoot.textMain))
+            color: !control.enabled ? "#53647d" : (control.active ? "#050505" : (control.hovered ? appRoot.brightGold : appRoot.textMain))
             font: control.font
+            style: Text.Raised
+            styleColor: control.active ? "#8f6400" : "#00183d"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+            transform: Translate { y: control.down ? 2 : -1 }
         }
         background: Item {
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                y: 4
+                height: parent.height - 4
+                radius: 7
+                color: control.active ? "#725400" : "#001535"
+                border.color: "#000000"
+                border.width: 1
+                opacity: control.enabled ? 1 : 0.45
+            }
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: -3
@@ -296,15 +332,29 @@ ApplicationWindow {
                 opacity: control.active ? 0.42 : (control.hovered ? 0.20 : 0)
             }
             Rectangle {
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                y: control.down ? 3 : 0
+                height: parent.height - 4
                 radius: 6
-                border.color: !control.enabled ? appRoot.lineSoft : (control.active || control.hovered ? appRoot.brightGold : appRoot.line)
-                border.width: control.active ? 2 : 1
+                border.color: !control.enabled ? appRoot.lineSoft : (control.active ? appRoot.brightGold : (control.hovered ? appRoot.brightBlue : appRoot.blue))
+                border.width: 2
+                clip: true
                 gradient: Gradient {
-                    GradientStop { position: 0; color: control.down ? "#efc45b" : (control.active ? "#f2ca64" : (control.hovered ? "#17263a" : "#0c1421")) }
-                    GradientStop { position: 1; color: control.down ? "#a97b22" : (control.active ? "#ad7c22" : "#040811") }
+                    GradientStop { position: 0; color: control.active ? "#fff176" : (control.down ? "#0848b8" : (control.hovered ? "#1976e8" : "#0d55c7")) }
+                    GradientStop { position: 1; color: control.active ? "#e5ad00" : (control.down ? "#031d4d" : (control.hovered ? "#0a3f9a" : "#05265f")) }
                 }
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 2; height: 1; color: control.active || control.hovered ? "#80ffe8a3" : "#18ffffff" }
+                Rectangle {
+                    z: 1
+                    width: 24
+                    height: parent.height * 1.7
+                    x: parent.width - 21
+                    y: -parent.height * 0.3
+                    rotation: 22
+                    color: control.active ? "#33ffffff" : "#294da3ff"
+                }
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.leftMargin: 3; anchors.rightMargin: 3; anchors.topMargin: 2; height: 2; radius: 1; color: control.active ? "#ccfff9bd" : "#bb76bdff" }
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.leftMargin: 3; anchors.rightMargin: 3; anchors.bottomMargin: 1; height: 3; radius: 1; color: control.active ? "#a06b3d00" : "#b000102c" }
             }
         }
     }
@@ -331,18 +381,30 @@ ApplicationWindow {
             color: picker.hovered ? appRoot.brightGold : appRoot.gold
             font.pixelSize: 18
         }
-        background: Rectangle {
-            color: picker.pressed ? "#17263a" : "#09111e"
-            border.color: picker.hovered || picker.popup.visible ? appRoot.brightGold : appRoot.line
-            border.width: picker.popup.visible ? 2 : 1
-            radius: 6
+        background: Item {
+            Rectangle { anchors.left: parent.left; anchors.right: parent.right; y: 4; height: parent.height - 4; radius: 6; color: "#00142f" }
+            Rectangle {
+                anchors.left: parent.left; anchors.right: parent.right
+                y: picker.pressed ? 3 : 0
+                height: parent.height - 4
+                color: picker.pressed ? "#0a3f9a" : "#061a3b"
+                border.color: picker.hovered || picker.popup.visible ? appRoot.brightGold : appRoot.blue
+                border.width: 2
+                radius: 6
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 2; height: 2; color: "#704da3ff" }
+                Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.rightMargin: 7; width: 3; height: parent.height * 0.55; color: appRoot.gold; opacity: 0.75 }
+            }
         }
         delegate: ItemDelegate {
             width: picker.width
             height: 40
             contentItem: Text {
-                text: picker.textRole ? model[picker.textRole] : modelData
-                color: highlighted ? "#171006" : appRoot.textMain
+                text: {
+                    if (picker.textRole && typeof model !== "undefined" && model[picker.textRole] !== undefined)
+                        return String(model[picker.textRole])
+                    return typeof modelData !== "undefined" ? String(modelData) : ""
+                }
+                color: highlighted ? "#050505" : appRoot.textMain
                 font.family: appRoot.font.family
                 font.pixelSize: 13
                 verticalAlignment: Text.AlignVCenter
@@ -367,8 +429,8 @@ ApplicationWindow {
     }
 
     component FieldBox: Rectangle {
-        color: "#111513"
-        border.color: "#30332d"
+        color: "#050b16"
+        border.color: appRoot.line
         radius: 4
     }
 
@@ -377,6 +439,9 @@ ApplicationWindow {
         font.family: appRoot.font.family
         font.pixelSize: 14
         font.bold: true
+        font.letterSpacing: 0.3
+        style: Text.Raised
+        styleColor: "#003a8c"
     }
 
     component ModulePage: Item {
@@ -393,7 +458,7 @@ ApplicationWindow {
             fillMode: Image.PreserveAspectCrop
             opacity: 0.09
         }
-        Rectangle { anchors.fill: parent; color: "#c0020710" }
+        Rectangle { anchors.fill: parent; color: "#e0000000" }
 
         ColumnLayout {
             anchors.fill: parent
@@ -404,7 +469,7 @@ ApplicationWindow {
                 Layout.maximumHeight: 58
                 Text { text: pageIcon; color: appRoot.gold; font.pixelSize: 34 }
                 Column {
-                    Text { text: pageTitle; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
+                    Text { text: pageTitle; color: appRoot.brightGold; font.family: genesisDisplayFont.name; font.pixelSize: 27; font.bold: true; font.letterSpacing: 0.4 }
                     Text { text: pageSubtitle; color: appRoot.textDim; font.pixelSize: 14 }
                 }
                 Item { Layout.fillWidth: true }
@@ -449,8 +514,8 @@ ApplicationWindow {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    color: index % 2 ? "#111512" : "#161914"
-                                    border.color: "#302b1c"
+                                    color: index % 2 ? "#050b16" : "#071329"
+                                    border.color: appRoot.line
                                     radius: 4
                                     Text { anchors.centerIn: parent; text: modelData.icon; color: appRoot.gold; font.pixelSize: 46 }
                                 }
@@ -468,7 +533,7 @@ ApplicationWindow {
                         anchors.fill: parent; anchors.margins: 14; spacing: 10
                         SmallLabel { text: "GENESIS STATUS" }
                         FieldBox { Layout.fillWidth: true; Layout.preferredHeight: 110
-                            Text { anchors.centerIn: parent; text: runtimeStatus.ready ? "SYSTEM READY" : "CHECK REQUIRED"; color: runtimeStatus.ready ? "#59d66f" : "#e5b94f"; font.pixelSize: 18; font.bold: true }
+                            Text { anchors.centerIn: parent; text: runtimeStatus.ready ? "SYSTEM READY" : "CHECK REQUIRED"; color: runtimeStatus.ready ? "#59d66f" : appRoot.gold; font.pixelSize: 18; font.bold: true }
                         }
                         SmallLabel { text: "Recent Activity" }
                         Repeater {
@@ -480,7 +545,7 @@ ApplicationWindow {
                         GoldButton { Layout.fillWidth: true; text: "Open Output Folder"; onClicked: genesisBridge.openOutputFolder() }
                         GoldButton { Layout.fillWidth: true; text: "GENESIS AI Assistant"; enabled: false }
                         Item { Layout.fillHeight: true }
-                        Text { Layout.fillWidth: true; text: "Preview module. Disabled controls are not connected to the Qt cockpit yet."; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                        Text { Layout.fillWidth: true; text: "Preview module. Disabled controls are not connected to the Qt cockpit yet."; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                     }
                 }
             }
@@ -489,7 +554,7 @@ ApplicationWindow {
 
     MediaPlayer {
         id: leftPlayer
-        source: "../assets/panel_backgrounds/genesis-cockpit-banner.mp4"
+        source: appRoot.bannerLeftInput
         loops: MediaPlayer.Infinite
         videoOutput: leftVideo
         audioOutput: AudioOutput { muted: true }
@@ -497,16 +562,32 @@ ApplicationWindow {
     }
     MediaPlayer {
         id: rightPlayer
-        source: "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4"
+        source: appRoot.bannerRightInput
         loops: MediaPlayer.Infinite
         videoOutput: rightVideo
         audioOutput: AudioOutput { muted: true }
         Component.onCompleted: play()
     }
+    MediaPlayer {
+        id: rightColumnPlayer
+        source: "../assets/panel_backgrounds/genesis-cockpit-banner-secondary.mp4"
+        loops: MediaPlayer.Infinite
+        videoOutput: rightColumnVideo
+        audioOutput: AudioOutput { muted: true }
+        Component.onCompleted: play()
+    }
+
+    Shortcut { sequence: "Ctrl+="; onActivated: appRoot.uiZoom = Math.min(1.25, appRoot.uiZoom + 0.05) }
+    Shortcut { sequence: "Ctrl++"; onActivated: appRoot.uiZoom = Math.min(1.25, appRoot.uiZoom + 0.05) }
+    Shortcut { sequence: "Ctrl+-"; onActivated: appRoot.uiZoom = Math.max(0.75, appRoot.uiZoom - 0.05) }
+    Shortcut { sequence: "Ctrl+0"; onActivated: appRoot.uiZoom = 1.0 }
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 10
+        width: 1516
+        height: 940
+        anchors.centerIn: parent
+        scale: appRoot.fittedScale * appRoot.uiZoom
+        transformOrigin: Item.Center
         spacing: 8
 
         GoldPanel {
@@ -519,9 +600,9 @@ ApplicationWindow {
                 anchors.fill: parent
                 gradient: Gradient {
                     orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: "#120d04" }
-                    GradientStop { position: 0.5; color: "#020303" }
-                    GradientStop { position: 1; color: "#120d04" }
+                    GradientStop { position: 0; color: "#020b1b" }
+                    GradientStop { position: 0.5; color: "#000000" }
+                    GradientStop { position: 1; color: "#020b1b" }
                 }
             }
 
@@ -535,7 +616,7 @@ ApplicationWindow {
                 anchors.rightMargin: parent.width * 0.25
                 visible: !appRoot.privacyMode
 
-                Rectangle { anchors.fill: parent; color: "#030403" }
+                Rectangle { anchors.fill: parent; color: "#000000" }
                 Image {
                     anchors.fill: parent
                     anchors.margins: 5
@@ -551,7 +632,7 @@ ApplicationWindow {
                     width: Math.min(parent.width - 40, 410)
                     height: 30
                     radius: 15
-                    color: "#e6030403"
+                    color: "#ed000000"
                     border.color: appRoot.line
                     Text {
                         anchors.centerIn: parent
@@ -563,6 +644,26 @@ ApplicationWindow {
                 }
             }
 
+            Image {
+                z: 0
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * 0.25
+                source: appRoot.bannerLeftPoster
+                fillMode: Image.PreserveAspectCrop
+                visible: !appRoot.privacyMode
+            }
+            Image {
+                z: 0
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: parent.width * 0.25
+                source: appRoot.bannerRightPoster
+                fillMode: Image.PreserveAspectCrop
+                visible: !appRoot.privacyMode
+            }
             VideoOutput {
                 id: leftVideo
                 z: 0
@@ -587,7 +688,7 @@ ApplicationWindow {
             Rectangle {
                 z: 4
                 anchors.fill: parent
-                color: "#050706"
+                color: "#000000"
                 border.color: appRoot.gold
                 visible: appRoot.privacyMode
                 Text { anchors.centerIn: parent; text: "PRIVATE"; color: appRoot.gold; font.pixelSize: 18; font.letterSpacing: 4 }
@@ -604,7 +705,7 @@ ApplicationWindow {
                 spacing: 7
                 Repeater {
                     model: [
-                        {label:"Create", page:0}, {label:"Poses", page:1},
+                        {label:"⌂ Home", page:0}, {label:"Poses", page:1},
                         {label:"Workflows", page:2}, {label:"Media", page:3},
                         {label:"Photos", page:4}, {label:"Cameras", page:5},
                         {label:"Entertainment", page:6}, {label:"System", page:7}
@@ -673,6 +774,11 @@ ApplicationWindow {
                             border.width: 2
                             radius: 8
                         }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: appRoot.pageIndex = 0
+                        }
                     }
                     Repeater {
                         model: [
@@ -696,7 +802,7 @@ ApplicationWindow {
                     anchors.bottom: parent.bottom
                     anchors.margins: 9
                     height: Math.min(185, parent.height * 0.22)
-                    color: "#090b0a"
+                    color: "#020817"
                     border.color: appRoot.line
                     radius: 5
                     clip: true
@@ -713,7 +819,7 @@ ApplicationWindow {
                         spacing: 5
                         visible: appRoot.sideColumnImageSource.toString().length === 0 && !appRoot.privacyMode
                         Text { anchors.horizontalCenter: parent.horizontalCenter; text: "+"; color: appRoot.gold; font.pixelSize: 28 }
-                        Text { text: "COLUMN PHOTO"; color: appRoot.textDim; font.pixelSize: 11; font.letterSpacing: 1 }
+                        Text { text: "COLUMN PHOTO"; color: appRoot.textDim; font.pixelSize: 12; font.letterSpacing: 1 }
                     }
                     Text {
                         anchors.centerIn: parent
@@ -741,7 +847,7 @@ ApplicationWindow {
                             Layout.maximumHeight: 52
                             Text { text: "♟"; color: appRoot.gold; font.pixelSize: 32 }
                             Column {
-                                Text { text: "Image Generation"; color: appRoot.brightGold; font.pixelSize: 24; font.bold: true }
+                                Text { text: "Image Generation"; color: appRoot.brightGold; font.family: genesisDisplayFont.name; font.pixelSize: 25; font.bold: true; font.letterSpacing: 0.4 }
                                 Text { text: "Create with your verified local models."; color: appRoot.textDim; font.pixelSize: 13 }
                             }
                             Item { Layout.fillWidth: true }
@@ -829,7 +935,7 @@ ApplicationWindow {
                                             enabled: false
                                         }
                                     }
-                                    Text { x: 220; y: 84; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note + "  ·  Triggers: " + appRoot.activeLoraTriggers; color: appRoot.textDim; font.pixelSize: 11; elide: Text.ElideRight }
+                                    Text { x: 220; y: 84; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note + "  ·  Triggers: " + appRoot.activeLoraTriggers; color: appRoot.textDim; font.pixelSize: 12; elide: Text.ElideRight }
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -843,7 +949,7 @@ ApplicationWindow {
                                         GoldPanel {
                                             Layout.fillWidth: true; Layout.fillHeight: true
                                             SmallLabel { x: 10; y: 10; text: modelData.title }
-                                            Rectangle { x: 10; y: 40; width: 105; height: parent.height - 82; color: "#181b18"; border.color: appRoot.line
+                                            Rectangle { x: 10; y: 40; width: 105; height: parent.height - 82; color: "#050b16"; border.color: appRoot.line
                                                 Text { anchors.centerIn: parent; text: "PREVIEW"; color: appRoot.textDim }
                                             }
                                             Text { x: 126; y: 42; width: parent.width - 138; text: modelData.model + "\n\n" + modelData.detail; color: appRoot.textMain; font.pixelSize: 13; lineHeight: 1.4 }
@@ -881,8 +987,22 @@ ApplicationWindow {
                             GoldPanel {
                                 Layout.preferredWidth: 370
                                 Layout.fillHeight: true
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    source: "../assets/panel_backgrounds/panel-01-image-generate.jpg"
+                                    fillMode: Image.PreserveAspectCrop
+                                    opacity: appRoot.privacyMode ? 0 : 0.16
+                                }
+                                VideoOutput {
+                                    id: rightColumnVideo
+                                    anchors.fill: parent
+                                    fillMode: VideoOutput.PreserveAspectCrop
+                                    opacity: appRoot.privacyMode ? 0 : 0.22
+                                }
+                                Rectangle { anchors.fill: parent; color: "#9e000000" }
                                 SmallLabel { x: 12; y: 10; text: "Preview" }
-                                Rectangle { x: 10; y: 38; width: parent.width - 20; height: parent.height * 0.48; color: "#171a18"; border.color: appRoot.line
+                                Rectangle { x: 10; y: 38; width: parent.width - 20; height: parent.height * 0.48; color: "#050b16"; border.color: appRoot.line
                                     Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
                                     Text { anchors.centerIn: parent; text: "GENERATED IMAGE PREVIEW"; color: appRoot.textDim; visible: genesisBridge.previewUrl.length === 0 }
                                 }
@@ -946,7 +1066,7 @@ ApplicationWindow {
                                     model: appRoot.poseModel
                                     GoldPanel {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        Rectangle { anchors.fill: parent; anchors.margins: 5; color: index % 2 ? "#181b18" : "#20231f"
+                                        Rectangle { anchors.fill: parent; anchors.margins: 5; color: index % 2 ? "#050b16" : "#071329"
                                             Image { anchors.fill: parent; source: modelData.source; fillMode: Image.PreserveAspectFit; asynchronous: true; cache: true }
                                         }
                                         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 24; color: "#b0000000"
@@ -979,7 +1099,7 @@ ApplicationWindow {
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: Math.min(180, parent.height * 0.36)
-                                        color: "#191c19"; border.color: appRoot.line
+                                        color: "#050b16"; border.color: appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 4; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
                                         Text { anchors.centerIn: parent; text: "SELECTED POSE PREVIEW"; color: appRoot.textDim; visible: appRoot.selectedPoseSource.toString().length === 0 }
                                     }
@@ -988,7 +1108,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         text: "Category:  " + appRoot.selectedPoseCategory + "\nPose ID:  " + appRoot.selectedPoseId + "\nPrompt source:  " + appRoot.selectedPosePromptSource + "\n485 mapped poses · model-safe LoRA filtering"
                                         color: appRoot.textMain
-                                        font.pixelSize: 11
+                                        font.pixelSize: 12
                                         lineHeight: 1.2
                                         wrapMode: Text.Wrap
                                     }
@@ -1131,7 +1251,7 @@ ApplicationWindow {
                             Layout.preferredHeight: 58
                             Text { text: "◐"; color: appRoot.gold; font.pixelSize: 34 }
                             Column {
-                                Text { text: "Inpaint / Edit"; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
+                                Text { text: "Inpaint / Edit"; color: appRoot.brightGold; font.family: genesisDisplayFont.name; font.pixelSize: 27; font.bold: true; font.letterSpacing: 0.4 }
                                 Text { text: "Change part of an image while preserving everything else."; color: appRoot.textDim; font.pixelSize: 14 }
                             }
                             Item { Layout.fillWidth: true }
@@ -1149,7 +1269,7 @@ ApplicationWindow {
                                     SmallLabel { text: "1. Source Image" }
                                     Rectangle {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        color: "#151916"; border.color: appRoot.line; radius: 5
+                                        color: "#050b16"; border.color: appRoot.line; radius: 5
                                         Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editSource; fillMode: Image.PreserveAspectFit }
                                         Text { anchors.centerIn: parent; text: "DROP SOURCE IMAGE"; color: appRoot.textDim; visible: appRoot.editSource.toString().length === 0 }
                                         DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.editSource = drop.urls[0] } }
@@ -1170,7 +1290,7 @@ ApplicationWindow {
                                     SmallLabel { text: "2. Mask / Reference (not connected)" }
                                     Rectangle {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        color: "#151916"; border.color: appRoot.line; radius: 5
+                                        color: "#050b16"; border.color: appRoot.line; radius: 5
                                         Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editMask; fillMode: Image.PreserveAspectFit }
                                         Text { anchors.centerIn: parent; text: "DROP MASK OR REFERENCE"; color: appRoot.textDim; visible: appRoot.editMask.toString().length === 0 }
                                         DropArea { anchors.fill: parent; enabled: false }
@@ -1195,7 +1315,7 @@ ApplicationWindow {
                                         wrapMode: TextEdit.Wrap
                                         color: appRoot.textMain
                                         onTextChanged: if (activeFocus) appRoot.editPrompt = text
-                                        background: Rectangle { color: "#111513"; border.color: appRoot.line; radius: 4 }
+                                        background: Rectangle { color: "#050b16"; border.color: appRoot.line; radius: 4 }
                                     }
                                     SmallLabel { text: "Fast edit engine" }
                                     FieldBox {
@@ -1205,17 +1325,17 @@ ApplicationWindow {
                                     }
                                     SmallLabel { text: "Edit strength  " + appRoot.editStrength.toFixed(2) }
                                     Slider { Layout.fillWidth: true; from: 0.05; to: 0.95; stepSize: 0.05; value: appRoot.editStrength; onMoved: appRoot.editStrength = value }
-                                    Text { Layout.fillWidth: true; text: "Lower values preserve identity and composition. Higher values allow broader changes."; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: "Lower values preserve identity and composition. Higher values allow broader changes."; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 105
-                                        color: "#151916"
+                                        color: "#050b16"
                                         border.color: appRoot.line
                                         radius: 4
                                         Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
                                         Text { anchors.centerIn: parent; text: "EDIT PREVIEW"; color: appRoot.textDim; visible: genesisBridge.previewUrl.length === 0 }
                                     }
-                                    Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                                     Item { Layout.fillHeight: true }
                                     GoldButton {
                                         Layout.fillWidth: true
@@ -1243,7 +1363,7 @@ ApplicationWindow {
             RowLayout {
                 anchors.fill: parent; anchors.margins: 10; spacing: 18
                 Text { text: Qt.formatDateTime(new Date(), "ddd, d MMM yyyy   hh:mm"); color: appRoot.textMain; font.pixelSize: 12 }
-                Text { text: runtimeStatus.comfyOnline ? "ComfyUI:  ● Online" : "ComfyUI:  ○ Offline"; color: runtimeStatus.comfyOnline ? "#66dd78" : "#e5b94f"; font.pixelSize: 12 }
+                Text { text: runtimeStatus.comfyOnline ? "ComfyUI:  ● Online" : "ComfyUI:  ○ Offline"; color: runtimeStatus.comfyOnline ? "#66dd78" : appRoot.gold; font.pixelSize: 12 }
                 Text { text: "GPU: " + runtimeStatus.gpuName; color: appRoot.textMain; font.pixelSize: 12 }
                 Text { text: "VRAM: " + runtimeStatus.vramUsedGiB + " / " + runtimeStatus.vramTotalGiB + " GB"; color: appRoot.textMain; font.pixelSize: 12 }
                 Item { Layout.fillWidth: true }
