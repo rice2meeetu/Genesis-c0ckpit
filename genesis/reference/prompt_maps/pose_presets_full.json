@@ -1,0 +1,400 @@
+{
+  "meta": {
+    "title": "GENESIS Pose Presets",
+    "target_model_default": "Qwen-Rapid-AIO-NSFW-v19",
+    "identity_mode": "Strict Identity Lock (image1=identity, image2=pose geometry)",
+    "created_for": "GENESIS Pose Maker standalone UI",
+    "total_presets": 70
+  },
+  "core_template": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: {pose}.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus.",
+  "stages": {
+    "stage_1": {
+      "name": "Stage 1 – Main Generation",
+      "default_model": "Qwen-Rapid-AIO-NSFW-v19",
+      "purpose": "Identity + Pose",
+      "user_can_swap_model": true,
+      "recommended_settings": "Steps 4-8, CFG ≈ 1.0, euler / euler_ancestral + beta"
+    },
+    "stage_2": {
+      "name": "Stage 2 – Refine / Upscale",
+      "purpose": "Skin detail, realism, optional upscale",
+      "examples": [
+        "Lustify",
+        "other refiners",
+        "upscalers"
+      ],
+      "optional": true
+    },
+    "stage_3": {
+      "name": "Stage 3 – ReActor FaceLock",
+      "purpose": "Final face consistency",
+      "optional": true
+    }
+  },
+  "categories": {
+    "Oral_BJ": [
+      {
+        "id": "bj_close",
+        "name": "BJ Close",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: close-up blowjob, woman leaning forward, mouth around the penis, detailed lips and tongue, eyes looking up.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_eye_contact",
+        "name": "BJ Eye Contact",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: blowjob with strong direct eye contact, woman looking straight at the viewer while performing oral sex, face clearly visible.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_kneeling",
+        "name": "BJ Kneeling",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman kneeling on the floor performing fellatio, looking up at the partner, upper body and face clearly visible.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "deepthroat",
+        "name": "Deepthroat",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: deepthroat, woman taking the penis deep into her mouth and throat, slight angle showing face and neck.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "handjob_licking",
+        "name": "Handjob + Licking",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman holding the penis with one hand and licking the tip, looking at the viewer.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_from_above",
+        "name": "BJ From Above (POV)",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: blowjob from above, looking up at the viewer, mouth around the penis, clear view of face and eyes.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_side_view",
+        "name": "BJ Side View",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: side-view blowjob, woman on her knees, profile of face and mouth clearly visible.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_balls",
+        "name": "Licking Balls",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman licking and sucking the testicles, looking up, detailed face.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_with_hand",
+        "name": "BJ with Hand Stroke",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: blowjob while stroking the shaft with one hand, eye contact, detailed lips.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bj_after",
+        "name": "After Oral (Face)",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: close-up of woman's face after oral sex, lips slightly open, intimate expression.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Missionary": [
+      {
+        "id": "missionary_classic",
+        "name": "Classic Missionary",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary position, woman on her back, legs open, man on top, clear view of faces and penetration.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_legs_up",
+        "name": "Missionary Legs Up",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary with legs raised high and spread, deep penetration, woman looking at partner or viewer.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "mating_press",
+        "name": "Mating Press",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: mating press, woman’s legs folded up toward her chest, deep penetration, intimate and intense.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_legs_shoulders",
+        "name": "Legs on Shoulders",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary with woman’s legs resting on the man’s shoulders, deep angle, faces close.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_creampie",
+        "name": "Missionary Creampie",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary position just after climax, semen visible and slightly overflowing, intimate expression.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_holding_legs",
+        "name": "Holding Own Legs",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary, woman holding her own legs up and open, deep penetration, eye contact.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_side_angle",
+        "name": "Missionary Side Angle",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary from a slight side angle, legs open, clear view of bodies and faces.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_wrists",
+        "name": "Wrists Held",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary with man’s hands holding woman’s wrists above her head, intimate.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_slow",
+        "name": "Slow Intimate Missionary",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: slow missionary, faces close together, intimate eye contact, gentle.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "missionary_legs_together",
+        "name": "Legs Together",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: missionary with legs closer together, tight angle, focused on faces and connection.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Doggy": [
+      {
+        "id": "doggy_classic",
+        "name": "Classic Doggy",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style, woman on all fours, arched back, looking back over her shoulder.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "prone_bone",
+        "name": "Prone Bone",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: prone bone, woman lying flat on her stomach, man on top from behind.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "face_down_ass_up",
+        "name": "Face Down Ass Up",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: face down ass up, woman’s chest and face on the bed, hips raised high.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_doggy",
+        "name": "Standing Doggy",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing sex from behind, woman bent forward slightly, hands on a surface.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_creampie",
+        "name": "Doggy Creampie",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style after climax, semen visible and dripping, woman looking back.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_hair_pull",
+        "name": "Doggy Hair Pull",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style with hair being pulled, arched back, looking back over her shoulder.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_low_angle",
+        "name": "Doggy Low Angle",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style from a low angle behind, arched back, detailed.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_on_bed_edge",
+        "name": "Doggy on Bed Edge",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style with woman on the edge of the bed, feet on the floor.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_looking_forward",
+        "name": "Doggy Looking Forward",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style, woman looking forward, arched back, strong posture.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "doggy_reach_back",
+        "name": "Doggy Reaching Back",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: doggy style, woman reaching back with one hand, looking over shoulder.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Cowgirl": [
+      {
+        "id": "cowgirl_classic",
+        "name": "Classic Cowgirl",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl position, woman on top facing the viewer, straddling and riding.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "reverse_cowgirl",
+        "name": "Reverse Cowgirl",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: reverse cowgirl, woman facing away, looking back over her shoulder.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_leaning",
+        "name": "Cowgirl Leaning Forward",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl leaning forward, hands on the man’s chest or bed, deep penetration.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "squatting_cowgirl",
+        "name": "Squatting Cowgirl",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman in a low squat cowgirl position, riding with thighs engaged.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_hands_chest",
+        "name": "Cowgirl Hands on Chest",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl, woman on top with hands on the man’s chest, looking at the viewer while riding.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_leaning_back",
+        "name": "Cowgirl Leaning Back",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl leaning back, hands behind her for support, chest forward.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_side_view",
+        "name": "Cowgirl Side View",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl from the side, clear profile of both bodies.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "reverse_cowgirl_ass",
+        "name": "Reverse Cowgirl Ass Focus",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: reverse cowgirl with strong focus on the woman’s back and ass, looking back.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_grinding",
+        "name": "Grinding Cowgirl",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl with slow grinding motion, intimate, faces close.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "cowgirl_creampie",
+        "name": "Cowgirl Creampie",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: cowgirl position after climax, semen visible, woman still on top.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Seated_Chair": [
+      {
+        "id": "creampie_chair",
+        "name": "Creampie Chair",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: seated or reclining on a chair after sex, legs open, semen visible and dripping.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "lap_riding_facing",
+        "name": "Lap Riding Facing",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman sitting on the man’s lap facing him, arms around his neck, intimate.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "lap_riding_reverse",
+        "name": "Lap Riding Reverse",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman sitting on the man’s lap facing away, leaning back slightly.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "chair_straddle",
+        "name": "Chair Straddle",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman straddling a chair, legs open, upright posture.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "edge_of_bed",
+        "name": "Edge of Bed Seated",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman seated on the edge of the bed, legs open, partner between her legs.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "chair_leaning_back",
+        "name": "Chair Leaning Back",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman leaning back in a chair, legs spread, relaxed after sex.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "lap_dance_into_sex",
+        "name": "Lap into Sex",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman on man’s lap transitioning from lap dance into sex, intimate.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "seated_spoon",
+        "name": "Seated Spooning",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: seated spooning on a chair or couch, bodies close.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "chair_one_leg_up",
+        "name": "Chair One Leg Up",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman seated with one leg raised and held, partner close.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "aftercare_chair",
+        "name": "Aftercare on Chair",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman sitting relaxed on a chair after sex, soft expression, legs slightly open.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Standing": [
+      {
+        "id": "standing_from_behind",
+        "name": "Standing From Behind",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing sex from behind, woman slightly bent forward, hands against a wall or surface.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_face_to_face",
+        "name": "Standing Face to Face",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing face-to-face sex, one of the woman’s legs raised and held.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "against_wall",
+        "name": "Against Wall",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman pressed against a wall, legs wrapped or one leg raised, intimate standing sex.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "against_wall_behind",
+        "name": "Against Wall From Behind",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman pressed against a wall from behind, hands on the wall, standing sex.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_lifted_leg",
+        "name": "Standing Lifted Leg",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing sex, one of the woman’s legs raised and held by the man, intimate face-to-face.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_full_nelson",
+        "name": "Standing Full Nelson Style",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing position with woman’s legs held up, deep penetration, intense.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "bent_over_table",
+        "name": "Bent Over Table",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman bent over a table or desk, standing sex from behind.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_creampie",
+        "name": "Standing Creampie",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing sex just after climax, semen visible, bodies still close.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "lifted_carry",
+        "name": "Lifted / Carried",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: woman being held up with legs around the man’s waist, standing sex.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "standing_side",
+        "name": "Standing Side Angle",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: standing sex from a side angle, clear view of both bodies.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ],
+    "Spooning_Side": [
+      {
+        "id": "spooning_classic",
+        "name": "Classic Spooning",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: spooning side sex, bodies close together, intimate and relaxed.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "side_leg_raised",
+        "name": "Side with Leg Raised",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: side sex with the woman’s top leg raised and held, clear view of penetration.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "spooning_creampie",
+        "name": "Spooning Creampie",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: spooning position after climax, semen visible, intimate afterglow.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "spooning_eye_contact",
+        "name": "Spooning Eye Contact",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: spooning side sex with the woman looking back over her shoulder at the partner, intimate.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "side_face_to_face",
+        "name": "Side Face to Face",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: both lying on their sides facing each other, intimate sex, legs intertwined.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "spooning_lazy",
+        "name": "Lazy Morning Spooning",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: relaxed spooning, soft morning light feel, intimate and slow.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "side_from_behind",
+        "name": "Side From Behind",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: both on their sides, man behind, deep spooning penetration.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "side_one_leg_over",
+        "name": "One Leg Over",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: side position with woman’s top leg draped over the man.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "afterglow_side",
+        "name": "Afterglow Side by Side",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: lying on their sides after sex, close, soft expressions, semen visible.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      },
+      {
+        "id": "side_intimate_closeup",
+        "name": "Side Intimate Close-up",
+        "prompt": "Keep the exact same person, face, hair, body proportions and appearance from image1. Do not change facial features. Maintain pixel-perfect fidelity to the original face.\nPose: close-up side sex, faces and upper bodies in frame, intimate.\nPhotorealistic, natural skin texture, realistic anatomy, professional digital photography, sharp focus."
+      }
+    ]
+  }
+}

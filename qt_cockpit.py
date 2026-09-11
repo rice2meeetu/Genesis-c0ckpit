@@ -103,6 +103,25 @@ def lora_trigger_words(path: Path) -> list[str]:
     return list(dict.fromkeys(words))[:12]
 
 
+
+def load_grok_preset_items() -> list[dict]:
+    p = PROJECT_ROOT / "genesis/reference/prompt_maps/pose_presets_full.json"
+    if not p.is_file():
+        return []
+    try:
+        d = __import__("json").loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out = [{"label": "Grok preset…", "prompt": ""}]
+    for cat, rows in d.get("categories", {}).items():
+        for row in rows or []:
+            if row.get("prompt"):
+                out.append({
+                    "label": f"{cat.replace('_', '/')} · {row.get('name', row.get('id', 'Preset'))}",
+                    "prompt": row["prompt"],
+                })
+    return out
+
 def load_generation_profiles() -> list[dict]:
     """Read installed model/LoRA names without loading any model tensors."""
     loras: set[str] = set()
@@ -542,6 +561,7 @@ def main() -> int:
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
     context.setContextProperty("poseItems", load_pose_items())
+    context.setContextProperty("grokPresetItems", load_grok_preset_items())
     context.setContextProperty("generationProfiles", load_generation_profiles())
     context.setContextProperty("runtimeStatus", load_runtime_status())
     generation_bridge = GenerationBridge(app)

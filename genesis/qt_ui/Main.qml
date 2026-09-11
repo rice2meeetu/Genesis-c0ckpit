@@ -58,7 +58,7 @@ ApplicationWindow {
         "../assets/panel_backgrounds/genesis-cockpit-banner.mp4",
         "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4"
     ]
-    readonly property var grokGeometryPresets: [
+    readonly property var grokGeometryPresets: (typeof grokPresetItems !== "undefined" && grokPresetItems.length > 0) ? grokPresetItems : [
         {label:"Grok preset…", prompt:""},
         {label:"BACK-LYING · HIGH", prompt:"Back-lying pose, legs raised or open as needed, high-angle camera looking down. Keep body geometry natural and preserve image1 identity."},
         {label:"BACK-LYING · SIDE", prompt:"Back-lying pose, legs raised, clear side-profile camera angle. Preserve image1 identity and use the pose reference only for geometry."},
