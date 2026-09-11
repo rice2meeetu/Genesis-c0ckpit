@@ -217,6 +217,7 @@ ApplicationWindow {
                             appRoot.selectedPosePromptSource = "GROK_GEOMETRY_PRESET"
                             appRoot.activeGrokPreset = modelData.label
                             appRoot.activePresetStatus = "Grok guide loaded: " + modelData.label
+                            presetPopup.close()
                         }
                     }
                 }
