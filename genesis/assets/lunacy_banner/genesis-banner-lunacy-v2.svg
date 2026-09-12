@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1774" height="887" viewBox="0 0 1774 887">
+  <g id="Background"><image href="cockpit_background_soft.jpg" x="0" y="0" width="1774" height="887" preserveAspectRatio="xMidYMid slice"/></g>
+  <g id="Cockpit Controls Left"><image href="controls_left.png" x="155" y="175" width="276" height="520"/></g>
+  <g id="Cockpit Controls Right"><image href="controls_right.png" x="1364" y="175" width="276" height="520"/></g>
+  <g id="Blonde Left Mirrored"><image href="blonde_left.png" x="5" y="305" width="783" height="535" transform="translate(793 0) scale(-1 1)"/></g>
+  <g id="Woman Right"><image href="woman_right.png" x="1160" y="390" width="716" height="490"/></g>
+  <g id="Chair Right"><image href="chair_right.png" x="790" y="215" width="890" height="585"/></g>
+  <g id="Blonde Center"><image href="blonde_center.png" x="490" y="92" width="472" height="725"/></g>
+  <g id="GENESIS COCKPIT Wordmark"><image href="genesis_cockpit_wordmark_full.png" x="272" y="500" width="1230" height="449"/></g>
+</svg>

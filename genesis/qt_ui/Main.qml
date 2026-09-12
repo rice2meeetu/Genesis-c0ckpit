@@ -6,28 +6,75 @@ import QtMultimedia
 
 ApplicationWindow {
     id: appRoot
+    Component.onCompleted: restoreLayoutSettings()
     visible: true
     width: 1536
     height: 960
     minimumWidth: 900
     minimumHeight: 600
     title: "GENESIS COCKPIT"
-    color: "#000000"
+    color: "#080d13"
     font.family: "Noto Sans Display"
     font.pixelSize: 15
 
-    readonly property color gold: "#ffd400"
-    readonly property color brightGold: "#fff176"
-    readonly property color blue: "#0b63f6"
-    readonly property color brightBlue: "#4da3ff"
-    readonly property color panel: "#030303"
-    readonly property color panelSoft: "#070b12"
-    readonly property color panelRaised: "#0a1426"
-    readonly property color line: "#1659b7"
-    readonly property color lineSoft: "#14233d"
-    readonly property color textMain: "#eef5ff"
-    readonly property color textDim: "#8fa8cc"
+    Rectangle {
+        anchors.fill: parent
+        z: -100
+        gradient: Gradient {
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.0; color: "#101b27" }
+            GradientStop { position: 0.42; color: "#080d13" }
+            GradientStop { position: 1.0; color: "#05080d" }
+        }
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 1
+            color: "#50f7d58d"
+        }
+    }
+
+    readonly property color gold: "#d3a04a"
+    readonly property color brightGold: "#f7d58d"
+    readonly property color blue: "#456179"
+    readonly property color brightBlue: "#8bc7dc"
+    readonly property color panel: "#0d141d"
+    readonly property color panelSoft: "#111a25"
+    readonly property color panelRaised: "#172332"
+    readonly property color line: "#30475a"
+    readonly property color lineSoft: "#20303d"
+    readonly property color textMain: "#edf2f5"
+    readonly property color textDim: "#95a5b5"
     property real uiZoom: 1.0
+    property bool layoutEditMode: false
+    property real createPreviewWidth: 370
+    property real createPromptHeight: 106
+    property real createReferenceHeight: 112
+    property real createSourceHeight: 92
+    property real createOutputHeight: 88
+
+    function saveLayoutSettings() {
+        genesisLayout.saveCreateLayout(createPreviewWidth, createPromptHeight, createReferenceHeight, createSourceHeight, createOutputHeight)
+    }
+
+    function restoreLayoutSettings() {
+        var layout = genesisLayout.loadCreateLayout()
+        if (layout.previewWidth !== undefined) createPreviewWidth = layout.previewWidth
+        if (layout.promptHeight !== undefined) createPromptHeight = layout.promptHeight
+        if (layout.referenceHeight !== undefined) createReferenceHeight = layout.referenceHeight
+        if (layout.sourceHeight !== undefined) createSourceHeight = layout.sourceHeight
+        if (layout.outputHeight !== undefined) createOutputHeight = layout.outputHeight
+    }
+
+    function resetLayoutSettings() {
+        genesisLayout.resetCreateLayout()
+        createPreviewWidth = 370
+        createPromptHeight = 106
+        createReferenceHeight = 112
+        createSourceHeight = 92
+        createOutputHeight = 88
+    }
     readonly property real fittedScale: Math.min(
         Math.max(1, width - 20) / 1516,
         Math.max(1, height - 20) / 940
@@ -35,7 +82,7 @@ ApplicationWindow {
     FontLoader { id: genesisDisplayFont; source: "../assets/fonts/Exo2-Black.ttf" }
     property bool privacyMode: false
     property int pageIndex: 0
-    readonly property var pageNames: ["IMAGE GENERATION", "POSE LIBRARY", "WORKFLOW EDITOR", "MEDIA TOOLS", "PHOTO LIBRARY", "CAM HUB", "ENTERTAINMENT", "SYSTEM", "INPAINT / EDIT"]
+    readonly property var pageNames: ["IMAGE GENERATION", "POSE LIBRARY", "WORKFLOW EDITOR", "MEDIA TOOLS", "PHOTO LIBRARY", "CAM HUB", "ENTERTAINMENT", "SYSTEM", "INPAINT / EDIT", "POSE MAKER"]
     readonly property var pageBannerSources: [
         "../assets/panel_backgrounds/panel-01-image-generate.jpg",
         "../assets/panel_backgrounds/panel-02-pose-lab.jpg",
@@ -45,7 +92,8 @@ ApplicationWindow {
         "../assets/panel_backgrounds/panel-08-camera-hub.png",
         "../assets/panel_backgrounds/panel-07-photo-viewer.png",
         "../assets/panel_backgrounds/panel-03-face-studio.jpg",
-        "../assets/panel_backgrounds/panel-01-image-generate.jpg"
+        "../assets/panel_backgrounds/panel-01-image-generate.jpg",
+        "../assets/panel_backgrounds/panel-02-pose-lab.jpg"
     ]
     readonly property var pageBannerVideos: [
         "../assets/panel_backgrounds/genesis-cockpit-banner.mp4",
@@ -56,7 +104,8 @@ ApplicationWindow {
         "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4",
         "../assets/panel_backgrounds/genesis-cockpit-banner-secondary.mp4",
         "../assets/panel_backgrounds/genesis-cockpit-banner.mp4",
-        "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4"
+        "../assets/panel_backgrounds/genesis-cockpit-banner-user-right.mp4",
+        "../assets/panel_backgrounds/genesis-cockpit-banner-secondary.mp4"
     ]
     readonly property var grokGeometryPresets: (typeof grokPresetItems !== "undefined" && grokPresetItems.length > 0) ? grokPresetItems : [
         {label:"Grok preset…", prompt:""},
@@ -82,6 +131,7 @@ ApplicationWindow {
         {label:"Suspended / elevated", prompt:"Elevated or suspended pose, clear body silhouette, believable balance and realistic anatomy."},
         {label:"Split-leg composition", prompt:"Wide or split-leg pose, symmetrical composition, natural joint alignment and realistic anatomy."}
     ]
+    readonly property var poseMakerPresets: (typeof curatedPosePresets !== "undefined" && curatedPosePresets.length > 0) ? curatedPosePresets : posePromptPresets
     readonly property var strengthProfiles: ["NATURAL", "BALANCED", "STRONG", "STRICT", "MAX POSE", "MAX IDENTITY", "HYBRID STRONG", "CUSTOM"]
     readonly property var posePromptModes: ["AUTO — prompt from selected pose", "MANUAL — keep my written prompt", "POSE ONLY — no written prompt"]
     readonly property var vramPresets: ["QUALITY · 832×1216", "BALANCED · 768×1152", "FAST SAFE · 704×1024"]
@@ -111,6 +161,16 @@ ApplicationWindow {
     readonly property var selectedGenerationProfile: generationModel.length ? generationModel[selectedGenerationIndex] : ({label:"No local model", model:"", note:"No compatible local model found", loras:["None"], ready:false, runnable:false})
     property string selectedLoraOne: "None"
     property string selectedLoraTwo: "None"
+    property url generationSource: ""
+    property string selectedCharacterId: ""
+    property string selectedCharacterName: ""
+    property url selectedCharacterImage: ""
+    property string selectedAnchorRole: "close-up"
+    property string newCharacterName: ""
+    property bool characterAdultConfirmed: false
+    property bool useStageTwo: false
+    property bool useStageThree: false
+    property bool useUpscale: false
     property url editSource: ""
     property url editMask: ""
     property string editPrompt: ""
@@ -128,6 +188,18 @@ ApplicationWindow {
         generationSpeed = name
         generationWidth = size
         generationHeight = size
+    }
+
+    function selectEnginePreset(index) {
+        selectedGenerationIndex = index
+        generationModelPicker.currentIndex = index
+        // The source, pose, prompt, and preset are deliberately preserved.
+        // LoRAs are re-selected only from the new model family's filtered list.
+        selectedLoraOne = "None"
+        selectedLoraTwo = "None"
+        loraOnePicker.currentIndex = 0
+        loraTwoPicker.currentIndex = 0
+        syncLoraTriggers()
     }
 
     function syncLoraTriggers() {
@@ -200,24 +272,43 @@ ApplicationWindow {
             }
             Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
             SmallLabel { text: "GROK CAMERA / POSE GUIDE" }
-            GridLayout {
+            Rectangle {
                 Layout.fillWidth: true
-                columns: 2
-                rowSpacing: 8
-                columnSpacing: 8
-                Repeater {
+                Layout.fillHeight: true
+                Layout.minimumHeight: 220
+                color: "#090806"
+                border.color: appRoot.line
+                radius: 5
+                ListView {
+                    id: grokPresetList
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    clip: true
+                    spacing: 7
                     model: appRoot.grokGeometryPresets.slice(1)
-                    GoldButton {
-                        Layout.fillWidth: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    flickableDirection: Flickable.VerticalFlick
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AlwaysOn
+                        active: true
+                    }
+                    delegate: Item {
+                        required property var modelData
+                        width: grokPresetList.width - 18
                         height: 42
-                        text: modelData.label
-                        active: appRoot.activeGrokPreset === modelData.label
-                        onClicked: {
-                            appRoot.selectedPosePrompt = modelData.prompt
-                            appRoot.selectedPosePromptSource = "GROK_GEOMETRY_PRESET"
-                            appRoot.activeGrokPreset = modelData.label
-                            appRoot.activePresetStatus = "Grok guide loaded: " + modelData.label
-                            presetPopup.close()
+                        GoldButton {
+                            anchors.fill: parent
+                            text: modelData.label
+                            active: appRoot.activeGrokPreset === modelData.label
+                            onClicked: {
+                                // A preset changes prompt state only.  Source/model/LoRA
+                                // selections intentionally survive regardless of order.
+                                appRoot.selectedPosePrompt = modelData.prompt
+                                appRoot.selectedPosePromptSource = "GROK_GEOMETRY_PRESET"
+                                appRoot.activeGrokPreset = modelData.label
+                                appRoot.activePresetStatus = "Grok guide loaded: " + modelData.label
+                                presetPopup.close()
+                            }
                         }
                     }
                 }
@@ -278,84 +369,99 @@ ApplicationWindow {
     component GoldPanel: Rectangle {
         color: appRoot.panel
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#08162e" }
-            GradientStop { position: 0.10; color: "#03070d" }
-            GradientStop { position: 1.0; color: "#000000" }
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.0; color: "#182533" }
+            GradientStop { position: 0.08; color: "#101a25" }
+            GradientStop { position: 1.0; color: "#0b1119" }
         }
         border.color: appRoot.line
         border.width: 1
-        radius: 8
-        Rectangle { z: 40; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.leftMargin: 12; anchors.rightMargin: 12; height: 1; color: "#804da3ff" }
-        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 4; anchors.topMargin: 4; width: 18; height: 2; color: appRoot.gold }
-        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 4; anchors.topMargin: 4; width: 2; height: 18; color: appRoot.gold }
-        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 4; anchors.bottomMargin: 4; width: 18; height: 2; color: appRoot.brightBlue }
-        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 4; anchors.bottomMargin: 4; width: 2; height: 18; color: appRoot.brightBlue }
+        radius: 12
+        antialiasing: true
+        Rectangle {
+            z: -1
+            anchors.fill: parent
+            anchors.margins: -2
+            radius: 14
+            color: "#28000000"
+        }
+        Rectangle {
+            z: 39
+            anchors.fill: parent
+            anchors.margins: 1
+            color: "transparent"
+            border.color: "#18f7d58d"
+            border.width: 1
+            radius: 11
+        }
+        Rectangle {
+            z: 40
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.leftMargin: 18
+            anchors.rightMargin: 18
+            height: 1
+            color: "#55f7d58d"
+        }
+        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 7; anchors.topMargin: 7; width: 22; height: 3; radius: 1.5; color: appRoot.gold }
+        Rectangle { z: 40; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: 7; anchors.topMargin: 7; width: 3; height: 22; radius: 1.5; color: appRoot.gold }
+        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 7; anchors.bottomMargin: 7; width: 22; height: 3; radius: 1.5; color: appRoot.brightBlue }
+        Rectangle { z: 40; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 7; anchors.bottomMargin: 7; width: 3; height: 22; radius: 1.5; color: appRoot.brightBlue }
     }
 
     component GoldButton: Button {
         id: control
         property bool active: false
         implicitHeight: 44
-        leftPadding: 12
-        rightPadding: 12
+        leftPadding: 14
+        rightPadding: 14
+        topPadding: 1
+        bottomPadding: 5
         font.pixelSize: 14
         font.weight: active ? Font.DemiBold : Font.Medium
         font.letterSpacing: 0.25
         contentItem: Text {
             text: control.text
-            color: !control.enabled ? "#53647d" : (control.active ? "#050505" : (control.hovered ? appRoot.brightGold : appRoot.textMain))
+            color: !control.enabled ? "#65717e" : (control.active ? "#091017" : (control.hovered ? appRoot.brightGold : appRoot.textMain))
             font: control.font
-            style: Text.Raised
-            styleColor: control.active ? "#8f6400" : "#00183d"
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            transform: Translate { y: control.down ? 2 : -1 }
+            elide: Text.ElideRight
         }
         background: Item {
             Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                y: 4
-                height: parent.height - 4
-                radius: 7
-                color: control.active ? "#725400" : "#001535"
-                border.color: "#000000"
-                border.width: 1
-                opacity: control.enabled ? 1 : 0.45
+                anchors.fill: parent
+                anchors.topMargin: 4
+                radius: 10
+                color: "#50000000"
             }
             Rectangle {
                 anchors.fill: parent
-                anchors.margins: -3
-                radius: 8
-                color: "transparent"
-                border.width: 2
-                border.color: appRoot.brightGold
-                opacity: control.active ? 0.42 : (control.hovered ? 0.20 : 0)
+                anchors.topMargin: control.down ? 3 : 0
+                anchors.bottomMargin: 4
+                radius: 10
+                color: !control.enabled ? "#111a22" : (control.active ? "#d3a04a" : (control.down ? "#152332" : (control.hovered ? "#182a38" : "#111a25")))
+                border.color: !control.enabled ? appRoot.lineSoft : (control.active ? appRoot.brightGold : (control.hovered ? appRoot.brightBlue : appRoot.line))
+                border.width: control.active || control.hovered ? 1.5 : 1
+            }
+            Rectangle {
+                visible: control.enabled && control.hovered
+                anchors.fill: parent
+                anchors.bottomMargin: 4
+                radius: 10
+                color: "#12f7d58d"
             }
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                y: control.down ? 3 : 0
-                height: parent.height - 4
-                radius: 6
-                border.color: !control.enabled ? appRoot.lineSoft : (control.active ? appRoot.brightGold : (control.hovered ? appRoot.brightBlue : appRoot.blue))
-                border.width: 2
-                clip: true
-                gradient: Gradient {
-                    GradientStop { position: 0; color: control.active ? "#fff176" : (control.down ? "#0848b8" : (control.hovered ? "#1976e8" : "#0d55c7")) }
-                    GradientStop { position: 1; color: control.active ? "#e5ad00" : (control.down ? "#031d4d" : (control.hovered ? "#0a3f9a" : "#05265f")) }
-                }
-                Rectangle {
-                    z: 1
-                    width: 24
-                    height: parent.height * 1.7
-                    x: parent.width - 21
-                    y: -parent.height * 0.3
-                    rotation: 22
-                    color: control.active ? "#33ffffff" : "#294da3ff"
-                }
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.leftMargin: 3; anchors.rightMargin: 3; anchors.topMargin: 2; height: 2; radius: 1; color: control.active ? "#ccfff9bd" : "#bb76bdff" }
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.leftMargin: 3; anchors.rightMargin: 3; anchors.bottomMargin: 1; height: 3; radius: 1; color: control.active ? "#a06b3d00" : "#b000102c" }
+                anchors.top: parent.top
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                anchors.topMargin: 2
+                height: 1
+                radius: 1
+                color: control.active ? "#aafffff0" : "#35f7d58d"
             }
         }
     }
@@ -383,16 +489,16 @@ ApplicationWindow {
             font.pixelSize: 18
         }
         background: Item {
-            Rectangle { anchors.left: parent.left; anchors.right: parent.right; y: 4; height: parent.height - 4; radius: 6; color: "#00142f" }
+            Rectangle { anchors.left: parent.left; anchors.right: parent.right; y: 4; height: parent.height - 4; radius: 10; color: "#0b121b" }
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
                 y: picker.pressed ? 3 : 0
                 height: parent.height - 4
-                color: picker.pressed ? "#0a3f9a" : "#061a3b"
+                color: picker.pressed ? "#1b2b38" : "#101922"
                 border.color: picker.hovered || picker.popup.visible ? appRoot.brightGold : appRoot.blue
                 border.width: 2
                 radius: 6
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 2; height: 2; color: "#704da3ff" }
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 2; height: 1; color: "#35f7d58d" }
                 Rectangle { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.rightMargin: 7; width: 3; height: parent.height * 0.55; color: appRoot.gold; opacity: 0.75 }
             }
         }
@@ -430,19 +536,19 @@ ApplicationWindow {
     }
 
     component FieldBox: Rectangle {
-        color: "#050b16"
+        color: "#0d151f"
         border.color: appRoot.line
-        radius: 4
+        border.width: 1
+        radius: 8
     }
 
     component SmallLabel: Text {
-        color: appRoot.gold
+        color: appRoot.brightGold
         font.family: appRoot.font.family
-        font.pixelSize: 14
+        font.pixelSize: 12
+        font.weight: Font.DemiBold
         font.bold: true
-        font.letterSpacing: 0.3
-        style: Text.Raised
-        styleColor: "#003a8c"
+        font.letterSpacing: 0.9
     }
 
     component ModulePage: Item {
@@ -515,7 +621,7 @@ ApplicationWindow {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    color: index % 2 ? "#050b16" : "#071329"
+                                    color: index % 2 ? "#0b0b08" : "#100d07"
                                     border.color: appRoot.line
                                     radius: 4
                                     Text { anchors.centerIn: parent; text: modelData.icon; color: appRoot.gold; font.pixelSize: 46 }
@@ -557,6 +663,7 @@ ApplicationWindow {
         id: leftPlayer
         source: appRoot.bannerLeftInput
         loops: MediaPlayer.Infinite
+        playbackRate: 0.6
         videoOutput: leftVideo
         audioOutput: AudioOutput { muted: true }
         Component.onCompleted: play()
@@ -565,15 +672,8 @@ ApplicationWindow {
         id: rightPlayer
         source: appRoot.bannerRightInput
         loops: MediaPlayer.Infinite
+        playbackRate: 0.6
         videoOutput: rightVideo
-        audioOutput: AudioOutput { muted: true }
-        Component.onCompleted: play()
-    }
-    MediaPlayer {
-        id: rightColumnPlayer
-        source: "../assets/panel_backgrounds/genesis-cockpit-banner-secondary.mp4"
-        loops: MediaPlayer.Infinite
-        videoOutput: rightColumnVideo
         audioOutput: AudioOutput { muted: true }
         Component.onCompleted: play()
     }
@@ -593,17 +693,17 @@ ApplicationWindow {
 
         GoldPanel {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(154, appRoot.height * 0.17)
-            Layout.maximumHeight: Math.max(154, appRoot.height * 0.17)
+            Layout.preferredHeight: Math.max(390, appRoot.height * 0.41)
+            Layout.maximumHeight: Math.max(390, appRoot.height * 0.41)
             clip: true
 
             Rectangle {
                 anchors.fill: parent
                 gradient: Gradient {
                     orientation: Gradient.Horizontal
-                    GradientStop { position: 0; color: "#020b1b" }
+                    GradientStop { position: 0; color: "#100d07" }
                     GradientStop { position: 0.5; color: "#000000" }
-                    GradientStop { position: 1; color: "#020b1b" }
+                    GradientStop { position: 1; color: "#100d07" }
                 }
             }
 
@@ -621,27 +721,10 @@ ApplicationWindow {
                 Image {
                     anchors.fill: parent
                     anchors.margins: 5
-                    source: "../assets/panel_backgrounds/genesis-cockpit-logo.jpg"
-                    sourceClipRect: Qt.rect(170, 825, 920, 285)
-                    fillMode: Image.PreserveAspectFit
+                    source: "../assets/lunacy_banner/genesis-cockpit-banner-lunacy-final.png"
+                    fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                }
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 8
-                    width: Math.min(parent.width - 40, 410)
-                    height: 30
-                    radius: 15
-                    color: "#ed000000"
-                    border.color: appRoot.line
-                    Text {
-                        anchors.centerIn: parent
-                        text: appRoot.pageNames[appRoot.pageIndex]
-                        color: appRoot.gold
-                        font.pixelSize: 13
-                        font.letterSpacing: 2
-                    }
+                    cache: true
                 }
             }
 
@@ -649,8 +732,8 @@ ApplicationWindow {
                 z: 0
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
                 width: parent.width * 0.25
+                height: parent.height
                 source: appRoot.bannerLeftPoster
                 fillMode: Image.PreserveAspectCrop
                 visible: !appRoot.privacyMode
@@ -659,8 +742,8 @@ ApplicationWindow {
                 z: 0
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
                 width: parent.width * 0.25
+                height: parent.height
                 source: appRoot.bannerRightPoster
                 fillMode: Image.PreserveAspectCrop
                 visible: !appRoot.privacyMode
@@ -670,8 +753,8 @@ ApplicationWindow {
                 z: 0
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
                 width: parent.width * 0.25
+                height: parent.height
                 fillMode: VideoOutput.PreserveAspectCrop
                 visible: !appRoot.privacyMode
             }
@@ -680,14 +763,108 @@ ApplicationWindow {
                 z: 0
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.bottom: parent.bottom
                 width: parent.width * 0.25
+                height: parent.height
                 fillMode: VideoOutput.PreserveAspectCrop
                 visible: !appRoot.privacyMode
             }
 
             Rectangle {
-                z: 4
+                z: 5
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.leftMargin: 18
+                anchors.topMargin: 18
+                width: 312
+                height: 72
+                radius: 18
+                color: "#b60b121b"
+                border.color: "#66f7d58d"
+                border.width: 1
+                visible: !appRoot.privacyMode
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 44
+                        Layout.preferredHeight: 44
+                        radius: 13
+                        color: appRoot.gold
+                        Text {
+                            anchors.centerIn: parent
+                            text: "G"
+                            color: "#091017"
+                            font.family: genesisDisplayFont.name
+                            font.pixelSize: 28
+                            font.bold: true
+                        }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+                        Text {
+                            text: "GENESIS c0ckpit"
+                            color: appRoot.brightGold
+                            font.family: genesisDisplayFont.name
+                            font.pixelSize: 21
+                            font.bold: true
+                            font.letterSpacing: 0.4
+                        }
+                        Text {
+                            text: "LOCAL WORKSPACE  ·  PRIVATE BY DEFAULT"
+                            color: appRoot.textDim
+                            font.pixelSize: 10
+                            font.letterSpacing: 0.7
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                z: 5
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.rightMargin: 18
+                anchors.topMargin: 18
+                width: 238
+                height: 32
+                radius: 16
+                color: "#a6101824"
+                border.color: "#55f7d58d"
+                border.width: 1
+                visible: !appRoot.privacyMode
+                Text {
+                    anchors.centerIn: parent
+                    text: "●  LOCAL  /  PRIVATE  /  READY"
+                    color: appRoot.brightBlue
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 0.8
+                }
+            }
+            Rectangle {
+                z: 5
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 18
+                anchors.bottomMargin: 18
+                width: 190
+                height: 28
+                radius: 14
+                color: "#99101824"
+                border.color: "#35f7d58d"
+                border.width: 1
+                visible: !appRoot.privacyMode
+                Text {
+                    anchors.centerIn: parent
+                    text: "KEEP WALKING ALLAN"
+                    color: appRoot.textDim
+                    font.pixelSize: 10
+                    font.letterSpacing: 1.1
+                }
+            }
+            Rectangle {
+                z: 6
                 anchors.fill: parent
                 color: "#000000"
                 border.color: appRoot.gold
@@ -706,10 +883,11 @@ ApplicationWindow {
                 spacing: 7
                 Repeater {
                     model: [
-                        {label:"⌂ Home", page:0}, {label:"Poses", page:1},
-                        {label:"Workflows", page:2}, {label:"Media", page:3},
-                        {label:"Photos", page:4}, {label:"Cameras", page:5},
-                        {label:"Entertainment", page:6}, {label:"System", page:7}
+                        {label:"▣  Generate", page:0},
+                        {label:"♟  Pose Maker", page:9},
+                        {label:"✦  Photoshop", page:8},
+                        {label:"▧  Photos", page:4},
+                        {label:"●  Cam Hub", page:5}
                     ]
                     GoldButton {
                         text: modelData.label
@@ -721,6 +899,15 @@ ApplicationWindow {
                 }
                 Item { Layout.fillWidth: true }
                 GoldButton { text: "✥  GENESIS AI  ›"; Layout.preferredWidth: 160; enabled: false }
+                GoldButton {
+                    text: appRoot.layoutEditMode ? "✏ EDITING" : "🔒 LAYOUT"
+                    active: appRoot.layoutEditMode
+                    Layout.preferredWidth: 122
+                    onClicked: {
+                        appRoot.layoutEditMode = !appRoot.layoutEditMode
+                        if (!appRoot.layoutEditMode) appRoot.saveLayoutSettings()
+                    }
+                }
                 GoldButton {
                     text: appRoot.privacyMode ? "🔒  Privacy On" : "🔓  Privacy Mode"
                     Layout.preferredWidth: 150
@@ -740,32 +927,18 @@ ApplicationWindow {
                 Column {
                     anchors.fill: parent
                     anchors.margins: 8
-                    spacing: 9
+                    spacing: 6
                     Item {
-                        width: 124; height: 108
+                        width: 124; height: 84
                         anchors.horizontalCenter: parent.horizontalCenter
                         Image {
                             id: sidebarLogoSource
                             anchors.fill: parent
-                            source: "../assets/panel_backgrounds/genesis-cockpit-logo.jpg"
+                            anchors.margins: 2
+                            source: "../assets/genesis-cockpit-icon-balanced-final.png"
                             fillMode: Image.PreserveAspectCrop
-                            visible: false
-                        }
-                        Rectangle {
-                            id: sidebarLogoMask
-                            anchors.fill: parent
-                            radius: 8
-                            color: "white"
-                            visible: false
-                            layer.enabled: true
-                        }
-                        MultiEffect {
-                            anchors.fill: parent
-                            source: sidebarLogoSource
-                            maskEnabled: true
-                            maskSource: sidebarLogoMask
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1.0
+                            asynchronous: true
+                            cache: true
                         }
                         Rectangle {
                             z: 2
@@ -783,14 +956,13 @@ ApplicationWindow {
                     }
                     Repeater {
                         model: [
-                            {label:"▣  Image Gen", page:0}, {label:"♟  Pose Library", page:1},
-                            {label:"◇  Workflows", page:2}, {label:"✂  Media Tools", page:3},
+                            {label:"▣  Image Gen", page:0}, {label:"✂  Media Tools", page:3},
                             {label:"▧  Photo Library", page:4}, {label:"●  Cam Hub", page:5},
                             {label:"▷  Entertainment", page:6}, {label:"⚙  System", page:7}
                         ]
                         GoldButton {
                             width: 140
-                            height: 46
+                            height: 38
                             text: modelData.label
                             active: appRoot.pageIndex === modelData.page
                             onClicked: appRoot.pageIndex = modelData.page
@@ -802,8 +974,8 @@ ApplicationWindow {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.margins: 9
-                    height: Math.min(185, parent.height * 0.22)
-                    color: "#020817"
+                    height: Math.min(64, parent.height * 0.14)
+                    color: "#0b0905"
                     border.color: appRoot.line
                     radius: 5
                     clip: true
@@ -839,9 +1011,15 @@ ApplicationWindow {
                 Layout.fillHeight: true
 
                 Item {
-                    ColumnLayout {
+                    ScrollView {
                         anchors.fill: parent
-                        spacing: 6
+                        clip: true
+                        contentWidth: availableWidth
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                        ColumnLayout {
+                            width: parent.width
+                            height: implicitHeight
+                            spacing: 6
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 52
@@ -859,23 +1037,59 @@ ApplicationWindow {
                         }
                         RowLayout {
                             Layout.fillWidth: true
+                            Layout.preferredHeight: 46
+                            Layout.maximumHeight: 46
+                            SmallLabel { text: "ENGINE PRESET" }
+                            Repeater {
+                                model: appRoot.generationModel
+                                GoldButton {
+                                    Layout.fillWidth: true
+                                    text: modelData.label
+                                    active: index === appRoot.selectedGenerationIndex
+                                    enabled: modelData.runnable
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: modelData.runnable ? modelData.note : modelData.note + " · blocked until workflow validation"
+                                    onClicked: appRoot.selectEnginePreset(index)
+                                }
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
                             Layout.preferredHeight: 44
                             Layout.maximumHeight: 44
                             Repeater {
-                                model: ["Create", "Pose Library", "Workflow", "Advanced", "ControlNet", "Inpaint / Edit", "Batch", "Settings"]
+                                model: ["Create", "Pose Library", "Workflow Editor", "Compare / Test", "History"]
                                 GoldButton {
                                     text: modelData
                                     active: index === 0
                                     Layout.fillWidth: true
                                     onClicked: {
                                         if (index === 1)
-                                            appRoot.pageIndex = 1
+                                            appRoot.pageIndex = 9
                                         else if (index === 2)
                                             appRoot.pageIndex = 2
-                                        else if (index === 5)
-                                            appRoot.pageIndex = 8
                                     }
                                 }
+                            }
+                        }
+                        GoldPanel {
+                            visible: appRoot.layoutEditMode
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: visible ? 88 : 0
+                            Layout.maximumHeight: visible ? 88 : 0
+                            border.color: appRoot.brightGold
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 8
+                                SmallLabel { text: "UI LAYOUT"; anchors.verticalCenter: parent.verticalCenter }
+                                GoldButton { text: "Preview −"; width: 92; onClicked: appRoot.createPreviewWidth = Math.max(260, appRoot.createPreviewWidth - 20) }
+                                GoldButton { text: "Preview +"; width: 92; onClicked: appRoot.createPreviewWidth = Math.min(620, appRoot.createPreviewWidth + 20) }
+                                GoldButton { text: "Prompt −"; width: 88; onClicked: appRoot.createPromptHeight = Math.max(80, appRoot.createPromptHeight - 10) }
+                                GoldButton { text: "Prompt +"; width: 88; onClicked: appRoot.createPromptHeight = Math.min(220, appRoot.createPromptHeight + 10) }
+                                GoldButton { text: "Panels −"; width: 88; onClicked: { appRoot.createReferenceHeight=Math.max(90,appRoot.createReferenceHeight-10); appRoot.createSourceHeight=Math.max(76,appRoot.createSourceHeight-10); appRoot.createOutputHeight=Math.max(76,appRoot.createOutputHeight-10) } }
+                                GoldButton { text: "Panels +"; width: 88; onClicked: { appRoot.createReferenceHeight=Math.min(180,appRoot.createReferenceHeight+10); appRoot.createSourceHeight=Math.min(160,appRoot.createSourceHeight+10); appRoot.createOutputHeight=Math.min(150,appRoot.createOutputHeight+10) } }
+                                GoldButton { text: "💾 SAVE"; width: 92; onClicked: appRoot.saveLayoutSettings() }
+                                GoldButton { text: "↺ RESET"; width: 92; onClicked: appRoot.resetLayoutSettings() }
                             }
                         }
                         RowLayout {
@@ -887,8 +1101,8 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 106
-                                    Layout.maximumHeight: 106
+                                    Layout.preferredHeight: appRoot.createPromptHeight
+                                    Layout.maximumHeight: appRoot.createPromptHeight
                                     GoldPanel {
                                         Layout.fillWidth: true; Layout.fillHeight: true
                                         SmallLabel { x: 10; y: 8; text: "Prompt" }
@@ -901,8 +1115,8 @@ ApplicationWindow {
                                     }
                                 }
                                 GoldPanel {
-                                    Layout.fillWidth: true; Layout.preferredHeight: 112
-                                    Layout.maximumHeight: 112
+                                    Layout.fillWidth: true; Layout.preferredHeight: appRoot.createReferenceHeight
+                                    Layout.maximumHeight: appRoot.createReferenceHeight
                                     SmallLabel { x: 12; y: 10; text: "Reference / Pose" }
                                     GoldButton { x: 12; y: 38; width: 185; text: "Select from Pose Library"; onClicked: appRoot.pageIndex = 1 }
                                     SmallLabel { x: 220; y: 10; text: "Model & LoRA Selection (Auto-filtered)" }
@@ -913,11 +1127,7 @@ ApplicationWindow {
                                             model: appRoot.generationModel
                                             textRole: "label"
                                             onActivated: {
-                                                appRoot.selectedGenerationIndex = currentIndex
-                                                appRoot.selectedLoraOne = "None"
-                                                appRoot.selectedLoraTwo = "None"
-                                                loraOnePicker.currentIndex = 0
-                                                loraTwoPicker.currentIndex = 0
+                                                appRoot.selectEnginePreset(currentIndex)
                                             }
                                         }
                                         PremiumCombo {
@@ -938,6 +1148,86 @@ ApplicationWindow {
                                     }
                                     Text { x: 220; y: 84; width: parent.width - 232; text: appRoot.selectedGenerationProfile.note + "  ·  Triggers: " + appRoot.activeLoraTriggers; color: appRoot.textDim; font.pixelSize: 12; elide: Text.ElideRight }
                                 }
+                                GoldPanel {
+                                    Layout.fillWidth: true; Layout.preferredHeight: 194
+                                    Layout.maximumHeight: 194
+                                    SmallLabel { x: 12; y: 8; text: "Character / Identity" }
+                                    PremiumCombo {
+                                        id: characterPicker; x: 12; y: 34; width: 220; height: 42
+                                        model: genesisBridge.characters
+                                        textRole: "name"
+                                        onActivated: {
+                                            var c = genesisBridge.characters[currentIndex]
+                                            if (c) {
+                                                appRoot.selectedCharacterId = c.id
+                                                appRoot.selectedCharacterName = c.name
+                                                appRoot.selectedCharacterImage = c.primaryImage
+                                                appRoot.generationSource = c.primaryImage
+                                            }
+                                        }
+                                    }
+                                    FieldBox {
+                                        x: 244; y: 34; width: 190; height: 42
+                                        TextField { anchors.fill: parent; anchors.margins: 2; color: appRoot.textMain; placeholderText: "Character name"; text: appRoot.newCharacterName; background: Rectangle { color: "transparent" }
+                                            onTextChanged: appRoot.newCharacterName = text }
+                                    }
+                                    CheckBox { x: 446; y: 36; text: "Adult 18+"; checked: appRoot.characterAdultConfirmed; onToggled: appRoot.characterAdultConfirmed = checked }
+                                    GoldButton {
+                                        x: 565; y: 34; width: 210; height: 42; text: "Create from Source Image"
+                                        enabled: appRoot.generationSource.toString().length > 0 && appRoot.characterAdultConfirmed
+                                        onClicked: {
+                                            var cid = genesisBridge.createCharacterFromImage(appRoot.newCharacterName, appRoot.generationSource.toString(), appRoot.characterAdultConfirmed)
+                                            if (cid.length) {
+                                                appRoot.selectedCharacterId = cid
+                                                appRoot.selectedCharacterName = appRoot.newCharacterName.length ? appRoot.newCharacterName : appRoot.generationSource.toString().split("/").pop()
+                                                appRoot.selectedCharacterImage = appRoot.generationSource
+                                            }
+                                        }
+                                    }
+                                    Text { x: 790; y: 39; width: parent.width - 802; text: appRoot.selectedCharacterName.length ? "ACTIVE: " + appRoot.selectedCharacterName + " · identity source locked" : "Load a source image, confirm adult, then save it as a reusable character."; color: appRoot.selectedCharacterName.length ? "#66dd78" : appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                                    PremiumCombo {
+                                        id: anchorRolePicker; x: 12; y: 84; width: 150; height: 42
+                                        model: ["close-up", "three-quarter", "side", "mid-shot", "full-body"]
+                                        onActivated: appRoot.selectedAnchorRole = currentText
+                                    }
+                                    GoldButton {
+                                        x: 174; y: 84; width: 190; height: 42; text: "Approve Current Anchor"
+                                        enabled: appRoot.selectedCharacterId.length > 0 && appRoot.generationSource.toString().length > 0
+                                        onClicked: genesisBridge.addCharacterReference(appRoot.selectedCharacterId, appRoot.generationSource.toString(), appRoot.selectedAnchorRole)
+                                    }
+                                    GoldButton {
+                                        x: 376; y: 84; width: 190; height: 42; text: "Use Role as Identity"
+                                        enabled: appRoot.selectedCharacterId.length > 0
+                                        onClicked: {
+                                            var chosen = genesisBridge.characterIdentitySource(appRoot.selectedCharacterId, appRoot.selectedAnchorRole)
+                                            if (chosen.length) appRoot.generationSource = chosen
+                                        }
+                                    }
+                                    Text { x: 580; y: 91; width: parent.width - 592; text: "Approved anchor roles: close-up · ¾ · side · mid-shot · full-body"; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { x: 12; y: 139; width: parent.width - 24; text: "IDENTITY RULE: every new pose starts from an original/approved anchor — never from the previous generated output. Contact-sheet generation will use these role-labelled anchors."; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                }
+                                GoldPanel {
+                                    Layout.fillWidth: true; Layout.preferredHeight: appRoot.createSourceHeight
+                                    Layout.maximumHeight: appRoot.createSourceHeight
+                                    SmallLabel { x: 12; y: 9; text: "Optional source image (selection survives presets and model changes)" }
+                                    Rectangle {
+                                        x: 12; y: 34; width: parent.width - 348; height: 46
+                                        color: "#0b0b08"; border.color: appRoot.line; radius: 4
+                                        Text { anchors.centerIn: parent; width: parent.width - 16; text: appRoot.generationSource.toString().length ? appRoot.generationSource.toString().split("/").pop() : "Choose an image or drop it here"; color: appRoot.generationSource.toString().length ? appRoot.textMain : appRoot.textDim; elide: Text.ElideMiddle; horizontalAlignment: Text.AlignHCenter }
+                                        DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) { appRoot.generationSource = drop.urls[0]; appRoot.useStageThree = true } } }
+                                    }
+                                    GoldButton {
+                                        anchors.right: clearSourceButton.left; anchors.rightMargin: 8; y: 34; width: 152; height: 46; text: "Load Image"
+                                        onClicked: {
+                                            var chosen = genesisBridge.chooseSourceImage()
+                                            if (chosen.length > 0) {
+                                                appRoot.generationSource = chosen
+                                                appRoot.useStageThree = true
+                                            }
+                                        }
+                                    }
+                                    GoldButton { id: clearSourceButton; anchors.right: parent.right; anchors.rightMargin: 12; y: 34; width: 145; height: 46; text: "Clear"; enabled: appRoot.generationSource.toString().length > 0; onClicked: appRoot.generationSource = "" }
+                                }
                                 RowLayout {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
@@ -950,17 +1240,40 @@ ApplicationWindow {
                                         GoldPanel {
                                             Layout.fillWidth: true; Layout.fillHeight: true
                                             SmallLabel { x: 10; y: 10; text: modelData.title }
-                                            Rectangle { x: 10; y: 40; width: 105; height: parent.height - 82; color: "#050b16"; border.color: appRoot.line
+                                            Rectangle { x: 10; y: 40; width: 105; height: parent.height - 82; color: "#0b0b08"; border.color: appRoot.line
                                                 Text { anchors.centerIn: parent; text: "PREVIEW"; color: appRoot.textDim }
                                             }
                                             Text { x: 126; y: 42; width: parent.width - 138; text: modelData.model + "\n\n" + modelData.detail; color: appRoot.textMain; font.pixelSize: 13; lineHeight: 1.4 }
-                                            Text { x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 10; text: "☑  Use previous stage output"; color: appRoot.textMain; font.pixelSize: 13 }
+                                            CheckBox {
+                                                x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 6
+                                                text: index === 0 ? "Stage 1 is the pipeline input" : "Use previous stage output"
+                                                enabled: index > 0
+                                                checked: index === 0 || (index === 1 ? appRoot.useStageTwo : appRoot.useStageThree)
+                                                onToggled: {
+                                                    if (index === 1) appRoot.useStageTwo = checked
+                                                    else if (index === 2) appRoot.useStageThree = checked
+                                                }
+                                            }
                                         }
                                     }
                                 }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 38
+                                    CheckBox {
+                                        text: "Upscale final output (2× Ultimate SD Upscale)"
+                                        checked: appRoot.useUpscale
+                                        enabled: genesisBridge.upscaleAvailable
+                                        onToggled: appRoot.useUpscale = checked
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: enabled ? "Consumes the final enabled stage output" : "Blocked until the required checkpoint, VAE, and 4x-UltraSharp model are installed"
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    Text { text: "Identity lock: " + (appRoot.selectedCharacterId.length ? "Saved Character → approved anchor → selected pose" : (appRoot.generationSource.toString().length ? "Source image → pose" : "add source image")); color: appRoot.generationSource.toString().length ? "#66dd78" : appRoot.textDim; font.pixelSize: 12 }
+                                }
                                 GoldPanel {
-                                    Layout.fillWidth: true; Layout.preferredHeight: 88
-                                    Layout.maximumHeight: 88
+                                    Layout.fillWidth: true; Layout.preferredHeight: appRoot.createOutputHeight
+                                    Layout.maximumHeight: appRoot.createOutputHeight
                                     SmallLabel { x: 12; y: 8; text: "Output Settings" }
                                     Row { x: 12; y: 36; spacing: 8
                                         Repeater { model: ["Width  " + appRoot.generationWidth, "Height  " + appRoot.generationHeight, "Steps  4", "CFG  1.0", "Save to  GENESIS-Exports"]
@@ -972,7 +1285,10 @@ ApplicationWindow {
                                         width: 190; height: 50
                                         active: enabled
                                         text: genesisBridge.busy ? "Generating…" : (appRoot.selectedGenerationProfile.runnable ? "▶  Generate" : "Workflow unavailable")
-                                        enabled: !genesisBridge.busy && appRoot.selectedPosePrompt.trim().length > 0 && appRoot.selectedGenerationProfile.runnable
+                                        enabled: !genesisBridge.busy
+                                            && appRoot.selectedPosePrompt.trim().length > 0
+                                            && appRoot.selectedGenerationProfile.runnable
+                                            && (!appRoot.selectedGenerationProfile.sourceRequired || appRoot.generationSource.toString().length > 0)
                                         onClicked: genesisBridge.queueGenerate(
                                             appRoot.selectedPosePrompt,
                                             appRoot.selectedPoseNegativePrompt,
@@ -980,13 +1296,18 @@ ApplicationWindow {
                                             appRoot.generationHeight,
                                             appRoot.selectedGenerationProfile.model,
                                             appRoot.selectedLoraOne,
-                                            appRoot.selectedLoraTwo
+                                            appRoot.selectedLoraTwo,
+                                            appRoot.generationSource.toString(),
+                                            appRoot.selectedPoseSource.toString(),
+                                            appRoot.useStageTwo,
+                                            appRoot.useStageThree,
+                                            appRoot.useUpscale
                                         )
                                     }
                                 }
                             }
                             GoldPanel {
-                                Layout.preferredWidth: 370
+                                Layout.preferredWidth: appRoot.createPreviewWidth
                                 Layout.fillHeight: true
                                 clip: true
                                 Image {
@@ -995,15 +1316,9 @@ ApplicationWindow {
                                     fillMode: Image.PreserveAspectCrop
                                     opacity: appRoot.privacyMode ? 0 : 0.16
                                 }
-                                VideoOutput {
-                                    id: rightColumnVideo
-                                    anchors.fill: parent
-                                    fillMode: VideoOutput.PreserveAspectCrop
-                                    opacity: appRoot.privacyMode ? 0 : 0.22
-                                }
                                 Rectangle { anchors.fill: parent; color: "#9e000000" }
                                 SmallLabel { x: 12; y: 10; text: "Preview" }
-                                Rectangle { x: 10; y: 38; width: parent.width - 20; height: parent.height * 0.48; color: "#050b16"; border.color: appRoot.line
+                                Rectangle { x: 10; y: 38; width: parent.width - 20; height: parent.height * 0.48; color: "#0b0b08"; border.color: appRoot.line
                                     Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
                                     Text { anchors.centerIn: parent; text: "GENERATED IMAGE PREVIEW"; color: appRoot.textDim; visible: genesisBridge.previewUrl.length === 0 }
                                 }
@@ -1024,6 +1339,7 @@ ApplicationWindow {
                                 Text { x: 12; y: parent.height * 0.67; width: parent.width - 24; text: "Engine: " + appRoot.selectedGenerationProfile.label + "\nCreate workflow: " + (appRoot.selectedGenerationProfile.runnable ? "validated" : "not connected") + "\nLoRA routing: one verified adapter\nNegative conditioning: distilled / zeroed\nSize: " + appRoot.generationWidth + " × " + appRoot.generationHeight + "\nPreset: " + appRoot.generationSpeed + "\nStatus: " + genesisBridge.status; color: appRoot.textMain; font.pixelSize: 12; lineHeight: 1.35; elide: Text.ElideRight }
                             }
                         }
+                    }
                     }
                 }
 
@@ -1067,7 +1383,7 @@ ApplicationWindow {
                                     model: appRoot.poseModel
                                     GoldPanel {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        Rectangle { anchors.fill: parent; anchors.margins: 5; color: index % 2 ? "#050b16" : "#071329"
+                                        Rectangle { anchors.fill: parent; anchors.margins: 5; color: index % 2 ? "#0b0b08" : "#100d07"
                                             Image { anchors.fill: parent; source: modelData.source; fillMode: Image.PreserveAspectFit; asynchronous: true; cache: true }
                                         }
                                         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 24; color: "#b0000000"
@@ -1082,6 +1398,10 @@ ApplicationWindow {
                                                 appRoot.selectedPoseCategory = modelData.category
                                                 appRoot.selectedPoseId = modelData.poseId
                                                 appRoot.selectedPosePrompt = modelData.prompt
+                                                if (appRoot.selectedCharacterId.length > 0) {
+                                                    var identitySource = genesisBridge.characterIdentitySource(appRoot.selectedCharacterId)
+                                                    if (identitySource.length > 0) appRoot.generationSource = identitySource
+                                                }
                                                 appRoot.selectedPoseNegativePrompt = modelData.negativePrompt
                                                 appRoot.selectedPosePromptSource = modelData.promptSource
                                                 appRoot.selectedPoseTemplateId = modelData.promptTemplateId
@@ -1100,7 +1420,7 @@ ApplicationWindow {
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: Math.min(180, parent.height * 0.36)
-                                        color: "#050b16"; border.color: appRoot.line
+                                        color: "#0b0b08"; border.color: appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 4; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
                                         Text { anchors.centerIn: parent; text: "SELECTED POSE PREVIEW"; color: appRoot.textDim; visible: appRoot.selectedPoseSource.toString().length === 0 }
                                     }
@@ -1270,7 +1590,7 @@ ApplicationWindow {
                                     SmallLabel { text: "1. Source Image" }
                                     Rectangle {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        color: "#050b16"; border.color: appRoot.line; radius: 5
+                                        color: "#0b0b08"; border.color: appRoot.line; radius: 5
                                         Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editSource; fillMode: Image.PreserveAspectFit }
                                         Text { anchors.centerIn: parent; text: "DROP SOURCE IMAGE"; color: appRoot.textDim; visible: appRoot.editSource.toString().length === 0 }
                                         DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.editSource = drop.urls[0] } }
@@ -1288,17 +1608,17 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent; anchors.margins: 12; spacing: 8
-                                    SmallLabel { text: "2. Mask / Reference (not connected)" }
+                                    SmallLabel { text: "2. Mask / Reference" }
                                     Rectangle {
                                         Layout.fillWidth: true; Layout.fillHeight: true
-                                        color: "#050b16"; border.color: appRoot.line; radius: 5
+                                        color: "#0b0b08"; border.color: appRoot.line; radius: 5
                                         Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.editMask; fillMode: Image.PreserveAspectFit }
-                                        Text { anchors.centerIn: parent; text: "DROP MASK OR REFERENCE"; color: appRoot.textDim; visible: appRoot.editMask.toString().length === 0 }
-                                        DropArea { anchors.fill: parent; enabled: false }
+                                        Text { anchors.centerIn: parent; text: "DROP MASK IMAGE"; color: appRoot.textDim; visible: appRoot.editMask.toString().length === 0 }
+                                        DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.editMask = drop.urls[0] } }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        GoldButton { Layout.fillWidth: true; text: "Paint Mask"; enabled: false }
+                                        GoldButton { Layout.fillWidth: true; text: "Choose Mask"; onClicked: appRoot.editMask = genesisBridge.chooseSourceImage() }
                                         GoldButton { Layout.fillWidth: true; text: "Clear"; onClicked: appRoot.editMask = "" }
                                     }
                                 }
@@ -1316,13 +1636,13 @@ ApplicationWindow {
                                         wrapMode: TextEdit.Wrap
                                         color: appRoot.textMain
                                         onTextChanged: if (activeFocus) appRoot.editPrompt = text
-                                        background: Rectangle { color: "#050b16"; border.color: appRoot.line; radius: 4 }
+                                        background: Rectangle { color: "#0b0b08"; border.color: appRoot.line; radius: 4 }
                                     }
-                                    SmallLabel { text: "Fast edit engine" }
+                                    SmallLabel { text: "Edit engines" }
                                     FieldBox {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 42
-                                        Text { anchors.centerIn: parent; text: "FluxUp Q4 · RX 9060 XT · Fast 8-step edit"; color: appRoot.textMain; font.pixelSize: 13 }
+                                        Text { anchors.centerIn: parent; text: "FluxUp Q4 image edit · JuggernautXL masked inpaint"; color: appRoot.textMain; font.pixelSize: 13 }
                                     }
                                     SmallLabel { text: "Edit strength  " + appRoot.editStrength.toFixed(2) }
                                     Slider { Layout.fillWidth: true; from: 0.05; to: 0.95; stepSize: 0.05; value: appRoot.editStrength; onMoved: appRoot.editStrength = value }
@@ -1330,7 +1650,7 @@ ApplicationWindow {
                                     Rectangle {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 105
-                                        color: "#050b16"
+                                        color: "#0b0b08"
                                         border.color: appRoot.line
                                         radius: 4
                                         Image { anchors.fill: parent; anchors.margins: 4; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit }
@@ -1338,19 +1658,161 @@ ApplicationWindow {
                                     }
                                     Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                                     Item { Layout.fillHeight: true }
-                                    GoldButton {
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 54
-                                        text: genesisBridge.busy ? "Working…" : "▶  Queue Image Edit"
-                                        enabled: !genesisBridge.busy && genesisBridge.editAvailable && appRoot.editSource.toString().length > 0 && appRoot.editPrompt.trim().length > 0
-                                        onClicked: genesisBridge.queueEdit(
-                                            appRoot.editSource.toString(),
-                                            appRoot.editPrompt,
-                                            appRoot.editStrength
-                                        )
+                                        GoldButton {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 54
+                                            text: genesisBridge.busy ? "Working…" : "▶  Image Edit"
+                                            enabled: !genesisBridge.busy && genesisBridge.editAvailable && appRoot.editSource.toString().length > 0 && appRoot.editPrompt.trim().length > 0
+                                            onClicked: genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength)
+                                        }
+                                        GoldButton {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 54
+                                            text: genesisBridge.busy ? "Working…" : "◉  Masked Inpaint"
+                                            enabled: !genesisBridge.busy && genesisBridge.inpaintAvailable && appRoot.editSource.toString().length > 0 && appRoot.editMask.toString().length > 0 && appRoot.editPrompt.trim().length > 0
+                                            onClicked: genesisBridge.queueInpaint(appRoot.editSource.toString(), appRoot.editMask.toString(), appRoot.editPrompt, appRoot.editStrength)
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                Item {
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 7
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 50
+                            Text { text: "♟"; color: appRoot.gold; font.pixelSize: 32 }
+                            Column {
+                                Text { text: "POSE MAKER"; color: appRoot.brightGold; font.family: genesisDisplayFont.name; font.pixelSize: 27; font.bold: true; font.letterSpacing: 1 }
+                                Text { text: "Phr00t  →  Lustify  →  ReActor ROCm"; color: appRoot.textDim; font.pixelSize: 13 }
+                            }
+                            Item { Layout.fillWidth: true }
+                            GoldButton { text: "Browse Pose Library"; Layout.preferredWidth: 170; onClicked: appRoot.pageIndex = 1 }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 205
+                            spacing: 8
+                            GoldPanel {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.margins: 10; spacing: 6
+                                    SmallLabel { text: "PERSON / SOURCE IMAGE" }
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.fillHeight: true
+                                        color: appRoot.panelRaised; border.color: appRoot.line; radius: 5
+                                        Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit }
+                                        Column { anchors.centerIn: parent; visible: appRoot.generationSource.toString().length === 0; spacing: 4
+                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: "IMAGE PREVIEW"; color: appRoot.textDim; font.pixelSize: 18; font.bold: true }
+                                            Text { text: "drop source image"; color: appRoot.textDim; font.pixelSize: 12 }
+                                        }
+                                        DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.generationSource = drop.urls[0] } }
+                                    }
+                                }
+                            }
+                            GoldPanel {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.margins: 10; spacing: 6
+                                    SmallLabel { text: "POSE REFERENCE (OPTIONAL)" }
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.fillHeight: true
+                                        color: appRoot.panelRaised; border.color: appRoot.line; radius: 5
+                                        Image { anchors.fill: parent; anchors.margins: 5; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit }
+                                        Text { anchors.centerIn: parent; text: "SELECT FROM POSE LIBRARY"; color: appRoot.textDim; visible: appRoot.selectedPoseSource.toString().length === 0 }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appRoot.pageIndex = 1 }
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true; Layout.preferredHeight: 42
+                            Repeater {
+                                model: appRoot.poseMakerPresets.slice(0, 5)
+                                GoldButton {
+                                    Layout.fillWidth: true; text: modelData.label
+                                    onClicked: {
+                                        appRoot.selectedPosePrompt = modelData.prompt
+                                        appRoot.selectedPosePromptSource = "POSE_MAKER_PRESET"
+                                    }
+                                }
+                            }
+                            PremiumCombo {
+                                id: poseMakerPresetPicker
+                                Layout.preferredWidth: 230
+                                model: appRoot.poseMakerPresets
+                                textRole: "label"
+                                onActivated: {
+                                    appRoot.selectedPosePrompt = appRoot.poseMakerPresets[currentIndex].prompt
+                                    appRoot.selectedPosePromptSource = "CURATED_DATABASE"
+                                }
+                            }
+                        }
+
+                        GoldPanel {
+                            Layout.fillWidth: true; Layout.preferredHeight: 88
+                            SmallLabel { x: 10; y: 8; text: "POSE INSTRUCTION" }
+                            TextArea {
+                                x: 8; y: 30; width: parent.width - 16; height: parent.height - 36
+                                text: appRoot.selectedPosePrompt
+                                placeholderText: "Keep the same person and facial identity. Change only the pose and position."
+                                wrapMode: TextEdit.Wrap; color: appRoot.textMain
+                                background: Rectangle { color: "transparent" }
+                                onTextChanged: if (activeFocus) appRoot.selectedPosePrompt = text
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true; Layout.preferredHeight: 44
+                            CheckBox { text: "Stage 2 — Lustify refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
+                            CheckBox { text: "Stage 3 — ReActor face lock"; checked: appRoot.useStageThree; onToggled: appRoot.useStageThree = checked }
+                            CheckBox { text: "Face restore after ReActor"; checked: appRoot.useUpscale; onToggled: appRoot.useUpscale = checked }
+                            Item { Layout.fillWidth: true }
+                            GoldButton {
+                                Layout.preferredWidth: 280; Layout.preferredHeight: 50; active: enabled
+                                text: genesisBridge.busy ? "GENERATING POSE…" : "GENERATE POSE"
+                                enabled: !genesisBridge.busy && appRoot.selectedGenerationProfile.runnable
+                                    && appRoot.generationSource.toString().length > 0
+                                    && appRoot.selectedPosePrompt.trim().length > 0
+                                onClicked: genesisBridge.queueGenerate(
+                                    appRoot.selectedPosePrompt, appRoot.selectedPoseNegativePrompt,
+                                    appRoot.generationWidth, appRoot.generationHeight,
+                                    appRoot.selectedGenerationProfile.model, appRoot.selectedLoraOne,
+                                    appRoot.selectedLoraTwo, appRoot.generationSource.toString(),
+                                    appRoot.selectedPoseSource.toString(), appRoot.useStageTwo,
+                                    appRoot.useStageThree, appRoot.useUpscale
+                                )
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true; Layout.fillHeight: true; spacing: 8
+                            Repeater {
+                                model: ["STAGE 1 — Phr00t", "STAGE 2 — Lustify", "STAGE 3 — Final ReActor"]
+                                GoldPanel {
+                                    Layout.fillWidth: true; Layout.fillHeight: true
+                                    SmallLabel { x: 10; y: 9; text: modelData }
+                                    Rectangle {
+                                        anchors.fill: parent; anchors.margins: 10; anchors.topMargin: 36
+                                        color: appRoot.panelRaised; border.color: index === 2 ? appRoot.gold : appRoot.line; radius: 5
+                                        Image { anchors.fill: parent; anchors.margins: 5; source: index === 2 ? genesisBridge.previewUrl : ""; fillMode: Image.PreserveAspectFit }
+                                        Text { anchors.centerIn: parent; text: index === 2 && genesisBridge.previewUrl.length > 0 ? "" : "OUTPUT PREVIEW"; color: appRoot.textDim; font.pixelSize: 15 }
+                                    }
+                                }
+                            }
+                        }
+                        FieldBox {
+                            Layout.fillWidth: true; Layout.preferredHeight: 42
+                            Text { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; text: "RUN LOG  ·  " + genesisBridge.status; color: appRoot.textDim; font.pixelSize: 12 }
                         }
                     }
                 }

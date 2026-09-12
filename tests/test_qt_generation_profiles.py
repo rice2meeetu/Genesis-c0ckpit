@@ -31,6 +31,16 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertTrue(profiles[0]["runnable"])
         self.assertTrue(profiles[1]["runnable"])
 
+    def test_phroot_is_runnable_but_explicitly_requires_source(self):
+        report = {"profiles": [{
+            "name": "Phr00t / QwenRapid AIO",
+            "ready": True,
+            "evidence": {"MODEL": "/models/Qwen-Rapid-AIO-NSFW-v19.safetensors"},
+        }]}
+        profile = build_generation_profiles(report, [])[0]
+        self.assertTrue(profile["runnable"])
+        self.assertTrue(profile["sourceRequired"])
+
     def test_unavailable_models_are_not_exposed(self):
         report = {"profiles": [{"name": "Missing", "ready": False, "evidence": {"MODEL": None}}]}
         self.assertEqual(build_generation_profiles(report, []), [])
@@ -72,12 +82,13 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertEqual(prompt["genesis_lora_1"]["inputs"]["model"], ["model", 0])
         self.assertEqual(prompt["sampler"]["inputs"]["model"], ["genesis_lora_1", 0])
 
-    def test_lora_stacking_is_rejected(self):
+    def test_lora_stacking_chains_in_selection_order(self):
         prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
-        with self.assertRaisesRegex(Exception, "stacking is blocked"):
-            insert_model_only_loras(
-                prompt, "model", "sampler", "model", ["one.safetensors", "two.safetensors"]
-            )
+        insert_model_only_loras(
+            prompt, "model", "sampler", "model", ["one.safetensors", "two.safetensors"]
+        )
+        self.assertEqual(prompt["genesis_lora_2"]["inputs"]["model"], ["genesis_lora_1", 0])
+        self.assertEqual(prompt["sampler"]["inputs"]["model"], ["genesis_lora_2", 0])
 
 
 if __name__ == "__main__":

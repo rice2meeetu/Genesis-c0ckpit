@@ -14,6 +14,9 @@ WORKFLOW_DEFAULT = "Use workflow default"
 KLEIN_4B_LORAS = {
     "F2K4BBabe_Engel_v1.0.safetensors",
     "hina_flux2klein4b_asianMix_v4.0-lora.safetensors",
+    # Structurally validated and completed a coherent 512px render on
+    # 2026-09-11. Keep strictly scoped to Klein 4B.
+    "klein4b-deepthroat-22epoc-k3nk.safetensors",
 }
 
 # Metadata-verified on the GENESIS machine as flux2_klein_9b.
@@ -29,12 +32,18 @@ KREA2_LORAS = {
     "snofs_krea_v1_3D.safetensors",
 }
 
+# Krea-native adapters with published community evidence of successful Klein 9B
+# use. Keep distinct from native compatibility until a local fixed-seed render passes.
+KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS = {
+    "lenovo_krea2_2.safetensors",
+    "snofs_krea_v1_3D.safetensors",
+}
+
 # These names must stay blocked even if their filename looks like a known
 # family.  Move a file into a verified set only after metadata/source evidence
 # and a repeatable generation test.
 BLOCKED_UNVERIFIED_LORAS = {
     "FLUX2_KLEIN_UNLOCKED_V1.safetensors",
-    "klein4b-deepthroat-22epoc-k3nk.safetensors",
     "flux2klein_tocowgirl.safetensors",
     "FK_sloppydeepthroat_epoch_10.safetensors",
     "FK_teeththroat.safetensors",
@@ -136,6 +145,8 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     family = model_family(model)
     if family == "flux2_klein_9b_kv":
         return base in KLEIN_9B_KV_VERIFIED_LORAS
+    if family == "flux2_klein_9b_base" and base in KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS:
+        return True
     return lora_family(lora) == family
 
 
@@ -147,7 +158,7 @@ def compatibility_note(model: str | None) -> str:
     family = model_family(model)
     return {
         "flux2_klein_4b": "Klein 4B · only verified 4B LoRAs",
-        "flux2_klein_9b_base": "Klein 9B Base · only verified regular-9B LoRAs",
+        "flux2_klein_9b_base": "Klein 9B Base · verified 9B + community cross-family LoRAs (local validation pending)",
         "flux2_klein_9b_kv": "Klein 9B-KV · LoRAs disabled until KV render verification",
         "krea2": "Krea 2 · only Krea 2 LoRAs",
         "aisha_9b": "Aisha 9B · use only adapters verified specifically with Aisha",

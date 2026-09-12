@@ -15,7 +15,10 @@ from genesis import workflow_lab
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_WORKFLOW = ROOT / "genesis/reference/pose_workflows/GENESIS_FLUX2_KLEIN_9B_KV_OFFICIAL_T2I.json"
+BASE_WORKFLOW = (
+    Path.home()
+    / "AI/ComfyUI/user/default/workflows/GENESIS_FLUX2_KLEIN_9B_KV_OFFICIAL_T2I.json"
+)
 OUTPUT = ROOT / "gpu_test_outputs/klein4b-lora-benchmark"
 REPORT = OUTPUT / "report.json"
 LORAS = (

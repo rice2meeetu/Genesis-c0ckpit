@@ -14,14 +14,17 @@ import threading
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QDesktopServices, QGuiApplication
+from PyQt6.QtCore import QObject, QSettings, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
+from PyQt6.QtWidgets import QApplication, QFileDialog
 
 from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.pose_prompt_profiles import PosePromptMap
+from genesis.generation_pipeline import adapt_prompt, compatible_selection
 from genesis import workflow_lab
+from genesis.character_library import add_reference, character_items, preferred_reference, save_character
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -35,11 +38,86 @@ REGULAR_9B_WORKFLOWS = (
     WORKFLOW_ROOT / "Flux.2 Klein 9b Text To Image.json",
 )
 EDIT_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUXUP_IMG2IMG_RX9060.json"
+INPAINT_CHECKPOINT = "juggernautXL_ragnarokBy.safetensors"
 REGULAR_9B_MODEL = "flux-2-klein-base-9b-Q4_K_M.gguf"
 KV_9B_MODEL = "flux-2-klein-9b-kv-fp8.safetensors"
+QWEN_MODEL = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+FOUR_B_MODEL = "flux-2-klein-4b.safetensors"
+TEXT_ENCODER_4B = "qwen_3_4b_fp4_flux2.safetensors"
 TEXT_ENCODER_9B = "qwen_3_8b_fp8mixed.safetensors"
-SUPPORTED_CREATE_MODELS = {REGULAR_9B_MODEL, KV_9B_MODEL}
+SUPPORTED_CREATE_MODELS = {FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL}
 OUTPUT_DIR = Path.home() / "GENESIS-Exports"
+REFERENCE_WORKFLOW_ROOT = PROJECT_ROOT / "genesis" / "reference" / "pose_workflows"
+STAGE_1_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_1_PHR00T_POSE.json"
+STAGE_2_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_2_LUSTIFY_REFINE.json"
+STAGE_3_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_3_REACTOR_ROCM.json"
+FOUR_B_SOURCE_WORKFLOW = WORKFLOW_ROOT / "FLUX2_Klein_Deepthroat_FaceSwap.json"
+UPSCALE_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "SD_UPSCALE_REFERENCE.json"
+UPSCALE_REQUIRED_ASSETS = {
+    "Realistic_Vision_V6.0_NV_B1.safetensors",
+    "vae-ft-mse-840000-ema-pruned.safetensors",
+    "4x-UltraSharp.safetensors",
+}
+
+
+def load_curated_pose_presets() -> list[dict]:
+    """Load the full 70-preset pack plus the separate curated 18-preset pack."""
+    presets: list[dict] = []
+    full_path = PROJECT_ROOT / "genesis/reference/prompt_maps/pose_presets_full.json"
+    try:
+        payload = json.loads(full_path.read_text(encoding="utf-8"))
+        for category, rows in payload.get("categories", {}).items():
+            for position, row in enumerate(rows):
+                if not isinstance(row, dict) or not row.get("prompt"):
+                    continue
+                presets.append({
+                    "id": "full70:" + str(row.get("id", "")),
+                    "label": str(row.get("name", "Preset")),
+                    "prompt": str(row["prompt"]),
+                    "priority": len(presets) + 1,
+                    "collection": "Full 70",
+                    "category": str(category),
+                })
+    except (OSError, ValueError, TypeError):
+        pass
+
+    candidates = (
+        Path.home() / "GENESIS_CURATED_PRESETS_DATABASE.json",
+        Path.home() / "AI/GENESIS_POSE_MAKER/GENESIS_CURATED_PRESETS_DATABASE.json",
+    )
+    for path in candidates:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            rows = payload.get("sexual_act_presets", [])
+            curated = [
+                {
+                    "id": "curated18:" + str(row.get("id", "")),
+                    "label": str(row.get("name", "Preset")) + " · Curated 18",
+                    "prompt": str(row.get("prompt", "")),
+                    "priority": 70 + int(row.get("priority", 9999)),
+                    "collection": "Curated 18",
+                    "category": "Curated",
+                }
+                for row in rows
+                if isinstance(row, dict) and row.get("prompt")
+            ]
+            presets.extend(sorted(curated, key=lambda row: (row["priority"], row["label"])))
+            break
+        except (OSError, ValueError, TypeError):
+            continue
+    return presets
+
+
+def upscale_assets_available() -> bool:
+    found: set[str] = set()
+    for root in MODEL_ROOTS:
+        if not root.is_dir():
+            continue
+        try:
+            found.update(path.name for path in root.rglob("*") if path.is_file())
+        except OSError:
+            continue
+    return UPSCALE_WORKFLOW.is_file() and UPSCALE_REQUIRED_ASSETS <= found
 
 
 def build_generation_profiles(
@@ -70,8 +148,10 @@ def build_generation_profiles(
             "triggers": {name: lora_triggers.get(name, []) for name in compatible},
             "ready": ready,
             "runnable": runnable,
+            "sourceRequired": model_name == QWEN_MODEL,
         })
-    profiles.sort(key=lambda item: ("Klein 9B Base" not in item["label"], item["label"].casefold()))
+    priority = {FOUR_B_MODEL: 0, REGULAR_9B_MODEL: 1, KV_9B_MODEL: 2, QWEN_MODEL: 3}
+    profiles.sort(key=lambda item: (priority.get(item["model"], 99), item["label"].casefold()))
     return profiles
 
 
@@ -152,12 +232,10 @@ def insert_model_only_loras(
     loras: list[str],
     strength: float = 0.65,
 ) -> dict:
-    """Insert the single live-validated model-only LoRA route."""
+    """Chain model-only LoRAs in selection order with independent-safe defaults."""
     selected = [name for name in loras if name and name != "None"]
-    if len(selected) > 1:
-        raise workflow_lab.ComfyError(
-            "LoRA stacking is blocked because live image checks produced distortion."
-        )
+    if len(selected) > 3:
+        raise workflow_lab.ComfyError("GENESIS currently allows at most 3 stacked LoRAs.")
 
     model_link: list = [str(source_node), 0]
     for index, name in enumerate(selected, 1):
@@ -215,6 +293,17 @@ def build_create_prompt(
         prompt["9"]["inputs"].update({"steps": 4, "width": width, "height": height})
         prompt["10"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["14"]["inputs"]["filename_prefix"] = "GENESIS-Klein9B-KV"
+    elif model_name == FOUR_B_MODEL:
+        prompt = workflow_lab.workflow_to_prompt(GENERATION_WORKFLOW, info)
+        prompt["1"]["inputs"]["unet_name"] = FOUR_B_MODEL
+        prompt["2"]["inputs"]["clip_name"] = TEXT_ENCODER_4B
+        prompt["3"]["inputs"]["text"] = prompt_text
+        prompt.pop("5", None)
+        prompt["6"]["inputs"]["model"] = ["1", 0]
+        prompt["9"]["inputs"].update({"steps": 4, "width": width, "height": height})
+        prompt["10"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
+        prompt["14"]["inputs"]["filename_prefix"] = "GENESIS-Klein4B-Fast"
+        insert_model_only_loras(prompt, "1", "6", "model", loras, strength=0.5)
     else:
         raise workflow_lab.ComfyError(f"No validated Create workflow for {model_name}.")
 
@@ -310,12 +399,50 @@ def load_runtime_status() -> dict:
         }
 
 
+class LayoutSettingsBridge(QObject):
+    """Persist user-adjustable QML layout values without touching generation state."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._settings = QSettings("GENESIS", "c0ckpit")
+
+    @pyqtSlot(result="QVariant")
+    def loadCreateLayout(self):
+        defaults = {
+            "previewWidth": 370.0,
+            "promptHeight": 106.0,
+            "referenceHeight": 112.0,
+            "sourceHeight": 92.0,
+            "outputHeight": 88.0,
+        }
+        return {key: float(self._settings.value("layout/create/" + key, value)) for key, value in defaults.items()}
+
+    @pyqtSlot(float, float, float, float, float)
+    def saveCreateLayout(self, previewWidth, promptHeight, referenceHeight, sourceHeight, outputHeight) -> None:
+        values = {
+            "previewWidth": previewWidth,
+            "promptHeight": promptHeight,
+            "referenceHeight": referenceHeight,
+            "sourceHeight": sourceHeight,
+            "outputHeight": outputHeight,
+        }
+        for key, value in values.items():
+            self._settings.setValue("layout/create/" + key, float(value))
+        self._settings.sync()
+
+    @pyqtSlot()
+    def resetCreateLayout(self) -> None:
+        self._settings.remove("layout/create")
+        self._settings.sync()
+
+
 class GenerationBridge(QObject):
     """Asynchronous Qt boundary around the preserved local ComfyUI client."""
 
     statusChanged = pyqtSignal()
     busyChanged = pyqtSignal()
     previewChanged = pyqtSignal()
+    charactersChanged = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -339,6 +466,14 @@ class GenerationBridge(QObject):
     def editAvailable(self) -> bool:
         return EDIT_WORKFLOW.is_file()
 
+    @pyqtProperty(bool, constant=True)
+    def inpaintAvailable(self) -> bool:
+        return True
+
+    @pyqtProperty(bool, constant=True)
+    def upscaleAvailable(self) -> bool:
+        return upscale_assets_available()
+
     def _set_status(self, value: str) -> None:
         self._status = value
         self.statusChanged.emit()
@@ -350,6 +485,50 @@ class GenerationBridge(QObject):
     def _set_preview(self, value: str) -> None:
         self._preview = value
         self.previewChanged.emit()
+
+    @pyqtProperty("QVariantList", notify=charactersChanged)
+    def characters(self):
+        return character_items()
+
+    @pyqtSlot(str, str, bool, result=str)
+    def createCharacterFromImage(self, name: str, source_url: str, adult_confirmed: bool) -> str:
+        source = Path(QUrl(source_url).toLocalFile()) if source_url else Path()
+        try:
+            row = save_character(name, str(source), adult_confirmed=adult_confirmed)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return ""
+        self.charactersChanged.emit()
+        self._set_status(f"Character saved · {row['name']}")
+        return row["id"]
+
+    @pyqtSlot(str, result=str)
+    @pyqtSlot(str, str, result=str)
+    def characterIdentitySource(self, character_id: str, role: str = "") -> str:
+        source = preferred_reference(character_id, role)
+        return QUrl.fromLocalFile(source).toString() if source else ""
+
+    @pyqtSlot(str, str, str, result=bool)
+    def addCharacterReference(self, character_id: str, source_url: str, role: str) -> bool:
+        source = Path(QUrl(source_url).toLocalFile()) if source_url else Path()
+        try:
+            row = add_reference(character_id, str(source), role=role)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return False
+        self.charactersChanged.emit()
+        self._set_status(f"Character anchor added · {row['name']} · {role or 'anchor'}")
+        return True
+
+    @pyqtSlot(result=str)
+    def chooseSourceImage(self) -> str:
+        path, _ = QFileDialog.getOpenFileName(
+            None,
+            "Choose a source image",
+            str(Path.home()),
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp)",
+        )
+        return QUrl.fromLocalFile(path).toString() if path else ""
 
     @pyqtSlot()
     def openOutputFolder(self) -> None:
@@ -366,7 +545,7 @@ class GenerationBridge(QObject):
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(source))):
             self._set_status("Could not open the generated image.")
 
-    @pyqtSlot(str, str, int, int, str, str, str)
+    @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool)
     def queueGenerate(
         self,
         prompt_text: str,
@@ -376,6 +555,11 @@ class GenerationBridge(QObject):
         model_name: str,
         lora_one: str,
         lora_two: str,
+        source_url: str,
+        pose_url: str,
+        use_stage_two: bool,
+        use_stage_three: bool,
+        use_upscale: bool,
     ) -> None:
         if self._busy:
             return
@@ -386,12 +570,62 @@ class GenerationBridge(QObject):
         if model_name not in SUPPORTED_CREATE_MODELS:
             self._set_status("That model has no validated Create workflow yet.")
             return
+        source = Path(QUrl(source_url).toLocalFile()) if source_url else None
+        pose = Path(QUrl(pose_url).toLocalFile()) if pose_url else None
+        if source_url and (source is None or not source.is_file()):
+            self._set_status("The selected source image is unavailable.")
+            return
+        if model_name == QWEN_MODEL and source is None:
+            self._set_status("Phr00t/Qwen requires a source image.")
+            return
+        if source is not None and model_name not in {QWEN_MODEL, FOUR_B_MODEL}:
+            self._set_status(
+                "That engine has no validated source-image graph. Choose 4B or Phr00t/Qwen, "
+                "or clear the source for text-to-image."
+            )
+            return
+        if use_stage_three and source is None:
+            self._set_status("Stage 3 face lock requires an original source image.")
+            return
+        if use_upscale and not self.upscaleAvailable:
+            self._set_status("Upscale is blocked: its checkpoint, VAE, or 4x-UltraSharp asset is missing.")
+            return
+        try:
+            compatible_selection(model_name, [lora_one, lora_two])
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
         self._set_busy(True)
-        engine = "Klein 9B Base" if model_name == REGULAR_9B_MODEL else "Klein 9B-KV"
+        engine = {
+            REGULAR_9B_MODEL: "Klein 9B Base",
+            KV_9B_MODEL: "Klein 9B-KV",
+            QWEN_MODEL: "Phr00t/Qwen",
+            FOUR_B_MODEL: "Klein 4B Fast",
+        }[model_name]
         self._set_status(f"Preparing validated {engine} generation…")
         threading.Thread(
             target=self._run_generate,
-            args=(prompt_text, negative_prompt, int(width), int(height), model_name, lora_one, lora_two),
+            args=(prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
+                  lora_two, source, pose, bool(use_stage_two), bool(use_stage_three),
+                  bool(use_upscale)),
+            daemon=True,
+        ).start()
+
+    @pyqtSlot(str, str, str, float)
+    def queueInpaint(self, source_url: str, mask_url: str, prompt_text: str, strength: float) -> None:
+        if self._busy:
+            return
+        source = Path(QUrl(source_url).toLocalFile())
+        mask = Path(QUrl(mask_url).toLocalFile())
+        prompt_text = prompt_text.strip()
+        if not source.is_file() or not mask.is_file() or not prompt_text:
+            self._set_status("Choose a source image, mask image, and enter inpaint instructions.")
+            return
+        self._set_busy(True)
+        self._set_status("Preparing masked inpaint workflow…")
+        threading.Thread(
+            target=self._run_inpaint,
+            args=(source, mask, prompt_text, float(strength)),
             daemon=True,
         ).start()
 
@@ -424,6 +658,11 @@ class GenerationBridge(QObject):
         model_name: str,
         lora_one: str,
         lora_two: str,
+        source: Path | None,
+        pose: Path | None,
+        use_stage_two: bool,
+        use_stage_three: bool,
+        use_upscale: bool,
     ) -> None:
         try:
             client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
@@ -431,41 +670,181 @@ class GenerationBridge(QObject):
             if not workflow_lab.gpu_acceleration_available(stats):
                 raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
             info = client.object_info()
-            prompt = build_create_prompt(
-                info, prompt_text, width, height, model_name, [lora_one, lora_two]
-            )
-            # These validated distilled graphs intentionally use zeroed negative
-            # conditioning; preserve the proven graph until another route is tested.
-            _ = negative_prompt
-
-            prompt_id = client.submit(prompt)
-            self._set_status(f"Queued {prompt_id[:8]}…")
-            result = client.wait(
-                prompt_id,
-                timeout=1800,
-                progress=lambda value: self._set_status(
-                    f"Generation {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
-                ),
-            )
-            if result.status != "completed":
-                raise workflow_lab.ComfyError(result.error or f"Generation ended: {result.status}")
-
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            saved: list[Path] = []
             stamp = time.strftime("%Y%m%d-%H%M%S")
-            for index, output in enumerate(result.outputs, 1):
-                if output.get("kind") != "images":
-                    continue
-                suffix = Path(output.get("filename", "image.png")).suffix or ".png"
-                target = OUTPUT_DIR / f"GENESIS-Klein-{stamp}-{index}{suffix}"
-                target.write_bytes(client.view(output))
-                saved.append(target)
-            if not saved:
-                raise workflow_lab.ComfyError("ComfyUI completed without an image output.")
-            self._set_preview(QUrl.fromLocalFile(str(saved[-1])).toString())
-            self._set_status(f"Complete · {saved[-1].name}")
+            if source is not None and model_name == FOUR_B_MODEL:
+                current = self._run_4b_source(
+                    client, info, source, adapt_prompt(prompt_text, FOUR_B_MODEL, source_image=True),
+                    [lora_one, lora_two], width, height, stamp,
+                )
+            elif source is not None:
+                current = self._run_reference_stage(
+                    client, info, STAGE_1_WORKFLOW, source,
+                    adapt_prompt(prompt_text, QWEN_MODEL, source_image=True),
+                    stamp, "Stage1", secondary_image=pose,
+                )
+            else:
+                prompt = build_create_prompt(
+                    info, adapt_prompt(prompt_text, model_name), width, height,
+                    model_name, [lora_one, lora_two]
+                )
+                # The validated distilled create graphs intentionally zero negative
+                # conditioning. Keep the user's text in state for compatible stages.
+                _ = negative_prompt
+                current = self._submit_and_save(client, prompt, stamp, "Klein")
+
+            if use_stage_two:
+                current = self._run_reference_stage(
+                    client, info, STAGE_2_WORKFLOW, current,
+                    adapt_prompt(prompt_text, "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors"),
+                    stamp, "Stage2",
+                )
+            if use_stage_three:
+                current = self._run_reference_stage(
+                    client, info, STAGE_3_WORKFLOW, current, "", stamp, "Stage3",
+                    secondary_image=source,
+                )
+            if use_upscale:
+                current = self._run_reference_stage(
+                    client, info, UPSCALE_WORKFLOW, current, "", stamp, "Upscale"
+                )
+            self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._set_status(f"Complete · {current.name}")
         except Exception as exc:
             self._set_status(f"Generation failed · {exc}")
+        finally:
+            self._set_busy(False)
+
+    def _run_4b_source(
+        self, client, info: dict, source: Path, prompt_text: str,
+        loras: list[str], width: int, height: int, stamp: str,
+    ) -> Path:
+        prompt = workflow_lab.workflow_to_prompt(FOUR_B_SOURCE_WORKFLOW, info)
+        selected = compatible_selection(FOUR_B_MODEL, loras)
+        lora = selected[0] if selected else "klein4b-deepthroat-22epoc-k3nk.safetensors"
+        prompt["4"]["inputs"].update({
+            "lora_name": lora,
+            "strength_model": 0.5 if selected else 0.0,
+            "strength_clip": 0.0,
+        })
+        prompt["5"]["inputs"]["text"] = prompt_text
+        prompt["7"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
+        prompt["9"]["inputs"].update({"steps": 4, "cfg": 1.0})
+        uploaded = client.upload_image(source)
+        prompt["11"]["inputs"]["image"] = "/".join(
+            value for value in (uploaded.get("subfolder"), uploaded.get("name")) if value
+        )
+        validation = workflow_lab.validate_prompt(prompt, info)
+        if not validation["valid"]:
+            missing = validation["missing_nodes"] + validation["missing_inputs"]
+            raise workflow_lab.ComfyError("Klein 4B source workflow is not runnable: " + ", ".join(missing))
+        return self._submit_and_save(client, prompt, stamp, "Klein4B")
+
+    def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
+        prompt_id = client.submit(prompt)
+        self._set_status(f"{stage} queued {prompt_id[:8]}…")
+        result = client.wait(
+            prompt_id,
+            timeout=1800,
+            progress=lambda value: self._set_status(
+                f"{stage} {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
+            ),
+        )
+        if result.status != "completed":
+            raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
+        saved: list[Path] = []
+        for index, output in enumerate(result.outputs, 1):
+            if output.get("kind") != "images":
+                continue
+            suffix = Path(output.get("filename", "image.png")).suffix or ".png"
+            target = OUTPUT_DIR / f"GENESIS-{stage}-{stamp}-{index}{suffix}"
+            target.write_bytes(client.view(output))
+            saved.append(target)
+        if not saved:
+            raise workflow_lab.ComfyError(f"{stage} completed without an image output.")
+        return saved[-1]
+
+    def _run_reference_stage(
+        self, client, info: dict, workflow: Path, input_image: Path,
+        prompt_text: str, stamp: str, stage: str, secondary_image: Path | None = None,
+    ) -> Path:
+        if not workflow.is_file():
+            raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
+        prompt = workflow_lab.workflow_to_prompt(workflow, info)
+        load_nodes = sorted(
+            (str(node_id) for node_id, node in prompt.items() if node.get("class_type") == "LoadImage"),
+            key=lambda value: int(value) if value.isdigit() else value,
+        )
+        images = [input_image] + ([secondary_image] if secondary_image is not None else [])
+        if len(load_nodes) < len(images):
+            raise workflow_lab.ComfyError(f"{stage} workflow has too few image inputs.")
+        for node_id, path in zip(load_nodes, images):
+            uploaded = client.upload_image(path)
+            prompt[node_id]["inputs"]["image"] = "/".join(
+                value for value in (uploaded.get("subfolder"), uploaded.get("name")) if value
+            )
+        if prompt_text:
+            controls = workflow_lab.discover_workflow_controls(prompt)
+            target = controls.get("positive")
+            if target:
+                prompt[str(target[0])]["inputs"][target[1]] = prompt_text
+        validation = workflow_lab.validate_prompt(prompt, info)
+        if not validation["valid"]:
+            missing = validation["missing_nodes"] + validation["missing_inputs"]
+            raise workflow_lab.ComfyError(f"{stage} is not runnable: " + ", ".join(missing))
+        return self._submit_and_save(client, prompt, stamp, stage)
+
+
+    def _run_inpaint(self, source: Path, mask: Path, prompt_text: str, strength: float) -> None:
+        try:
+            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
+            stats = client.system_stats()
+            if not workflow_lab.gpu_acceleration_available(stats):
+                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            info = client.object_info()
+            checkpoints = (
+                info.get("CheckpointLoaderSimple", {})
+                .get("input", {}).get("required", {}).get("ckpt_name", [[], {}])[0]
+            )
+            if INPAINT_CHECKPOINT not in checkpoints:
+                raise workflow_lab.ComfyError(
+                    f"Inpaint checkpoint is unavailable: {INPAINT_CHECKPOINT}"
+                )
+
+            src_up = client.upload_image(source)
+            mask_up = client.upload_image(mask)
+            src_name = "/".join(v for v in (src_up.get("subfolder"), src_up.get("name")) if v)
+            mask_name = "/".join(v for v in (mask_up.get("subfolder"), mask_up.get("name")) if v)
+            denoise = max(0.05, min(0.95, strength))
+            seed = int(time.time_ns() & 0xFFFFFFFFFFFF)
+            prompt = {
+                "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": INPAINT_CHECKPOINT}},
+                "2": {"class_type": "LoadImage", "inputs": {"image": src_name}},
+                "3": {"class_type": "LoadImageMask", "inputs": {"image": mask_name, "channel": "red"}},
+                "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt_text, "clip": ["1", 1]}},
+                "5": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
+                "6": {"class_type": "VAEEncodeForInpaint", "inputs": {
+                    "pixels": ["2", 0], "vae": ["1", 2], "mask": ["3", 0], "grow_mask_by": 6
+                }},
+                "7": {"class_type": "KSampler", "inputs": {
+                    "model": ["1", 0], "seed": seed, "steps": 24, "cfg": 5.0,
+                    "sampler_name": "dpmpp_2m", "scheduler": "karras",
+                    "positive": ["4", 0], "negative": ["5", 0],
+                    "latent_image": ["6", 0], "denoise": denoise
+                }},
+                "8": {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["1", 2]}},
+                "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "GENESIS-Inpaint"}},
+            }
+            validation = workflow_lab.validate_prompt(prompt, info)
+            if not validation["valid"]:
+                missing = validation["missing_nodes"] + validation["missing_inputs"]
+                raise workflow_lab.ComfyError("Inpaint workflow is not runnable: " + ", ".join(missing))
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            current = self._submit_and_save(client, prompt, stamp, "Inpaint")
+            self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._set_status(f"Complete · {current.name}")
+        except Exception as exc:
+            self._set_status(f"Inpaint failed · {exc}")
         finally:
             self._set_busy(False)
 
@@ -549,23 +928,28 @@ def main() -> int:
     page_indexes = {
         "create": 0, "poses": 1, "workflow": 2, "media": 3,
         "photos": 4, "cameras": 5, "entertainment": 6, "system": 7, "edit": 8,
+        "posemaker": 9,
     }
     parser.add_argument("--page", choices=tuple(page_indexes), default="create")
     parser.add_argument("--banner", choices=("video", "photos"), default="video")
     args, qt_args = parser.parse_known_args()
     sys.argv = [sys.argv[0], *qt_args]
-    app = QGuiApplication(sys.argv)
+    app = QApplication(sys.argv)
     app.setApplicationName("GENESIS Cockpit")
+    app.setWindowIcon(QIcon(str(PROJECT_ROOT / "genesis/assets/genesis-cockpit-icon-balanced-final.png")))
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
     context.setContextProperty("poseItems", load_pose_items())
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
+    context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
     context.setContextProperty("generationProfiles", load_generation_profiles())
     context.setContextProperty("runtimeStatus", load_runtime_status())
     generation_bridge = GenerationBridge(app)
+    layout_bridge = LayoutSettingsBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
+    context.setContextProperty("genesisLayout", layout_bridge)
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
     if not engine.rootObjects():
         return 1
@@ -574,7 +958,9 @@ def main() -> int:
     window.setProperty("bannerMode", 1 if args.banner == "photos" else 0)
     if args.width or args.height:
         window.resize(max(900, args.width or window.width()), max(600, args.height or window.height()))
-    if not args.screenshot:
+    if args.screenshot:
+        window.show()
+    else:
         window.showMaximized()
     if args.screenshot:
         target = Path(args.screenshot).expanduser().resolve()

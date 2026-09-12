@@ -17,6 +17,8 @@ class ModelCompatibilityTests(unittest.TestCase):
     def test_four_b_and_nine_b_loras_do_not_cross(self):
         model = "flux-2-klein-4b.safetensors"
         self.assertTrue(is_compatible(model, "hina_flux2klein4b_asianMix_v4.0-lora.safetensors"))
+        self.assertTrue(is_compatible(model, "klein4b-deepthroat-22epoc-k3nk.safetensors"))
+        self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "klein4b-deepthroat-22epoc-k3nk.safetensors"))
         self.assertFalse(is_compatible(model, "Klein_Anatomy_Revamped.safetensors"))
 
     def test_kv_rejects_unverified_regular_nine_b_lora(self):
@@ -33,11 +35,11 @@ class ModelCompatibilityTests(unittest.TestCase):
     def test_known_sdxl_checkpoint_accepts_sdxl_adapter(self):
         self.assertTrue(is_compatible("juggernautXL_ragnarokBy.safetensors", "add-detail-xl.safetensors"))
 
-    def test_local_krea2_loras_are_not_klein9b(self):
+    def test_local_krea2_loras_keep_native_family_but_are_community_allowed_on_klein9b(self):
         model = "flux-2-klein-base-9b-Q4_K_M.gguf"
         for name in ("snofs_krea_v1_3D.safetensors", "lenovo_krea2_2.safetensors"):
             self.assertEqual(lora_family(name), "krea2")
-            self.assertFalse(is_compatible(model, name))
+            self.assertTrue(is_compatible(model, name))
 
     def test_only_metadata_verified_regular_9b_loras_are_enabled(self):
         model = "flux-2-klein-base-9b-Q4_K_M.gguf"
@@ -50,7 +52,14 @@ class ModelCompatibilityTests(unittest.TestCase):
 
     def test_explicit_unverified_names_stay_blocked_even_if_filename_matches(self):
         self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "FLUX2_KLEIN_UNLOCKED_V1.safetensors"))
-        self.assertFalse(is_compatible("flux-2-klein-4b.safetensors", "klein4b-deepthroat-22epoc-k3nk.safetensors"))
+        self.assertFalse(is_compatible("flux-2-klein-4b.safetensors", "FK_teeththroat.safetensors"))
+
+    def test_community_krea_loras_are_exposed_for_regular_klein9b_only(self):
+        regular = "flux-2-klein-base-9b-Q4_K_M.gguf"
+        kv = "flux-2-klein-9b-kv-fp8.safetensors"
+        for name in ("snofs_krea_v1_3D.safetensors", "lenovo_krea2_2.safetensors"):
+            self.assertTrue(is_compatible(regular, name))
+            self.assertFalse(is_compatible(kv, name))
 
 
 if __name__ == "__main__":
