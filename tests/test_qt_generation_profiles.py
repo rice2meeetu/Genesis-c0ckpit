@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from qt_cockpit import build_generation_profiles, insert_model_only_loras
 
@@ -89,6 +90,18 @@ class QtGenerationProfileTests(unittest.TestCase):
         )
         self.assertEqual(prompt["genesis_lora_2"]["inputs"]["model"], ["genesis_lora_1", 0])
         self.assertEqual(prompt["sampler"]["inputs"]["model"], ["genesis_lora_2", 0])
+
+    def test_module_pages_route_buttons_through_qt_bridge(self):
+        root = Path(__file__).resolve().parents[1]
+        qml = (root / "genesis/qt_ui/Main.qml").read_text(encoding="utf-8")
+        python = (root / "qt_cockpit.py").read_text(encoding="utf-8")
+        self.assertIn("moduleBridge.triggerAction(modelData.action)", qml)
+        self.assertIn("moduleBridge.triggerAction(modelData)", qml)
+        self.assertIn('setContextProperty("moduleBridge", module_bridge)', python)
+        self.assertNotIn(
+            'GoldButton { Layout.fillWidth: true; text: modelData.action; enabled: false }',
+            qml,
+        )
 
 
 if __name__ == "__main__":
