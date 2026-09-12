@@ -490,12 +490,27 @@ class ModuleBridge(QObject):
         self._set_status(f"Starting {label}…")
         threading.Thread(target=worker, daemon=True).start()
 
+    @pyqtSlot()
+    def refresh(self) -> None:
+        def worker() -> None:
+            snapshot = integrations.status_snapshot()
+            online = [
+                name for name, item in snapshot.get("integrations", {}).items()
+                if item.get("online")
+            ]
+            summary = ", ".join(online) if online else "no local services online"
+            self._set_status("Health check · " + summary)
+        self._set_status("Running health check…")
+        threading.Thread(target=worker, daemon=True).start()
+
     @pyqtSlot(str)
     def triggerAction(self, action: str) -> None:
         key = action.strip().lower()
         if not key:
             return
-        if any(word in key for word in ("output", "export")):
+        if key in {"refresh", "health check"}:
+            self.refresh()
+        elif any(word in key for word in ("output", "export")):
             self._open(OUTPUT_DIR, "GENESIS exports")
         elif any(word in key for word in ("workflow", "json", "nodes", "preflight", "validate")):
             self._open(WORKFLOW_ROOT, "ComfyUI workflows")
