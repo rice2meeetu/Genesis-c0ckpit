@@ -582,7 +582,7 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
                 Repeater {
                     model: quickActions
-                    GoldButton { text: modelData; Layout.preferredWidth: 128; enabled: false }
+                    GoldButton { text: modelData; Layout.preferredWidth: 128; onClicked: moduleBridge.triggerAction(modelData) }
                 }
             }
             GoldPanel {
@@ -593,10 +593,10 @@ ApplicationWindow {
                     anchors.fill: parent; anchors.margins: 7; spacing: 8
                     SmallLabel { text: sectionTitle; Layout.preferredWidth: 170 }
                     FieldBox { Layout.fillWidth: true; Layout.fillHeight: true
-                        Text { anchors.left: parent.left; anchors.leftMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: "Module preview — search unavailable"; color: appRoot.textDim; font.pixelSize: 13 }
+                        Text { anchors.left: parent.left; anchors.leftMargin: 14; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; text: moduleBridge.status; color: appRoot.textDim; font.pixelSize: 13; elide: Text.ElideRight }
                     }
-                    GoldButton { text: "Refresh"; Layout.preferredWidth: 100; enabled: false }
-                    GoldButton { text: "View Options"; Layout.preferredWidth: 120; enabled: false }
+                    GoldButton { text: "Refresh"; Layout.preferredWidth: 100; onClicked: moduleBridge.refresh() }
+                    GoldButton { text: "View Options"; Layout.preferredWidth: 120; onClicked: moduleBridge.triggerAction("Application Settings") }
                 }
             }
             RowLayout {
@@ -628,7 +628,7 @@ ApplicationWindow {
                                 }
                                 Text { text: modelData.title; color: appRoot.brightGold; font.pixelSize: 17; font.bold: true }
                                 Text { Layout.fillWidth: true; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
-                                GoldButton { Layout.fillWidth: true; text: modelData.action; enabled: false }
+                                GoldButton { Layout.fillWidth: true; text: modelData.action; onClicked: moduleBridge.triggerAction(modelData.action) }
                             }
                         }
                     }
@@ -650,9 +650,9 @@ ApplicationWindow {
                         Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
                         SmallLabel { text: "Quick Access" }
                         GoldButton { Layout.fillWidth: true; text: "Open Output Folder"; onClicked: genesisBridge.openOutputFolder() }
-                        GoldButton { Layout.fillWidth: true; text: "GENESIS AI Assistant"; enabled: false }
+                        GoldButton { Layout.fillWidth: true; text: "GENESIS AI Assistant"; onClicked: moduleBridge.triggerAction("GENESIS AI Assistant") }
                         Item { Layout.fillHeight: true }
-                        Text { Layout.fillWidth: true; text: "Preview module. Disabled controls are not connected to the Qt cockpit yet."; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                        Text { Layout.fillWidth: true; text: "Connected to existing local GENESIS tools. Actions report their result above."; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                     }
                 }
             }
