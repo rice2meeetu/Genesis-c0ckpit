@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -23,7 +24,7 @@ from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import adapt_prompt, compatible_selection
-from genesis import workflow_lab
+from genesis import integrations, workflow_lab
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character
 
 
@@ -434,6 +435,95 @@ class LayoutSettingsBridge(QObject):
     def resetCreateLayout(self) -> None:
         self._settings.remove("layout/create")
         self._settings.sync()
+
+
+class ModuleBridge(QObject):
+    """Route Qt module cards to existing GENESIS tools and services."""
+
+    statusChanged = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._status = "Ready · choose a module action"
+
+    @pyqtProperty(str, notify=statusChanged)
+    def status(self) -> str:
+        return self._status
+
+    def _set_status(self, value: str) -> None:
+        self._status = value
+        self.statusChanged.emit()
+
+    def _open(self, target: str | Path, label: str) -> None:
+        url = QUrl(str(target)) if str(target).startswith(("http://", "https://")) else QUrl.fromLocalFile(str(target))
+        ok = QDesktopServices.openUrl(url)
+        self._set_status(f"{label} opened" if ok else f"Could not open {label}")
+
+    def _legacy(self, action: str) -> None:
+        if integrations.process_running(r"Genesis-c0ckpit/main.py"):
+            self._set_status(f"{action} · full GENESIS workspace is already running")
+            return
+        try:
+            subprocess.Popen(
+                [sys.executable, str(PROJECT_ROOT / "main.py")],
+                cwd=str(PROJECT_ROOT),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self._set_status(f"{action} · full GENESIS workspace opened")
+        except OSError as exc:
+            self._set_status(f"{action} failed · {exc}")
+
+    def _service(self, url: str, health_path: str, service: str, label: str) -> None:
+        def worker() -> None:
+            online = integrations.endpoint_online(url, health_path)
+            ok, detail = integrations.start_user_service(service, already_online=online)
+            if ok:
+                for _ in range(40):
+                    if integrations.endpoint_online(url, health_path, timeout=0.5):
+                        integrations.open_url(url)
+                        self._set_status(f"{label} online")
+                        return
+                    time.sleep(0.75)
+            self._set_status(f"{label} · {detail}")
+        self._set_status(f"Starting {label}…")
+        threading.Thread(target=worker, daemon=True).start()
+
+    @pyqtSlot(str)
+    def triggerAction(self, action: str) -> None:
+        key = action.strip().lower()
+        if not key:
+            return
+        if any(word in key for word in ("output", "export")):
+            self._open(OUTPUT_DIR, "GENESIS exports")
+        elif any(word in key for word in ("workflow", "json", "nodes", "preflight", "validate")):
+            self._open(WORKFLOW_ROOT, "ComfyUI workflows")
+        elif any(word in key for word in ("camera", "grid", "recordings", "hub")):
+            self._open(integrations.GO2RTC_URL, "Camera Hub")
+        elif any(word in key for word in ("movie", "video library")):
+            ok, detail = integrations.launch_jellyfin_desktop()
+            self._set_status(detail if ok else f"Jellyfin failed · {detail}")
+        elif "comfyui" in key or key == "manage service":
+            self._service(integrations.COMFYUI_URL, "/system_stats", integrations.COMFYUI_SERVICE, "ComfyUI")
+        elif "ai settings" in key or "ai assistant" in key:
+            self._service(integrations.QWEN_URL, "/health", integrations.QWEN_SERVICE, "GENESIS AI")
+        elif "monitor" in key:
+            try:
+                subprocess.Popen(["gnome-system-monitor"], start_new_session=True)
+                self._set_status("System monitor opened")
+            except OSError as exc:
+                self._set_status(f"System monitor failed · {exc}")
+        elif "backup" in key or "recovery" in key:
+            self._open(PROJECT_ROOT / "backups", "GENESIS recovery")
+        elif "storage" in key or "model" in key:
+            self._open(Path("/mnt/AI-Storage"), "Models and storage")
+        elif "web app" in key or "connections" in key:
+            self._service(integrations.SILLYTAVERN_URL, "/", integrations.SILLYTAVERN_SERVICE, "SillyTavern")
+        elif "settings" in key:
+            self._open(PROJECT_ROOT, "GENESIS settings")
+        else:
+            self._legacy(action)
 
 
 class GenerationBridge(QObject):
@@ -948,8 +1038,10 @@ def main() -> int:
     context.setContextProperty("runtimeStatus", load_runtime_status())
     generation_bridge = GenerationBridge(app)
     layout_bridge = LayoutSettingsBridge(app)
+    module_bridge = ModuleBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
+    context.setContextProperty("moduleBridge", module_bridge)
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
     if not engine.rootObjects():
         return 1
