@@ -52,6 +52,78 @@ PAGE_INDEXES = {
     "settings": 11,
 }
 
+POSE_PAGE_HEADER = (
+    'PageHeader { titleText: "Pose Library"; subtitleText: "Visual preset browser — '
+    'choose geometry first, then send it straight to Create."; iconText: "♟" }'
+)
+WORKFLOW_PAGE_HEADER = (
+    'PageHeader { titleText: "Workflow Studio"; subtitleText: "Inspect, validate and '
+    'launch the generation pipelines behind GENESIS."; iconText: "◇" }'
+)
+
+POSE_PAGE_QML = r'''
+                Item {
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 9
+                        PageHeader { titleText: "Pose Library"; subtitleText: "Full preset collections and the indexed OpenPose library — searchable, visual and ready for Create."; iconText: "♟" }
+                        PremiumPoseBrowser {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            gold: appRoot.gold
+                            brightGold: appRoot.brightGold
+                            ice: appRoot.ice
+                            panel: appRoot.panel
+                            raised: appRoot.raised
+                            line: appRoot.line
+                            textMain: appRoot.textMain
+                            textDim: appRoot.textDim
+                            sourceImage: appRoot.generationSource
+                            onSourceImageRequested: appRoot.chooseSource()
+                            onItemChosen: function(source, name, category, prompt, collection) {
+                                appRoot.selectedPoseSource = source
+                                appRoot.selectedPoseName = name
+                                appRoot.selectedPoseCategory = category
+                                appRoot.selectedPosePrompt = prompt
+                            }
+                            onUseInCreate: function(source, name, category, prompt, collection) {
+                                appRoot.selectedPoseSource = source
+                                appRoot.selectedPoseName = name
+                                appRoot.selectedPoseCategory = category
+                                appRoot.selectedPosePrompt = prompt
+                                if (prompt.length > 0)
+                                    appRoot.generationPrompt = prompt
+                                appRoot.pageIndex = 1
+                            }
+                        }
+                    }
+                }
+
+'''
+
+
+def compose_premium_qml(source: str | None = None) -> str:
+    """Replace only the legacy Pose Library page with the virtualized browser.
+
+    Keeping the replacement in the launcher avoids a risky whole-file rewrite of
+    the large reviewed QML shell while GitHub is the only available editor.  The
+    marker check is intentionally strict: if the shell changes, startup fails
+    instead of silently composing the wrong page.
+    """
+    if source is None:
+        source = (UI_ROOT / "MainPremium.qml").read_text(encoding="utf-8")
+    pose_header = source.find(POSE_PAGE_HEADER)
+    workflow_header = source.find(WORKFLOW_PAGE_HEADER)
+    if pose_header < 0 or workflow_header < 0 or workflow_header <= pose_header:
+        raise ValueError("Premium QML page markers changed; refusing unsafe composition.")
+    pose_start = source.rfind("\n                Item {", 0, pose_header)
+    workflow_start = source.rfind("\n                Item {", 0, workflow_header)
+    if pose_start < 0 or workflow_start < 0 or workflow_start <= pose_start:
+        raise ValueError("Premium QML page boundaries are invalid; refusing unsafe composition.")
+    pose_start += 1
+    workflow_start += 1
+    return source[:pose_start] + POSE_PAGE_QML + source[workflow_start:]
+
 
 class PremiumModuleBridge(ModuleBridge):
     """Windows-safe launcher routes for the premium frontend.
@@ -180,7 +252,15 @@ def main() -> int:
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
 
-    engine.load(QUrl.fromLocalFile(str(UI_ROOT / "MainPremium.qml")))
+    try:
+        qml_source = compose_premium_qml()
+    except (OSError, ValueError) as exc:
+        print(f"GENESIS premium composition failed: {exc}", file=sys.stderr)
+        return 1
+    engine.loadData(
+        qml_source.encode("utf-8"),
+        QUrl.fromLocalFile(str(UI_ROOT / "MainPremium.qml")),
+    )
     if not engine.rootObjects():
         return 1
 

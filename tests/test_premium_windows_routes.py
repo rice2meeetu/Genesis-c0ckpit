@@ -65,3 +65,17 @@ def test_pose_browser_does_not_use_repeater_for_full_pose_grid():
     grid_source = source[grid_start:grid_end]
     assert "model: root.visibleItems" in grid_source
     assert "Repeater" not in grid_source
+
+
+def test_launcher_composes_pose_browser_into_reviewed_shell():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    required = [
+        "compose_premium_qml",
+        "POSE_PAGE_HEADER",
+        "WORKFLOW_PAGE_HEADER",
+        "PremiumPoseBrowser {",
+        "engine.loadData(",
+        "onUseInCreate",
+    ]
+    for marker in required:
+        assert marker in source, marker

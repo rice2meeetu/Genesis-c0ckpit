@@ -43,17 +43,21 @@ jobs:
           QT_QUICK_CONTROLS_STYLE: Basic
         run: python tests/smoke_premium_pose_browser.py
 
-      - name: Smoke-load premium QML offscreen
+      - name: Smoke-load integrated premium QML offscreen
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_CONTROLS_STYLE: Basic
         run: |
           python qt_cockpit_premium.py --page home --width 1400 --height 900 --screenshot premium-home.png
-          if (-not (Test-Path premium-home.png)) { throw 'Premium QML screenshot was not created.' }
+          if (-not (Test-Path premium-home.png)) { throw 'Premium home screenshot was not created.' }
+          python qt_cockpit_premium.py --page poses --width 1400 --height 900 --screenshot premium-poses.png
+          if (-not (Test-Path premium-poses.png)) { throw 'Premium pose screenshot was not created.' }
 
-      - name: Upload premium screenshot
+      - name: Upload premium screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: premium-home
-          path: premium-home.png
+          name: premium-ui-screenshots
+          path: |
+            premium-home.png
+            premium-poses.png
