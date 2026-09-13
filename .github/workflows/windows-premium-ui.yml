@@ -17,6 +17,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements-windows.txt
 
       - name: Install Windows dependencies
         shell: pwsh
@@ -29,10 +31,17 @@ jobs:
         run: python -m py_compile qt_cockpit.py qt_cockpit_premium.py main.py
 
       - name: Run premium UI contract tests
-        run: python -m pytest tests/test_premium_ui_contract.py -q
+        run: python -m pytest tests/test_premium_ui_contract.py tests/test_premium_windows_routes.py -q
 
       - name: Run core test suite
         run: python -m pytest tests -q
+
+      - name: Smoke-load premium pose browser QML
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_CONTROLS_STYLE: Basic
+        run: python tests/smoke_premium_pose_browser.py
 
       - name: Smoke-load premium QML offscreen
         shell: pwsh
