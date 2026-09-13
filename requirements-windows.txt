@@ -1,0 +1,7 @@
+PyQt6==6.11.0
+Pillow
+imagehash
+pytest
+pyinstaller
+opencv-python
+numpy

@@ -56,3 +56,9 @@ To
 
 # Track schema, keep runtime database ignored
 !database/face_schema.sql
+
+.venv-windows/
+qml-err.txt
+qml-out.txt
+windows_qml_diag.py
+

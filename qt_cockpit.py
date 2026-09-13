@@ -1074,12 +1074,18 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            screen = window.screen() or app.primaryScreen()
-            image = screen.grabWindow(int(window.winId())) if screen else None
-            if image is None or image.isNull() or not image.save(str(target)):
+            # Capture the Qt Quick scene rather than the desktop window stack.
+            # QScreen.grabWindow() can return an unrelated foreground window on
+            # Windows, making automated visual verification unreliable.
+            def finish_capture(result) -> None:
+                image = result.image()
+                if image.isNull() or not image.save(str(target)):
+                    app.exit(2)
+                    return
+                app.quit()
+
+            if not window.contentItem().grabToImage(finish_capture):
                 app.exit(2)
-                return
-            app.quit()
 
         QTimer.singleShot(2500, save_screenshot)
     return app.exec()
