@@ -4,6 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = PROJECT_ROOT / "qt_cockpit_premium.py"
 QML = PROJECT_ROOT / "genesis" / "qt_ui" / "MainPremium.qml"
+POSE_BROWSER = PROJECT_ROOT / "genesis" / "qt_ui" / "PremiumPoseBrowser.qml"
 
 
 def test_premium_launcher_exposes_full_pose_library():
@@ -34,3 +35,33 @@ def test_premium_pose_ui_keeps_preset_collections_visible():
     assert "Full 70" in source
     assert "Curated 18" in source
     assert "Grok Camera Presets" in source
+
+
+def test_virtualized_pose_browser_contract():
+    assert POSE_BROWSER.is_file()
+    source = POSE_BROWSER.read_text(encoding="utf-8")
+    required = [
+        "GridView",
+        "curatedPosePresets",
+        "poseItems",
+        'browserMode: "Presets"',
+        '"Full 70"',
+        '"Curated 18"',
+        '"OpenPose"',
+        "searchText",
+        "collectionFilter",
+        "categoryFilter",
+        "useInCreate",
+        "sourceImageRequested",
+    ]
+    for marker in required:
+        assert marker in source, marker
+
+
+def test_pose_browser_does_not_use_repeater_for_full_pose_grid():
+    source = POSE_BROWSER.read_text(encoding="utf-8")
+    grid_start = source.index("GridView {")
+    grid_end = source.index("Text {\n                    anchors.centerIn: parent", grid_start)
+    grid_source = source[grid_start:grid_end]
+    assert "model: root.visibleItems" in grid_source
+    assert "Repeater" not in grid_source
