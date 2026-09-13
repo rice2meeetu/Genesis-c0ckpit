@@ -274,15 +274,11 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            def finish_capture(result) -> None:
-                image = result.image()
-                if image.isNull() or not image.save(str(target)):
-                    app.exit(2)
-                    return
-                app.quit()
-
-            if not window.contentItem().grabToImage(finish_capture):
+            image = window.grabWindow()
+            if image.isNull() or not image.save(str(target)):
                 app.exit(2)
+                return
+            app.quit()
 
         QTimer.singleShot(2500, save_screenshot)
     else:
