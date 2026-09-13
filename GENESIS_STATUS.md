@@ -1,12 +1,12 @@
 # GENESIS Photo Studio Status
 
 ## Current Version
-GENESIS v0.10 + Cockpit work in progress
-Branch: genesis-cockpit
-Latest checkpoint: d2e82fd
+GENESIS v0.10 + Cockpit stabilization
+Branch: main
+Latest checkpoint: 7d4ca55
 
 ## Project Root
-/home/rice2meetyou/GENESIS-Photo-Studio
+/home/rice2meetyou/Genesis-c0ckpit
 
 ## Current State
 
@@ -48,6 +48,17 @@ Completed:
   the existing `.venv`; they no longer divert into experimental viewer builds
 - Jellyfin MPV Shim controls aligned across native/Flatpak profiles; shim
   autostart disabled so it only runs when explicitly launched
+- Cockpit Klein 4B Fast generation live-tested end to end at 512x512: queued,
+  completed in 56 seconds, exported, and visually verified without modifying
+  the saved workflow
+- `/mnt/C` confirmed mounted read/write and the guarded SillyTavern user service
+  live-started successfully on `127.0.0.1:8000`
+- ComfyUI and llama.cpp user-service startup paths live-tested successfully;
+  llama.cpp returned a healthy response and ComfyUI was restored with an empty
+  queue and RX 9060 XT GPU acceleration available
+- All ten Qt Cockpit pages launched successfully on the host display; automated
+  Wayland/XWayland screenshots remain black and are not treated as a visual pass
+- Current automated suite passes: 71 tests
 
 ## Current Architecture
 
@@ -67,19 +78,13 @@ GENESIS
 GENESIS Cockpit stabilization
 
 Next:
-- Live-test one complete Klein generation from the cockpit while ComfyUI is
-  running; the working saved workflow itself remains untouched
 - Physically verify the updated mouse gestures during real Jellyfin playback
-- Clear the Windows NTFS dirty flag in Windows and remount `/mnt/C` read/write,
-  then live-test the guarded SillyTavern start button
-- Live-test llama.cpp and ComfyUI user-service startup outside the Codex sandbox
+- Perform a human visual pass of the full Cockpit on the host desktop; all ten
+  pages launch, but automated Wayland/XWayland captures are black
 - Configure TTS only if the existing AllTalk/Genesis Voice backend becomes
   available; do not install a replacement implicitly
 - Configure vector/chat memory as a separate backed-up SillyTavern milestone
 - Reconcile the older experimental/untracked viewer files without deleting them
-- Visually smoke-test the full cockpit on the host desktop; the Codex sandbox
-  cannot attach to display `:0`, but the selected `.venv` has Tk, Pillow, and
-  imagehash available
 
 ## Working Tree Note
 
