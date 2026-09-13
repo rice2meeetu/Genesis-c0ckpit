@@ -27,7 +27,7 @@ class VisualBrowserTests(unittest.TestCase):
             folder, folders, files = folder_entries(root)
 
             self.assertEqual(folder, root.resolve())
-            self.assertEqual(folders, [nested])
+            self.assertEqual([path.resolve() for path in folders], [nested.resolve()])
             self.assertEqual([path.name for path in files], ["A.jpg", "b.png"])
 
     def test_newest_sort_uses_source_revision(self):
@@ -43,7 +43,10 @@ class VisualBrowserTests(unittest.TestCase):
 
             _, _, files = folder_entries(root, newest=True)
 
-            self.assertEqual(files, [newer, older])
+            self.assertEqual(
+                [path.resolve() for path in files],
+                [newer.resolve(), older.resolve()],
+            )
 
     def test_thumbnail_cache_refreshes_when_source_changes(self):
         with tempfile.TemporaryDirectory() as directory:
