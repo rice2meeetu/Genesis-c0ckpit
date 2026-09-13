@@ -2,11 +2,17 @@
 setlocal
 cd /d "%~dp0"
 echo === GENESIS WINDOWS BUILD ===
-if not exist ".venv\Scripts\python.exe" py -3.12 -m venv .venv
-".venv\Scripts\python.exe" -m pip install --upgrade pip
-".venv\Scripts\python.exe" -m pip install PyQt6 pillow imagehash pytest safetensors
+set "PY=.venv-windows\Scripts\python.exe"
+if not exist "%PY%" py -3.12 -m venv .venv-windows
+"%PY%" -m pip install --upgrade pip
 if errorlevel 1 goto :fail
-".venv\Scripts\python.exe" -m pytest tests\test_model_compatibility.py tests\test_qt_generation_profiles.py tests\test_generation_pipeline.py -q
+"%PY%" -m pip install -r requirements-windows.txt
+if errorlevel 1 goto :fail
+"%PY%" -m pip install --no-deps face-recognition==1.3.0
+if errorlevel 1 goto :fail
+"%PY%" -m py_compile qt_cockpit.py main.py
+if errorlevel 1 goto :fail
+"%PY%" -m pytest tests -q
 if errorlevel 1 goto :fail
 echo.
 echo GENESIS WINDOWS CORE BUILD: PASS

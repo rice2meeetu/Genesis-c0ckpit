@@ -7,12 +7,14 @@ from genesis import integrations
 
 class IntegrationTests(unittest.TestCase):
     def test_first_existing_prefers_first_available_runtime(self):
-        candidates = (Path("/missing/preferred"), Path("/available/fallback"))
+        preferred = Path("missing") / "preferred"
+        fallback = Path("available") / "fallback"
+        candidates = (preferred, fallback)
         with patch.object(Path, "exists", autospec=True) as exists:
-            exists.side_effect = lambda path: str(path) == "/available/fallback"
+            exists.side_effect = lambda path: Path(path) == fallback
             self.assertEqual(
                 integrations.first_existing(candidates),
-                Path("/available/fallback"),
+                fallback,
             )
 
     def test_start_user_service_does_not_duplicate_online_service(self):
