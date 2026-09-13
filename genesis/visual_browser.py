@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 from pathlib import Path
 from threading import Lock
 import tkinter as tk
@@ -11,12 +12,36 @@ from tkinter import ttk
 from PIL import Image, ImageOps, ImageTk
 
 EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
+_REVISION_SAMPLE_BYTES = 65536
+
+
+def _content_fingerprint(path: Path, size: int) -> bytes:
+    """Return a bounded content fingerprint for revision-aware thumbnail caching.
+
+    Windows can preserve identical mtime/ctime values across a very fast rewrite.
+    Reading a bounded prefix/suffix keeps cache-hit IO small while still detecting
+    ordinary image replacements reliably. Files up to 128 KiB are hashed in full.
+    """
+    digest = hashlib.blake2b(digest_size=16)
+    with path.open('rb') as handle:
+        head = handle.read(_REVISION_SAMPLE_BYTES)
+        digest.update(head)
+        if size > _REVISION_SAMPLE_BYTES:
+            handle.seek(max(_REVISION_SAMPLE_BYTES, size - _REVISION_SAMPLE_BYTES))
+            digest.update(handle.read(_REVISION_SAMPLE_BYTES))
+    return digest.digest()
 
 
 def revision(path):
     path = Path(path)
     stat = path.stat()
-    return (str(path.resolve()), stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
+    return (
+        str(path.resolve()),
+        stat.st_mtime_ns,
+        stat.st_ctime_ns,
+        stat.st_size,
+        _content_fingerprint(path, stat.st_size),
+    )
 
 
 def folder_entries(folder, newest=False):
