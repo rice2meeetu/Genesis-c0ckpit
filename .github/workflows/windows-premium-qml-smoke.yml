@@ -1,0 +1,43 @@
+name: Windows Premium QML Fast Smoke
+
+on:
+  push:
+    branches: [windows-build]
+  workflow_dispatch:
+
+jobs:
+  qml-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install minimal Qt runtime
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PyQt6==6.11.0
+
+      - name: Compile premium launcher
+        run: python -m py_compile qt_cockpit.py qt_cockpit_premium.py
+
+      - name: Smoke integrated premium QML pages
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          QSG_RHI_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
+        run: |
+          python qt_cockpit_premium.py --page home --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium home smoke exited with code $LASTEXITCODE." }
+          python qt_cockpit_premium.py --page poses --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium pose smoke exited with code $LASTEXITCODE." }
+          python qt_cockpit_premium.py --page create --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium create smoke exited with code $LASTEXITCODE." }
