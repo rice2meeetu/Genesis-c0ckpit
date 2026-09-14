@@ -225,12 +225,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="home")
     parser.add_argument("--screenshot")
+    parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
     args, qt_args = parser.parse_known_args()
     sys.argv = [sys.argv[0], *qt_args]
 
-    if args.screenshot:
+    if args.screenshot or args.smoke:
         # Headless Windows runners need an explicit Qt Quick software renderer.
         # This must be selected before the first QQuickWindow is constructed.
         QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
@@ -308,6 +309,12 @@ def main() -> int:
             result.ready.connect(lambda: finish_capture(result))
 
         QTimer.singleShot(750, start_capture)
+    elif args.smoke:
+        # Full integrated startup validation for graphics-less CI runners.
+        # The QML shell must compose, instantiate, show and process events before
+        # the timer exits successfully; no fragile framebuffer capture required.
+        window.show()
+        QTimer.singleShot(1200, app.quit)
     else:
         window.showMaximized()
     return app.exec()
