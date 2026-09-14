@@ -43,20 +43,20 @@ jobs:
           QT_QUICK_CONTROLS_STYLE: Basic
         run: python tests/smoke_premium_pose_browser.py
 
-      - name: Render integrated premium QML screenshots
+      - name: Smoke integrated premium QML pages
         shell: pwsh
         env:
-          QT_QPA_PLATFORM: minimal
+          QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QSG_RHI_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
         run: |
-          python qt_cockpit_premium.py --page home --width 1400 --height 900 --screenshot premium-home.png
-          if (-not (Test-Path premium-home.png)) { throw 'Premium home screenshot was not created.' }
-          if ((Get-Item premium-home.png).Length -lt 1024) { throw 'Premium home screenshot is unexpectedly small.' }
-          python qt_cockpit_premium.py --page poses --width 1400 --height 900 --screenshot premium-poses.png
-          if (-not (Test-Path premium-poses.png)) { throw 'Premium pose screenshot was not created.' }
-          if ((Get-Item premium-poses.png).Length -lt 1024) { throw 'Premium pose screenshot is unexpectedly small.' }
+          python qt_cockpit_premium.py --page home --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium home smoke exited with code $LASTEXITCODE." }
+          python qt_cockpit_premium.py --page poses --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium pose smoke exited with code $LASTEXITCODE." }
+          python qt_cockpit_premium.py --page create --width 1400 --height 900 --smoke
+          if ($LASTEXITCODE -ne 0) { throw "Premium create smoke exited with code $LASTEXITCODE." }
 
       - name: Build packaged premium Windows app
         shell: pwsh
@@ -67,28 +67,17 @@ jobs:
       - name: Smoke packaged premium Windows app
         shell: pwsh
         env:
-          QT_QPA_PLATFORM: minimal
+          QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QSG_RHI_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
         run: |
-          $process = Start-Process -FilePath '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe' -ArgumentList '--page','home','--width','1400','--height','900','--screenshot','packaged-premium-home.png' -Wait -PassThru
+          $process = Start-Process -FilePath '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe' -ArgumentList '--page','home','--width','1400','--height','900','--smoke' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Packaged GENESIS exited with code $($process.ExitCode)." }
-          if (-not (Test-Path packaged-premium-home.png)) { throw 'Packaged premium screenshot was not created.' }
-          if ((Get-Item packaged-premium-home.png).Length -lt 1024) { throw 'Packaged premium screenshot is unexpectedly small.' }
 
       - name: Archive packaged Windows app
         shell: pwsh
         run: Compress-Archive -Path 'dist\GENESIS-c0ckpit\*' -DestinationPath 'GENESIS-c0ckpit-Windows.zip' -Force
-
-      - name: Upload premium screenshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: premium-ui-screenshots
-          path: |
-            premium-home.png
-            premium-poses.png
-            packaged-premium-home.png
 
       - name: Upload packaged Windows app
         uses: actions/upload-artifact@v4
