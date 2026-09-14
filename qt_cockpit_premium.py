@@ -2,8 +2,9 @@
 
 This entry point deliberately reuses the established GENESIS generation bridge
 from ``qt_cockpit.py`` while providing Windows-native module launching and the
-full local pose index to the premium QML.  The original ``Main.qml`` remains a
-recovery path until the premium frontend passes Windows smoke verification.
+full local pose index to the premium QML. The same entry point can also relaunch
+into the established PhotoStudio workspaces so packaged premium buttons do not
+depend on a separate source-tree Python process.
 """
 
 from __future__ import annotations
@@ -53,6 +54,18 @@ PAGE_INDEXES = {
     "posemaker": 10,
     "settings": 11,
 }
+
+LEGACY_TOOL_PAGES = (
+    "home",
+    "photos",
+    "enhance",
+    "background",
+    "batch",
+    "canvas",
+    "cameras",
+    "ai",
+    "poses",
+)
 
 POSE_PAGE_HEADER = (
     'PageHeader { titleText: "Pose Library"; subtitleText: "Visual preset browser — '
@@ -110,7 +123,7 @@ def normalize_compact_qml(source: str) -> str:
 
     The premium design shell intentionally uses compact one-line declarations.
     Semicolons are valid between QML properties, but Qt rejects ``Child { ... };
-    Child { ... }``.  Only that exact structural separator is normalized; JS
+    Child { ... }``. Only that exact structural separator is normalized; JS
     statement semicolons and ordinary property separators are left untouched.
     """
     return QML_CHILD_SEPARATOR_RE.sub("} ", source)
@@ -120,7 +133,7 @@ def compose_premium_qml(source: str | None = None) -> str:
     """Replace only the legacy Pose Library page with the virtualized browser.
 
     Keeping the replacement in the launcher avoids a risky whole-file rewrite of
-    the large reviewed QML shell while GitHub is the only available editor.  The
+    the large reviewed QML shell while GitHub is the only available editor. The
     marker check is intentionally strict: if the shell changes, startup fails
     instead of silently composing the wrong page.
     """
@@ -140,14 +153,79 @@ def compose_premium_qml(source: str | None = None) -> str:
     return normalize_compact_qml(composed)
 
 
+def legacy_page_for_action(action: str) -> str:
+    """Map premium presentation actions onto an existing functional workspace."""
+    key = action.strip().lower()
+    if any(word in key for word in ("background", "cutout")):
+        return "background"
+    if "batch" in key:
+        return "batch"
+    if any(word in key for word in ("enhance", "upscale")):
+        return "enhance"
+    if any(word in key for word in ("canvas", "editor", "edit")):
+        return "canvas"
+    if any(word in key for word in (
+        "duplicate",
+        "face organiser",
+        "face organizer",
+        "media viewer",
+        "scan library",
+        "add folder",
+        "photo library",
+    )):
+        return "photos"
+    if "pose" in key:
+        return "poses"
+    if "camera" in key:
+        return "cameras"
+    if any(word in key for word in ("genesis ai", "ai assistant")):
+        return "ai"
+    return "home"
+
+
+def run_legacy_tool_page(requested: str) -> int:
+    """Run an established PhotoStudio workspace from source or a frozen EXE."""
+    from main import PhotoStudio
+
+    legacy = PhotoStudio()
+    target_page = "enhance" if requested == "batch" else requested
+
+    def navigate(attempt: int = 0) -> None:
+        pages = getattr(legacy, "pages", {})
+        if target_page in pages and hasattr(legacy, "_show_page"):
+            legacy._show_page(target_page)
+            if requested in {"enhance", "background", "batch"} and hasattr(legacy, "_show_photo_tools_mode"):
+                legacy._show_photo_tools_mode(requested)
+            legacy.deiconify()
+            try:
+                legacy.lift()
+                legacy.focus_force()
+            except Exception:
+                pass
+            return
+        if attempt < 40:
+            legacy.after(250, lambda: navigate(attempt + 1))
+            return
+        legacy.deiconify()
+
+    legacy.after(250, navigate)
+    legacy.mainloop()
+    return 0
+
+
+def packaged_tool_import_smoke() -> int:
+    """Verify PyInstaller bundled the mature tool host and its dependencies."""
+    from main import PhotoStudio
+
+    return 0 if PhotoStudio.__name__ == "PhotoStudio" else 3
+
+
 class PremiumModuleBridge(ModuleBridge):
     """Windows-safe launcher routes for the premium frontend.
 
-    The legacy bridge contains Linux service-manager and Flatpak assumptions.
-    This subclass keeps the same QML API but uses endpoint checks, Explorer,
-    Task Manager, and the current repository location on Windows. Unknown
-    creative-tool actions still open the preserved GENESIS workspace rather
-    than pretending a native implementation exists.
+    Service and folder actions remain native. Creative tools that already exist
+    in the mature PhotoStudio are relaunched through this same premium entry
+    point, which works both from source and from the packaged Windows EXE.
     """
 
     def _open_path_or_url(self, target: str | Path, label: str) -> None:
@@ -157,6 +235,7 @@ class PremiumModuleBridge(ModuleBridge):
         self._set_status(f"{label} opened" if ok else f"Could not open {label}")
 
     def _launch_legacy_workspace(self, action: str) -> None:
+        page = legacy_page_for_action(action)
         try:
             kwargs: dict = {
                 "cwd": str(PROJECT_ROOT),
@@ -167,8 +246,17 @@ class PremiumModuleBridge(ModuleBridge):
                 kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
             else:
                 kwargs["start_new_session"] = True
-            subprocess.Popen([sys.executable, str(PROJECT_ROOT / "main.py")], **kwargs)
-            self._set_status(f"{action} · GENESIS workspace opened")
+            if getattr(sys, "frozen", False):
+                command = [sys.executable, "--legacy-page", page]
+            else:
+                command = [
+                    sys.executable,
+                    str(PROJECT_ROOT / "qt_cockpit_premium.py"),
+                    "--legacy-page",
+                    page,
+                ]
+            subprocess.Popen(command, **kwargs)
+            self._set_status(f"{action} · {page} tools opened")
         except OSError as exc:
             self._set_status(f"{action} failed · {exc}")
 
@@ -238,12 +326,19 @@ class PremiumModuleBridge(ModuleBridge):
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="home")
+    parser.add_argument("--legacy-page", choices=LEGACY_TOOL_PAGES)
+    parser.add_argument("--tool-smoke", action="store_true")
     parser.add_argument("--screenshot")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
     args, qt_args = parser.parse_known_args()
     sys.argv = [sys.argv[0], *qt_args]
+
+    if args.tool_smoke:
+        return packaged_tool_import_smoke()
+    if args.legacy_page:
+        return run_legacy_tool_page(args.legacy_page)
 
     if args.screenshot or args.smoke:
         # Headless Windows runners need an explicit Qt Quick software renderer.
