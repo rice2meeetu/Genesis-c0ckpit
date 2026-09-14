@@ -18,6 +18,7 @@ from pathlib import Path
 from PyQt6.QtCore import QTimer, QUrl, pyqtSlot
 from PyQt6.QtGui import QDesktopServices, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
+from PyQt6.QtQuick import QQuickWindow, QSGRendererInterface
 from PyQt6.QtWidgets import QApplication
 
 from genesis import integrations
@@ -229,6 +230,11 @@ def main() -> int:
     args, qt_args = parser.parse_known_args()
     sys.argv = [sys.argv[0], *qt_args]
 
+    if args.screenshot:
+        # Headless Windows runners need an explicit Qt Quick software renderer.
+        # This must be selected before the first QQuickWindow is constructed.
+        QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
+
     app = QApplication(sys.argv)
     app.setApplicationName("GENESIS c0ckpit Premium")
     app.setWindowIcon(QIcon(str(PROJECT_ROOT / "genesis/assets/genesis-cockpit-icon-balanced-final.png")))
@@ -272,15 +278,36 @@ def main() -> int:
         window.show()
         target = Path(args.screenshot).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
+        capture_state = {"attempt": 0, "result": None}
 
-        def save_screenshot() -> None:
-            image = window.grabWindow()
-            if image.isNull() or not image.save(str(target)):
+        def retry_capture(reason: str) -> None:
+            capture_state["attempt"] += 1
+            if capture_state["attempt"] >= 12:
+                print(f"GENESIS premium screenshot failed: {reason}", file=sys.stderr)
                 app.exit(2)
                 return
-            app.quit()
+            QTimer.singleShot(250, start_capture)
 
-        QTimer.singleShot(2500, save_screenshot)
+        def finish_capture(result) -> None:
+            if result.saveToFile(str(target)):
+                app.quit()
+                return
+            retry_capture("Qt Quick item grab could not be saved")
+
+        def start_capture() -> None:
+            content_item = window.contentItem()
+            if content_item is None or content_item.width() <= 0 or content_item.height() <= 0:
+                retry_capture("premium content item is not ready")
+                return
+            window.requestUpdate()
+            result = content_item.grabToImage()
+            if result is None:
+                retry_capture("Qt Quick item grab could not be started")
+                return
+            capture_state["result"] = result
+            result.ready.connect(lambda: finish_capture(result))
+
+        QTimer.singleShot(750, start_capture)
     else:
         window.showMaximized()
     return app.exec()
