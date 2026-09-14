@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -61,6 +62,7 @@ WORKFLOW_PAGE_HEADER = (
     'PageHeader { titleText: "Workflow Studio"; subtitleText: "Inspect, validate and '
     'launch the generation pipelines behind GENESIS."; iconText: "◇" }'
 )
+QML_CHILD_SEPARATOR_RE = re.compile(r"}\s*;\s*(?=[A-Z][A-Za-z0-9_]*\s*\{)")
 
 POSE_PAGE_QML = r'''
                 Item {
@@ -103,6 +105,17 @@ POSE_PAGE_QML = r'''
 '''
 
 
+def normalize_compact_qml(source: str) -> str:
+    """Remove invalid semicolons between sibling QML child objects.
+
+    The premium design shell intentionally uses compact one-line declarations.
+    Semicolons are valid between QML properties, but Qt rejects ``Child { ... };
+    Child { ... }``.  Only that exact structural separator is normalized; JS
+    statement semicolons and ordinary property separators are left untouched.
+    """
+    return QML_CHILD_SEPARATOR_RE.sub("} ", source)
+
+
 def compose_premium_qml(source: str | None = None) -> str:
     """Replace only the legacy Pose Library page with the virtualized browser.
 
@@ -123,7 +136,8 @@ def compose_premium_qml(source: str | None = None) -> str:
         raise ValueError("Premium QML page boundaries are invalid; refusing unsafe composition.")
     pose_start += 1
     workflow_start += 1
-    return source[:pose_start] + POSE_PAGE_QML + source[workflow_start:]
+    composed = source[:pose_start] + POSE_PAGE_QML + source[workflow_start:]
+    return normalize_compact_qml(composed)
 
 
 class PremiumModuleBridge(ModuleBridge):
