@@ -16,8 +16,14 @@ $env:QT_QUICK_CONTROLS_STYLE='Basic'
 & $Python -m pytest tests -q
 if ($PremiumSmoke) {
   $env:QT_QPA_PLATFORM='offscreen'
-  & $Python qt_cockpit_premium.py --page home --width 1400 --height 900 --screenshot premium-home.png
-  if (-not (Test-Path 'premium-home.png')) { throw 'Premium QML smoke screenshot was not created.' }
+  $env:QT_QUICK_BACKEND='software'
+  $env:QSG_RHI_BACKEND='software'
+  & $Python qt_cockpit_premium.py --page home --width 1400 --height 900 --smoke
+  if ($LASTEXITCODE -ne 0) { throw "Premium QML smoke exited with code $LASTEXITCODE." }
+  & $Python qt_cockpit_premium.py --page poses --width 1400 --height 900 --smoke
+  if ($LASTEXITCODE -ne 0) { throw "Premium pose smoke exited with code $LASTEXITCODE." }
+  & $Python qt_cockpit_premium.py --page create --width 1400 --height 900 --smoke
+  if ($LASTEXITCODE -ne 0) { throw "Premium create smoke exited with code $LASTEXITCODE." }
   Write-Host 'GENESIS PREMIUM UI SMOKE: PASS'
 }
 if ($Package) {
