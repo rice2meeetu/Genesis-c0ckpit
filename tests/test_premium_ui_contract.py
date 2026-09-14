@@ -8,6 +8,7 @@ BAT = PROJECT_ROOT / "START_GENESIS_PREMIUM_WINDOWS.bat"
 BUILD_SCRIPT = PROJECT_ROOT / "build-windows.ps1"
 REQUIREMENTS = PROJECT_ROOT / "requirements-windows.txt"
 WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "windows-premium-ui.yml"
+INSTALLER = PROJECT_ROOT / "installer" / "GENESIS-c0ckpit.iss"
 
 
 def test_premium_ui_files_exist():
@@ -17,6 +18,7 @@ def test_premium_ui_files_exist():
     assert BUILD_SCRIPT.is_file()
     assert REQUIREMENTS.is_file()
     assert WORKFLOW.is_file()
+    assert INSTALLER.is_file()
 
 
 def test_premium_ui_contains_reference_driven_sections():
@@ -46,6 +48,7 @@ def test_premium_ui_contains_reference_driven_sections():
 def test_premium_ui_keeps_real_generation_and_edit_bridges():
     source = QML.read_text(encoding="utf-8")
     assert "genesisBridge.chooseSourceImage()" in source
+    assert "source: appRoot.generationSource" in source
     assert "genesisBridge.queueGenerate(" in source
     assert "genesisBridge.queueEdit(" in source
     assert "genesisBridge.openPreview()" in source
@@ -136,3 +139,18 @@ def test_windows_ci_smokes_integrated_and_packaged_premium_app():
     assert "Smoke packaged premium Windows app" in source
     assert "--tool-smoke" in source
     assert "GENESIS-c0ckpit-Windows.zip" in source
+
+
+def test_windows_installer_is_built_and_smoked():
+    installer = INSTALLER.read_text(encoding="utf-8")
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    build = BUILD_SCRIPT.read_text(encoding="utf-8")
+    assert 'Source: "..\\dist\\GENESIS-c0ckpit\\*"' in installer
+    assert "GENESIS-c0ckpit-Setup" in installer
+    assert "PrivilegesRequired=lowest" in installer
+    assert "Create a desktop shortcut" in installer
+    assert "Build Windows installer" in workflow
+    assert "Smoke installed Windows app" in workflow
+    assert "installer-output/GENESIS-c0ckpit-Setup.exe" in workflow
+    assert "[switch]$Installer" in build
+    assert "Inno Setup 6 is required for -Installer" in build
