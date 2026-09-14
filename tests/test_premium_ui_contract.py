@@ -5,12 +5,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 QML = PROJECT_ROOT / "genesis" / "qt_ui" / "MainPremium.qml"
 LAUNCHER = PROJECT_ROOT / "qt_cockpit_premium.py"
 BAT = PROJECT_ROOT / "START_GENESIS_PREMIUM_WINDOWS.bat"
+BUILD_SCRIPT = PROJECT_ROOT / "build-windows.ps1"
 
 
 def test_premium_ui_files_exist():
     assert QML.is_file()
     assert LAUNCHER.is_file()
     assert BAT.is_file()
+    assert BUILD_SCRIPT.is_file()
 
 
 def test_premium_ui_contains_reference_driven_sections():
@@ -54,3 +56,18 @@ def test_premium_launcher_reuses_existing_backend_bridges():
     assert 'UI_ROOT / "MainPremium.qml"' in source
     assert '"home": 0' in source
     assert '"settings": 11' in source
+
+
+def test_premium_launcher_has_headless_safe_capture_path():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert "QQuickWindow.setGraphicsApi" in source
+    assert "GraphicsApi.Software" in source
+    assert "content_item.grabToImage()" in source
+    assert "result.saveToFile" in source
+
+
+def test_windows_package_uses_premium_entry_point():
+    source = BUILD_SCRIPT.read_text(encoding="utf-8")
+    package_line = next(line for line in source.splitlines() if "pyinstaller.exe" in line)
+    assert package_line.rstrip().endswith("qt_cockpit_premium.py")
+    assert not package_line.rstrip().endswith("qt_cockpit.py")
