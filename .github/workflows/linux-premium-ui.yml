@@ -1,0 +1,52 @@
+name: Linux Premium UI Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "genesis/qt_ui/**"
+      - "qt_cockpit.py"
+      - "qt_cockpit_linux_premium.py"
+      - "launch-qt-cockpit.sh"
+      - "tests/test_linux_premium_ui_contract.py"
+      - ".github/workflows/linux-premium-ui.yml"
+  workflow_dispatch:
+
+jobs:
+  premium-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install UI test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PyQt6 pytest psutil
+
+      - name: Compile premium launcher
+        run: python -m py_compile qt_cockpit.py qt_cockpit_linux_premium.py
+
+      - name: Verify premium UI contract
+        run: python -m pytest tests/test_linux_premium_ui_contract.py -q
+
+      - name: Smoke premium QML shell
+        run: |
+          python qt_cockpit_linux_premium.py --page create --width 1400 --height 900 --screenshot /tmp/genesis-linux-premium.png
+          test -s /tmp/genesis-linux-premium.png
+
+      - name: Upload smoke screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: genesis-linux-premium-smoke
+          path: /tmp/genesis-linux-premium.png
+          if-no-files-found: error
