@@ -8,7 +8,7 @@ on:
 jobs:
   verify-premium-ui:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +58,29 @@ jobs:
           if (-not (Test-Path premium-poses.png)) { throw 'Premium pose screenshot was not created.' }
           if ((Get-Item premium-poses.png).Length -lt 1024) { throw 'Premium pose screenshot is unexpectedly small.' }
 
+      - name: Build packaged premium Windows app
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed --name GENESIS-c0ckpit --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' --add-data 'genesis\reference;genesis\reference' qt_cockpit_premium.py
+          if (-not (Test-Path 'dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe')) { throw 'Packaged GENESIS executable was not created.' }
+
+      - name: Smoke packaged premium Windows app
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: minimal
+          QT_QUICK_BACKEND: software
+          QSG_RHI_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
+        run: |
+          $process = Start-Process -FilePath '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe' -ArgumentList '--page','home','--width','1400','--height','900','--screenshot','packaged-premium-home.png' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Packaged GENESIS exited with code $($process.ExitCode)." }
+          if (-not (Test-Path packaged-premium-home.png)) { throw 'Packaged premium screenshot was not created.' }
+          if ((Get-Item packaged-premium-home.png).Length -lt 1024) { throw 'Packaged premium screenshot is unexpectedly small.' }
+
+      - name: Archive packaged Windows app
+        shell: pwsh
+        run: Compress-Archive -Path 'dist\GENESIS-c0ckpit\*' -DestinationPath 'GENESIS-c0ckpit-Windows.zip' -Force
+
       - name: Upload premium screenshots
         uses: actions/upload-artifact@v4
         with:
@@ -65,3 +88,11 @@ jobs:
           path: |
             premium-home.png
             premium-poses.png
+            packaged-premium-home.png
+
+      - name: Upload packaged Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: GENESIS-c0ckpit-Windows
+          path: GENESIS-c0ckpit-Windows.zip
+          if-no-files-found: error
