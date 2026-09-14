@@ -1,5 +1,6 @@
 param(
   [switch]$Package,
+  [switch]$Installer,
   [switch]$PremiumSmoke
 )
 $ErrorActionPreference = 'Stop'
@@ -29,7 +30,7 @@ if ($PremiumSmoke) {
   if ($LASTEXITCODE -ne 0) { throw "Premium tool-host smoke exited with code $LASTEXITCODE." }
   Write-Host 'GENESIS PREMIUM SOURCE SMOKE: PASS'
 }
-if ($Package) {
+if ($Package -or $Installer) {
   & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --collect-all rembg --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' --add-data 'genesis\reference;genesis\reference' qt_cockpit_premium.py
   $Exe = '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe'
   if (-not (Test-Path $Exe)) { throw 'Packaged GENESIS executable was not created.' }
@@ -40,4 +41,25 @@ if ($Package) {
     if ($tools.ExitCode -ne 0) { throw "Packaged GENESIS tool-host smoke exited with code $($tools.ExitCode)." }
     Write-Host 'GENESIS PREMIUM PACKAGED SMOKE: PASS'
   }
+  Compress-Archive -Path '.\dist\GENESIS-c0ckpit\*' -DestinationPath '.\GENESIS-c0ckpit-Windows.zip' -Force
+  Write-Host 'GENESIS PORTABLE ZIP: GENESIS-c0ckpit-Windows.zip'
+}
+if ($Installer) {
+  $IsccCandidates = @(
+    'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+    'C:\Program Files\Inno Setup 6\ISCC.exe'
+  )
+  $Iscc = $IsccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $Iscc) {
+    $IsccCommand = Get-Command iscc.exe -ErrorAction SilentlyContinue
+    if ($IsccCommand) { $Iscc = $IsccCommand.Source }
+  }
+  if (-not $Iscc) {
+    throw 'Inno Setup 6 is required for -Installer. Install Inno Setup, or download the CI-built GENESIS-c0ckpit-Setup.exe artifact.'
+  }
+  & $Iscc '.\installer\GENESIS-c0ckpit.iss'
+  if ($LASTEXITCODE -ne 0) { throw "Inno Setup exited with code $LASTEXITCODE." }
+  $SetupExe = '.\installer-output\GENESIS-c0ckpit-Setup.exe'
+  if (-not (Test-Path $SetupExe)) { throw 'GENESIS installer was not created.' }
+  Write-Host 'GENESIS WINDOWS INSTALLER: installer-output\GENESIS-c0ckpit-Setup.exe'
 }
