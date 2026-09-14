@@ -241,6 +241,16 @@ def main() -> int:
     app.setWindowIcon(QIcon(str(PROJECT_ROOT / "genesis/assets/genesis-cockpit-icon-balanced-final.png")))
 
     engine = QQmlApplicationEngine()
+
+    def report_qml_warnings(warnings) -> None:
+        for warning in warnings:
+            try:
+                detail = warning.toString()
+            except Exception:
+                detail = str(warning)
+            print(f"GENESIS premium QML: {detail}", file=sys.stderr, flush=True)
+
+    engine.warnings.connect(report_qml_warnings)
     context = engine.rootContext()
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
@@ -262,13 +272,14 @@ def main() -> int:
     try:
         qml_source = compose_premium_qml()
     except (OSError, ValueError) as exc:
-        print(f"GENESIS premium composition failed: {exc}", file=sys.stderr)
+        print(f"GENESIS premium composition failed: {exc}", file=sys.stderr, flush=True)
         return 1
     engine.loadData(
         qml_source.encode("utf-8"),
         QUrl.fromLocalFile(str(UI_ROOT / "MainPremium.qml")),
     )
     if not engine.rootObjects():
+        print("GENESIS premium QML failed to create a root object.", file=sys.stderr, flush=True)
         return 1
 
     window = engine.rootObjects()[0]
