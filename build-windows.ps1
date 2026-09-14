@@ -21,5 +21,5 @@ if ($PremiumSmoke) {
   Write-Host 'GENESIS PREMIUM UI SMOKE: PASS'
 }
 if ($Package) {
-  & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' qt_cockpit.py
+  & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' qt_cockpit_premium.py
 }
