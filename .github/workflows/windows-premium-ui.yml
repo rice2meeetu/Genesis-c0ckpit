@@ -8,7 +8,7 @@ on:
 jobs:
   verify-premium-ui:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,9 +88,41 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path 'dist\GENESIS-c0ckpit\*' -DestinationPath 'GENESIS-c0ckpit-Windows.zip' -Force
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler was not found.' }
+          & $iscc '.\installer\GENESIS-c0ckpit.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup exited with code $LASTEXITCODE." }
+          if (-not (Test-Path '.\installer-output\GENESIS-c0ckpit-Setup.exe')) { throw 'GENESIS installer was not created.' }
+
+      - name: Smoke installed Windows app
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          QSG_RHI_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP 'GENESIS-c0ckpit-installed'
+          $setup = Resolve-Path '.\installer-output\GENESIS-c0ckpit-Setup.exe'
+          $install = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR=' + $installDir) -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "GENESIS installer exited with code $($install.ExitCode)." }
+          $installedExe = Join-Path $installDir 'GENESIS-c0ckpit.exe'
+          if (-not (Test-Path $installedExe)) { throw 'Installed GENESIS executable was not found.' }
+          $tools = Start-Process -FilePath $installedExe -ArgumentList '--tool-smoke' -Wait -PassThru
+          if ($tools.ExitCode -ne 0) { throw "Installed GENESIS tool host exited with code $($tools.ExitCode)." }
+
       - name: Upload packaged Windows app
         uses: actions/upload-artifact@v4
         with:
           name: GENESIS-c0ckpit-Windows
-          path: GENESIS-c0ckpit-Windows.zip
+          path: |
+            GENESIS-c0ckpit-Windows.zip
+            installer-output/GENESIS-c0ckpit-Setup.exe
           if-no-files-found: error
