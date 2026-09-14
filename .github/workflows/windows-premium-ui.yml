@@ -57,6 +57,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Premium pose smoke exited with code $LASTEXITCODE." }
           python qt_cockpit_premium.py --page create --width 1400 --height 900 --smoke
           if ($LASTEXITCODE -ne 0) { throw "Premium create smoke exited with code $LASTEXITCODE." }
+          python qt_cockpit_premium.py --tool-smoke
+          if ($LASTEXITCODE -ne 0) { throw "Source tool-host smoke exited with code $LASTEXITCODE." }
 
       - name: Build packaged premium Windows app
         shell: pwsh
@@ -74,6 +76,8 @@ jobs:
         run: |
           $process = Start-Process -FilePath '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe' -ArgumentList '--page','home','--width','1400','--height','900','--smoke' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Packaged GENESIS exited with code $($process.ExitCode)." }
+          $tools = Start-Process -FilePath '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe' -ArgumentList '--tool-smoke' -Wait -PassThru
+          if ($tools.ExitCode -ne 0) { throw "Packaged GENESIS tool host exited with code $($tools.ExitCode)." }
 
       - name: Archive packaged Windows app
         shell: pwsh
