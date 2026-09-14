@@ -66,8 +66,11 @@ def test_premium_launcher_has_headless_safe_capture_path():
     assert "result.saveToFile" in source
 
 
-def test_windows_package_uses_premium_entry_point():
+def test_windows_package_uses_premium_entry_point_and_reference_data():
     source = BUILD_SCRIPT.read_text(encoding="utf-8")
     package_line = next(line for line in source.splitlines() if "pyinstaller.exe" in line)
     assert package_line.rstrip().endswith("qt_cockpit_premium.py")
     assert not package_line.rstrip().endswith("qt_cockpit.py")
+    assert "genesis\\qt_ui;genesis\\qt_ui" in package_line
+    assert "genesis\\assets;genesis\\assets" in package_line
+    assert "genesis\\reference;genesis\\reference" in package_line
