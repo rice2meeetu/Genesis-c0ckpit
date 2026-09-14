@@ -1,6 +1,6 @@
 """Safe launch and status helpers for existing GENESIS applications.
 
-This module never installs, updates, or rewrites an integrated application.  It
+This module never installs, updates, or rewrites an integrated application. It
 only probes local endpoints, starts predeclared user services, and opens the
 already-installed interfaces.
 """
@@ -19,8 +19,12 @@ from pathlib import Path
 
 
 JELLYFIN_URL = "http://127.0.0.1:8096"
+# Rocinante is reserved for SillyTavern/persona chat.
 LLAMA_URL = "http://127.0.0.1:8081"
+# Heavy Qwen3 build/coding route.
 QWEN_URL = "http://127.0.0.1:8082"
+# Dedicated everyday GENESIS AI route.
+ASSISTANT_URL = "http://127.0.0.1:8083"
 SILLYTAVERN_URL = "http://127.0.0.1:8000"
 COMFYUI_URL = "http://127.0.0.1:8188"
 GO2RTC_URL = "http://127.0.0.1:1984"
@@ -30,16 +34,24 @@ SWARMUI_URL = "http://127.0.0.1:7801"
 
 LLAMA_SERVICE = "genesis-llama.service"
 QWEN_SERVICE = "genesis-qwen.service"
+ASSISTANT_SERVICE = "genesis-assistant.service"
 SILLYTAVERN_SERVICE = "genesis-sillytavern.service"
 COMFYUI_SERVICE = "genesis-comfyui.service"
 
 LLAMA_BINARY = Path(
     "/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server"
 )
+# SillyTavern model only. Do not route GENESIS AI through Rocinante.
 LLAMA_MODEL = Path(
     "/mnt/AI-Storage/LLM-Models/"
     "Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf"
 )
+# Tested everyday local GENESIS agent.
+ASSISTANT_MODEL = Path(
+    "/mnt/AI-Storage/GENESIS-LLM/"
+    "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+)
+# Stronger on-demand build/coding model.
 QWEN_MODEL = Path(
     "/mnt/AI-Storage/GENESIS-LLM/"
     "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf"
@@ -47,8 +59,7 @@ QWEN_MODEL = Path(
 SILLYTAVERN_ROOT = Path("/mnt/C/Users/p4uln/SillyTavern")
 COMFYUI_ROOT = Path.home() / "AI" / "ComfyUI"
 COMFYUI_PYTHON_CANDIDATES = (
-    Path.home()
-    / "miniforge3/envs/comfyui-reactor-rocm/bin/python",
+    Path.home() / "miniforge3/envs/comfyui-reactor-rocm/bin/python",
     COMFYUI_ROOT / ".venv/bin/python",
     COMFYUI_ROOT / "venv/bin/python",
 )
@@ -111,7 +122,6 @@ def endpoint_online(url: str, path: str = "/", timeout: float = 1.5):
         _request_json(url.rstrip("/") + path, timeout=timeout)
         return True
     except json.JSONDecodeError:
-        # HTML endpoints (notably SillyTavern) are still healthy responses.
         return True
     except (OSError, urllib.error.URLError, TimeoutError):
         return False
@@ -220,6 +230,7 @@ def integration_diagnostics():
     """Return structured, non-mutating diagnostics for the local AI stack."""
     llama_online = endpoint_online(LLAMA_URL, "/health")
     qwen_online = endpoint_online(QWEN_URL, "/health")
+    assistant_online = endpoint_online(ASSISTANT_URL, "/health")
     silly_online = endpoint_online(SILLYTAVERN_URL, "/")
     comfy_online = endpoint_online(COMFYUI_URL, "/system_stats")
     jellyfin_online = endpoint_online(JELLYFIN_URL, "/System/Info/Public")
@@ -244,16 +255,25 @@ def integration_diagnostics():
                 str(COMFYUI_PYTHON),
             ),
             IntegrationDiagnostic(
-                "llama.cpp",
+                "SillyTavern LLM",
                 LLAMA_BINARY.is_file() and LLAMA_MODEL.is_file(),
                 llama_online,
                 LLAMA_URL,
                 LLAMA_SERVICE,
                 service_state(LLAMA_SERVICE),
-                str(LLAMA_BINARY),
+                str(LLAMA_MODEL),
             ),
             IntegrationDiagnostic(
-                "Qwen Assistant",
+                "GENESIS AI Local",
+                LLAMA_BINARY.is_file() and ASSISTANT_MODEL.is_file(),
+                assistant_online,
+                ASSISTANT_URL,
+                ASSISTANT_SERVICE,
+                service_state(ASSISTANT_SERVICE),
+                str(ASSISTANT_MODEL),
+            ),
+            IntegrationDiagnostic(
+                "Qwen Build Assistant",
                 LLAMA_BINARY.is_file() and QWEN_MODEL.is_file(),
                 qwen_online,
                 QWEN_URL,
@@ -269,11 +289,7 @@ def integration_diagnostics():
                 SILLYTAVERN_SERVICE,
                 service_state(SILLYTAVERN_SERVICE),
                 str(SILLYTAVERN_ROOT),
-                (
-                    "Windows volume is read-only"
-                    if silly_installed and not silly_writable
-                    else None
-                ),
+                "Windows volume is read-only" if silly_installed and not silly_writable else None,
             ),
             IntegrationDiagnostic(
                 "Jellyfin",
@@ -317,8 +333,9 @@ def integration_diagnostics():
 
 def status_snapshot():
     diagnostics = integration_diagnostics()
-    llama_online = diagnostics["llama.cpp"]["online"]
-    qwen_online = diagnostics["Qwen Assistant"]["online"]
+    llama_online = diagnostics["SillyTavern LLM"]["online"]
+    assistant_online = diagnostics["GENESIS AI Local"]["online"]
+    qwen_online = diagnostics["Qwen Build Assistant"]["online"]
     silly_online = diagnostics["SillyTavern"]["online"]
     comfy_online = diagnostics["ComfyUI"]["online"]
     jellyfin_server = diagnostics["Jellyfin"]["online"]
@@ -343,6 +360,12 @@ def status_snapshot():
         "llama_model": LLAMA_MODEL.name,
         "llama_endpoint": LLAMA_URL,
         "llama_context": 12288,
+        "assistant_online": assistant_online,
+        "assistant_installed": LLAMA_BINARY.is_file() and ASSISTANT_MODEL.is_file(),
+        "assistant_service": service_state(ASSISTANT_SERVICE),
+        "assistant_model": ASSISTANT_MODEL.name,
+        "assistant_endpoint": ASSISTANT_URL,
+        "assistant_context": 16384,
         "qwen_online": qwen_online,
         "qwen_installed": LLAMA_BINARY.is_file() and QWEN_MODEL.is_file(),
         "qwen_service": service_state(QWEN_SERVICE),
@@ -354,8 +377,7 @@ def status_snapshot():
         "silly_writable": mount_is_writable(SILLYTAVERN_ROOT),
         "silly_service": service_state(SILLYTAVERN_SERVICE),
         "comfy_online": comfy_online,
-        "comfy_installed": COMFYUI_PYTHON.is_file()
-        and (COMFYUI_ROOT / "main.py").is_file(),
+        "comfy_installed": COMFYUI_PYTHON.is_file() and (COMFYUI_ROOT / "main.py").is_file(),
         "comfy_service": service_state(COMFYUI_SERVICE),
         "comfy_gpu": comfy_gpu,
         "go2rtc_online": go2rtc_online,
