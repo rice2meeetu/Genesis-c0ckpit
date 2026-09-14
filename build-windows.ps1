@@ -12,6 +12,7 @@ if (-not (Test-Path $Python)) {
 & $Python -m pip install -r requirements-windows.txt
 & $Python -m pip install --no-deps face-recognition==1.3.0
 $env:QT_QUICK_CONTROLS_STYLE='Basic'
+& $Python -c "from rembg import remove; import onnxruntime as ort; assert 'CPUExecutionProvider' in ort.get_available_providers(); assert callable(remove); print('rembg CPU backend ready')"
 & $Python -m py_compile qt_cockpit.py qt_cockpit_premium.py main.py
 & $Python -m pytest tests -q
 if ($PremiumSmoke) {
@@ -29,7 +30,7 @@ if ($PremiumSmoke) {
   Write-Host 'GENESIS PREMIUM SOURCE SMOKE: PASS'
 }
 if ($Package) {
-  & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' --add-data 'genesis\reference;genesis\reference' qt_cockpit_premium.py
+  & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --collect-all rembg --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' --add-data 'genesis\reference;genesis\reference' qt_cockpit_premium.py
   $Exe = '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe'
   if (-not (Test-Path $Exe)) { throw 'Packaged GENESIS executable was not created.' }
   if ($PremiumSmoke) {
