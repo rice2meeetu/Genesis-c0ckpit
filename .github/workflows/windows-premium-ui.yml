@@ -75,6 +75,7 @@ jobs:
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKLS_STYLE: Basic
           QT_QUICK_BACKEND: software
           QSG_RHI_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
@@ -120,11 +121,16 @@ jobs:
           $tools = Start-Process -FilePath $installedExe -ArgumentList '--tool-smoke' -Wait -PassThru
           if ($tools.ExitCode -ne 0) { throw "Installed GENESIS tool host exited with code $($tools.ExitCode)." }
 
-      - name: Upload packaged Windows app
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: GENESIS-c0ckpit-Windows
-          path: |
-            GENESIS-c0ckpit-Windows.zip
-            installer-output/GENESIS-c0ckpit-Setup.exe
+          name: GENESIS-c0ckpit-Windows-Installer
+          path: installer-output/GENESIS-c0ckpit-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload portable Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: GENESIS-c0ckpit-Windows-Portable
+          path: GENESIS-c0ckpit-Windows.zip
           if-no-files-found: error
