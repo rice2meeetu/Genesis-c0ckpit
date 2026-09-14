@@ -6,6 +6,7 @@ QML = PROJECT_ROOT / "genesis" / "qt_ui" / "MainPremium.qml"
 LAUNCHER = PROJECT_ROOT / "qt_cockpit_premium.py"
 BAT = PROJECT_ROOT / "START_GENESIS_PREMIUM_WINDOWS.bat"
 BUILD_SCRIPT = PROJECT_ROOT / "build-windows.ps1"
+REQUIREMENTS = PROJECT_ROOT / "requirements-windows.txt"
 WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "windows-premium-ui.yml"
 
 
@@ -14,6 +15,7 @@ def test_premium_ui_files_exist():
     assert LAUNCHER.is_file()
     assert BAT.is_file()
     assert BUILD_SCRIPT.is_file()
+    assert REQUIREMENTS.is_file()
     assert WORKFLOW.is_file()
 
 
@@ -100,6 +102,18 @@ def test_packaged_tool_action_mapping_covers_media_requirements():
         '"photos"',
     ):
         assert token in source
+
+
+def test_windows_background_removal_backend_is_packaged():
+    requirements = REQUIREMENTS.read_text(encoding="utf-8")
+    build = BUILD_SCRIPT.read_text(encoding="utf-8")
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "rembg[cpu]==2.0.84" in requirements
+    assert "CPUExecutionProvider" in build
+    assert "--collect-all rembg" in build
+    assert "Verify background removal backend" in workflow
+    assert "CPUExecutionProvider" in workflow
+    assert "--collect-all rembg" in workflow
 
 
 def test_windows_package_uses_premium_entry_point_and_reference_data():
