@@ -28,7 +28,14 @@ from genesis import integrations, workflow_lab
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+import sys as _sys
+from pathlib import Path as _Path
+
+if getattr(_sys, "frozen", False):
+    PROJECT_ROOT = _Path(getattr(_sys, "_MEIPASS", _Path(_sys.executable).resolve().parent))
+else:
+    PROJECT_ROOT = _Path(__file__).resolve().parent
+
 UI_ROOT = PROJECT_ROOT / "genesis" / "qt_ui"
 ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
