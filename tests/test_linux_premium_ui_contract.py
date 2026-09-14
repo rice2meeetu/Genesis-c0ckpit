@@ -4,7 +4,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 QML = ROOT / "genesis" / "qt_ui" / "MainPremiumLinux.qml"
 LAUNCHER = ROOT / "qt_cockpit_linux_premium.py"
+ASSISTANT = ROOT / "genesis" / "assistant_bridge.py"
 SHELL_LAUNCHER = ROOT / "launch-qt-cockpit.sh"
+LLAMA_SERVICE = ROOT / "systemd" / "genesis-llama.service"
+QWEN_SERVICE = ROOT / "systemd" / "genesis-qwen.service"
 
 
 def source() -> str:
@@ -55,11 +58,31 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert "genesisBridge.queueGenerate(" in qml
 
 
-def test_linux_launcher_loads_full_pose_index_and_premium_qml():
+def test_linux_launcher_loads_full_pose_index_premium_qml_and_ai():
     launcher = LAUNCHER.read_text(encoding="utf-8")
     assert "load_pose_items(limit=600)" in launcher
     assert 'UI_ROOT / "MainPremiumLinux.qml"' in launcher
     assert '"settings": 10' in launcher
+    assert '"ai": 11' in launcher
+    assert 'label:"GENESIS AI", page:11' in launcher
+    assert "AssistantBridge" in launcher
+    assert "CHAT · ROCINANTE" in launcher
+    assert "BUILD · QWEN CODER" in launcher
+    assert "STUDIO · QWEN" in launcher
+
+
+def test_local_assistant_preserves_chosen_model_split():
+    assistant = ASSISTANT.read_text(encoding="utf-8")
+    llama = LLAMA_SERVICE.read_text(encoding="utf-8")
+    qwen = QWEN_SERVICE.read_text(encoding="utf-8")
+    assert "Rocinante-X-12B" in assistant
+    assert "Qwen3-Coder-30B-A3B" in assistant
+    assert "integrations.LLAMA_URL" in assistant
+    assert "integrations.QWEN_URL" in assistant
+    assert "Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf" in llama
+    assert "--port 8081" in llama
+    assert "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf" in qwen
+    assert "--port 8082" in qwen
 
 
 def test_shell_launcher_uses_premium_entrypoint():
