@@ -75,6 +75,33 @@ def test_premium_launcher_has_deterministic_smoke_mode():
     assert "QTimer.singleShot(1200, app.quit)" in source
 
 
+def test_packaged_tool_routes_relaunch_same_executable():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert 'parser.add_argument("--legacy-page", choices=LEGACY_TOOL_PAGES)' in source
+    assert 'parser.add_argument("--tool-smoke", action="store_true")' in source
+    assert 'command = [sys.executable, "--legacy-page", page]' in source
+    assert 'str(PROJECT_ROOT / "qt_cockpit_premium.py")' in source
+    assert '[sys.executable, str(PROJECT_ROOT / "main.py")]' not in source
+    assert 'from main import PhotoStudio' in source
+    assert 'legacy._show_photo_tools_mode(requested)' in source
+
+
+def test_packaged_tool_action_mapping_covers_media_requirements():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    for token in (
+        '"background"',
+        '"batch"',
+        '"enhance"',
+        '"upscale"',
+        '"canvas"',
+        '"duplicate"',
+        '"face organiser"',
+        '"media viewer"',
+        '"photos"',
+    ):
+        assert token in source
+
+
 def test_windows_package_uses_premium_entry_point_and_reference_data():
     source = BUILD_SCRIPT.read_text(encoding="utf-8")
     package_line = next(line for line in source.splitlines() if "pyinstaller.exe" in line)
@@ -93,4 +120,5 @@ def test_windows_ci_smokes_integrated_and_packaged_premium_app():
     assert "--page create --width 1400 --height 900 --smoke" in source
     assert "Build packaged premium Windows app" in source
     assert "Smoke packaged premium Windows app" in source
+    assert "--tool-smoke" in source
     assert "GENESIS-c0ckpit-Windows.zip" in source
