@@ -24,8 +24,19 @@ if ($PremiumSmoke) {
   if ($LASTEXITCODE -ne 0) { throw "Premium pose smoke exited with code $LASTEXITCODE." }
   & $Python qt_cockpit_premium.py --page create --width 1400 --height 900 --smoke
   if ($LASTEXITCODE -ne 0) { throw "Premium create smoke exited with code $LASTEXITCODE." }
-  Write-Host 'GENESIS PREMIUM UI SMOKE: PASS'
+  & $Python qt_cockpit_premium.py --tool-smoke
+  if ($LASTEXITCODE -ne 0) { throw "Premium tool-host smoke exited with code $LASTEXITCODE." }
+  Write-Host 'GENESIS PREMIUM SOURCE SMOKE: PASS'
 }
 if ($Package) {
   & .\.venv-windows\Scripts\pyinstaller.exe --noconfirm --clean --windowed --name GENESIS-c0ckpit --add-data 'genesis\qt_ui;genesis\qt_ui' --add-data 'genesis\assets;genesis\assets' --add-data 'genesis\reference;genesis\reference' qt_cockpit_premium.py
+  $Exe = '.\dist\GENESIS-c0ckpit\GENESIS-c0ckpit.exe'
+  if (-not (Test-Path $Exe)) { throw 'Packaged GENESIS executable was not created.' }
+  if ($PremiumSmoke) {
+    $premium = Start-Process -FilePath $Exe -ArgumentList '--page','home','--width','1400','--height','900','--smoke' -Wait -PassThru
+    if ($premium.ExitCode -ne 0) { throw "Packaged GENESIS premium smoke exited with code $($premium.ExitCode)." }
+    $tools = Start-Process -FilePath $Exe -ArgumentList '--tool-smoke' -Wait -PassThru
+    if ($tools.ExitCode -ne 0) { throw "Packaged GENESIS tool-host smoke exited with code $($tools.ExitCode)." }
+    Write-Host 'GENESIS PREMIUM PACKAGED SMOKE: PASS'
+  }
 }
