@@ -115,6 +115,8 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "GENESIS installer exited with code $($install.ExitCode)." }
           $installedExe = Join-Path $installDir 'GENESIS-c0ckpit.exe'
           if (-not (Test-Path $installedExe)) { throw 'Installed GENESIS executable was not found.' }
+          $premium = Start-Process -FilePath $installedExe -ArgumentList '--page','create','--width','1400','--height','900','--smoke' -Wait -PassThru
+          if ($premium.ExitCode -ne 0) { throw "Installed GENESIS premium UI exited with code $($premium.ExitCode)." }
           $tools = Start-Process -FilePath $installedExe -ArgumentList '--tool-smoke' -Wait -PassThru
           if ($tools.ExitCode -ne 0) { throw "Installed GENESIS tool host exited with code $($tools.ExitCode)." }
 
