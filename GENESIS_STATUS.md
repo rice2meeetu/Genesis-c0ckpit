@@ -3,7 +3,7 @@
 ## Current Version
 GENESIS v0.10 + Cockpit stabilization
 Branch: main
-Latest checkpoint: 7d4ca55
+Latest checkpoint: dbc170c
 
 ## Project Root
 /home/rice2meetyou/Genesis-c0ckpit
@@ -88,9 +88,9 @@ Next:
 
 ## Working Tree Note
 
-The branch contains substantial pre-existing uncommitted and untracked work.
-Do not discard, reset, or bulk-clean it. Back up touched files before changes and
-stage only deliberate milestone files.
+The branch is currently clean and synchronized with `origin/main`. Preserve this
+verified baseline: back up touched files before risky changes and stage only
+deliberate milestone files.
 
 ## Rules
 

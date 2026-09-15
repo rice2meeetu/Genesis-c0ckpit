@@ -34,11 +34,11 @@ are in `systemd/`. Logs go to `~/.local/state/genesis/`.
 
 ## Current blocker
 
-The Windows NTFS partition is mounted read-only because its dirty flag is set.
-SillyTavern needs write access to its data, chats, logs, and backups, so GENESIS
-will not start it in this state. Clear the NTFS dirty flag safely in Windows
-(normally with Fast Startup disabled and `chkdsk /f`), then mount `/mnt/C`
-read/write. No SillyTavern content was modified by this integration.
+No NTFS write blocker is currently active. `/mnt/C` was subsequently verified
+read/write and the guarded SillyTavern user service was live-started successfully
+on `127.0.0.1:8000`. If the Windows volume becomes dirty/read-only again, GENESIS
+should continue refusing to start SillyTavern until the filesystem is repaired
+safely from Windows.
 
 ## Validation
 

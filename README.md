@@ -20,8 +20,8 @@ services are changed only through an explicit Camera Hub action.
 ## Launch on the Genesis workstation
 
 ```bash
-cd /home/rice2meetyou/GENESIS-Photo-Studio
-./launch.sh
+cd /home/rice2meetyou/Genesis-c0ckpit
+./launch-qt-cockpit.sh
 ```
 
 The application expects the existing workstation services and Python virtual
