@@ -10,17 +10,17 @@ ApplicationWindow {
     minimumWidth: 1120
     minimumHeight: 720
     title: "GENESIS c0ckpit · Linux"
-    color: "#070b10"
+    color: "#181a1e"
     font.family: "Noto Sans"
 
     readonly property color gold: "#d2a34e"
     readonly property color brightGold: "#f3d28b"
     readonly property color ice: "#7fc4d8"
-    readonly property color bg: "#070b10"
-    readonly property color panel: "#0d141d"
-    readonly property color raised: "#121c27"
-    readonly property color raised2: "#172432"
-    readonly property color line: "#2d4354"
+    readonly property color bg: "#181a1e"
+    readonly property color panel: "#23262b"
+    readonly property color raised: "#2b2f35"
+    readonly property color raised2: "#343941"
+    readonly property color line: "#454b53"
     readonly property color textMain: "#eef3f6"
     readonly property color textDim: "#91a2b2"
     readonly property color success: "#62d27a"
@@ -163,9 +163,9 @@ ApplicationWindow {
         border.width: 1
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#152230" }
-            GradientStop { position: 0.11; color: "#101923" }
-            GradientStop { position: 1.0; color: "#0a1017" }
+            GradientStop { position: 0.0; color: "#30343a" }
+            GradientStop { position: 0.11; color: "#292d32" }
+            GradientStop { position: 1.0; color: "#1f2226" }
         }
         Rectangle {
             anchors.left: parent.left
@@ -194,7 +194,7 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 9
-            color: !button.enabled ? "#10161d" : (button.active ? appRoot.gold : (button.down ? "#182735" : (button.hovered ? "#162432" : "#101923")))
+            color: !button.enabled ? "#24272b" : (button.active ? appRoot.gold : (button.down ? "#30343a" : (button.hovered ? "#363b42" : "#2b2f34")))
             border.color: button.active ? appRoot.brightGold : (button.hovered ? appRoot.ice : appRoot.line)
             border.width: button.active || button.hovered ? 1.5 : 1
         }
@@ -216,7 +216,7 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 8
-            color: nav.active ? "#182635" : (nav.hovered ? "#111d28" : "transparent")
+            color: nav.active ? "#353a40" : (nav.hovered ? "#2d3136" : "transparent")
             border.color: nav.active ? appRoot.gold : "transparent"
             border.width: 1
             Rectangle {
@@ -260,9 +260,9 @@ ApplicationWindow {
         z: -10
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0; color: "#0f1a25" }
+            GradientStop { position: 0; color: "#2d3137" }
             GradientStop { position: 0.40; color: appRoot.bg }
-            GradientStop { position: 1; color: "#04070b" }
+            GradientStop { position: 1; color: "#15171a" }
         }
     }
 
@@ -273,21 +273,21 @@ ApplicationWindow {
 
         Panel {
             Layout.fillWidth: true
-            Layout.preferredHeight: 74
+            Layout.preferredHeight: 92
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 12
                 spacing: 12
                 Rectangle {
-                    Layout.preferredWidth: 46
-                    Layout.preferredHeight: 46
+                    Layout.preferredWidth: 64
+                    Layout.preferredHeight: 64
                     radius: 12
                     color: appRoot.gold
-                    Text { anchors.centerIn: parent; text: "G"; color: "#071018"; font.pixelSize: 28; font.bold: true }
+                    Text { anchors.centerIn: parent; text: "G"; color: "#071018"; font.pixelSize: 38; font.bold: true }
                 }
                 ColumnLayout {
                     spacing: 0
-                    Text { text: "GENESIS c0ckpit"; color: appRoot.brightGold; font.pixelSize: 22; font.bold: true }
+                    Text { text: "GENESIS c0ckpit"; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
                     Text { text: "Keep walking Allan.  ·  Local creative workspace"; color: appRoot.textDim; font.pixelSize: 11 }
                 }
                 Item { Layout.fillWidth: true }
@@ -295,7 +295,7 @@ ApplicationWindow {
                     Layout.preferredWidth: 190
                     Layout.preferredHeight: 34
                     radius: 17
-                    color: "#111c25"
+                    color: "#2b2f35"
                     border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                     Text {
                         anchors.centerIn: parent
@@ -315,7 +315,7 @@ ApplicationWindow {
             spacing: 10
 
             Panel {
-                Layout.preferredWidth: 210
+                Layout.preferredWidth: 250
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent
@@ -323,13 +323,13 @@ ApplicationWindow {
                     spacing: 5
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 92
-                        radius: 9
-                        color: "#0a0f15"
+                        Layout.preferredHeight: 220
+                        radius: 14
+                        color: "#202328"
                         border.color: appRoot.line
                         Image {
                             anchors.fill: parent
-                            anchors.margins: 8
+                            anchors.margins: 4
                             source: "../assets/genesis-cockpit-icon-balanced-final.png"
                             fillMode: Image.PreserveAspectFit
                             visible: !privacyMode
@@ -382,7 +382,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 245
                                         radius: 10
-                                        color: "#080d12"
+                                        color: "#1f2227"
                                         border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
                                         border.width: appRoot.generationSource.toString().length ? 2 : 1
                                         Image { anchors.fill: parent; anchors.margins: 7; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
@@ -413,7 +413,7 @@ ApplicationWindow {
                                         placeholderText: "Search 70 Grok + curated presets…"
                                         color: appRoot.textMain
                                         onTextChanged: appRoot.presetSearch = text
-                                        background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -486,7 +486,7 @@ ApplicationWindow {
                                         color: appRoot.textMain
                                         wrapMode: TextEdit.Wrap
                                         onTextChanged: if (activeFocus) appRoot.generationPrompt = text
-                                        background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
                                     }
                                     TextField {
                                         Layout.fillWidth: true
@@ -494,7 +494,7 @@ ApplicationWindow {
                                         placeholderText: "Negative prompt (optional)"
                                         color: appRoot.textMain
                                         onTextChanged: if (activeFocus) appRoot.generationNegativePrompt = text
-                                        background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -567,7 +567,7 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 8 } }
+                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 } }
                             Repeater {
                                 model: ["All", "Standing", "Sitting", "Lying", "Kneeling", "All Fours"]
                                 GButton { text: modelData; active: appRoot.poseCategory === modelData; onClicked: appRoot.poseCategory = modelData }
@@ -591,7 +591,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 170
                                         radius: 8
-                                        color: "#080d12"
+                                        color: "#1f2227"
                                         border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: appRoot.generationSource.toString().length > 0 && !privacyMode }
                                         Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
@@ -601,7 +601,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 210
                                         radius: 8
-                                        color: "#080d12"
+                                        color: "#1f2227"
                                         border.color: appRoot.gold
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
                                     }
@@ -717,7 +717,7 @@ ApplicationWindow {
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing: 10
                         PageHeader { titleText: "Camera Hub"; subtitleText: "Local cameras and recordings in their own workspace."; iconText: "●" }
-                        Panel { Layout.fillWidth: true; Layout.fillHeight: true; ColumnLayout { anchors.centerIn: parent; spacing: 12; Text { text:"CAMERA HUB"; color: appRoot.brightGold; font.pixelSize: 28; font.bold: true } Text { text:"Open the local camera service and live grid."; color: appRoot.textDim; font.pixelSize: 14 } GButton { text:"Open Camera Hub"; active:true; Layout.preferredWidth:220; onClicked: moduleBridge.triggerAction("camera hub") } } }
+                        Panel { Layout.fillWidth: true; Layout.fillHeight: true; ColumnLayout { anchors.centerIn: parent; spacing: 12; Text { text:"CAMERA HUB"; color: appRoot.brightGold; font.pixelSize: 38; font.bold: true } Text { text:"Open the local camera service and live grid."; color: appRoot.textDim; font.pixelSize: 14 } GButton { text:"Open Camera Hub"; active:true; Layout.preferredWidth:220; onClicked: moduleBridge.triggerAction("camera hub") } } }
                     }
                 }
 
