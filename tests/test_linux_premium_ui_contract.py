@@ -89,6 +89,15 @@ def test_local_assistant_preserves_chosen_model_split():
     assert "--port 8082" in qwen
 
 
+def test_page_header_binds_to_component_properties():
+    qml = source()
+    assert "id: pageHeader" in qml
+    assert "text: pageHeader.titleText" in qml
+    assert "text: pageHeader.subtitleText" in qml
+    assert "text: parent.titleText" not in qml
+    assert "text: parent.subtitleText" not in qml
+
+
 def test_shell_launcher_uses_premium_entrypoint():
     shell = SHELL_LAUNCHER.read_text(encoding="utf-8")
     assert "qt_cockpit_linux_premium.py" in shell

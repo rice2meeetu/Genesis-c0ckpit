@@ -239,17 +239,18 @@ ApplicationWindow {
     }
 
     component PageHeader: RowLayout {
+        id: pageHeader
         property string titleText: ""
         property string subtitleText: ""
         property string iconText: "◆"
         Layout.fillWidth: true
         Layout.preferredHeight: 62
         spacing: 12
-        Text { text: parent.iconText; color: appRoot.gold; font.pixelSize: 30 }
+        Text { text: pageHeader.iconText; color: appRoot.gold; font.pixelSize: 30 }
         ColumnLayout {
             spacing: 0
-            Text { text: parent.titleText; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
-            Text { text: parent.subtitleText; color: appRoot.textDim; font.pixelSize: 13 }
+            Text { text: pageHeader.titleText; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
+            Text { text: pageHeader.subtitleText; color: appRoot.textDim; font.pixelSize: 13 }
         }
         Item { Layout.fillWidth: true }
     }
