@@ -1,0 +1,16 @@
+[Unit]
+Description=GENESIS persistent ChatGPT remote control agent
+After=network-online.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Genesis-c0ckpit/control_bridge
+ExecStart=%h/Genesis-c0ckpit/control_bridge/remote-supervisor.sh
+Restart=always
+RestartSec=8
+StartLimitIntervalSec=0
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
