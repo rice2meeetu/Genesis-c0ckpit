@@ -1,0 +1,19 @@
+[Unit]
+Description=GENESIS Control Bridge
+After=network-online.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Genesis-c0ckpit/control_bridge
+ExecStart=%h/Genesis-c0ckpit/control_bridge/.venv/bin/python %h/Genesis-c0ckpit/control_bridge/server.py
+Environment=PYTHONUNBUFFERED=1
+Environment=GENESIS_BRIDGE_HOST=127.0.0.1
+Environment=GENESIS_BRIDGE_PORT=8766
+Environment=GENESIS_BRIDGE_TRANSPORT=streamable-http
+Restart=always
+RestartSec=2
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
