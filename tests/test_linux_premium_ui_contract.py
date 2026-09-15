@@ -7,6 +7,7 @@ LAUNCHER = ROOT / "qt_cockpit_linux_premium.py"
 ASSISTANT = ROOT / "genesis" / "assistant_bridge.py"
 SHELL_LAUNCHER = ROOT / "launch-qt-cockpit.sh"
 LLAMA_SERVICE = ROOT / "systemd" / "genesis-llama.service"
+ASSISTANT_SERVICE = ROOT / "systemd" / "genesis-assistant.service"
 QWEN_SERVICE = ROOT / "systemd" / "genesis-qwen.service"
 
 
@@ -74,13 +75,16 @@ def test_linux_launcher_loads_full_pose_index_premium_qml_and_ai():
 def test_local_assistant_preserves_chosen_model_split():
     assistant = ASSISTANT.read_text(encoding="utf-8")
     llama = LLAMA_SERVICE.read_text(encoding="utf-8")
+    local = ASSISTANT_SERVICE.read_text(encoding="utf-8")
     qwen = QWEN_SERVICE.read_text(encoding="utf-8")
-    assert "Rocinante-X-12B" in assistant
+    assert "Rocinante is intentionally excluded" in assistant
     assert "Qwen3-Coder-30B-A3B" in assistant
-    assert "integrations.LLAMA_URL" in assistant
+    assert "integrations.ASSISTANT_URL" in assistant
     assert "integrations.QWEN_URL" in assistant
     assert "Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf" in llama
     assert "--port 8081" in llama
+    assert "qwen2.5-coder-14b-instruct-q4_k_m.gguf" in local
+    assert "--port 8083" in local
     assert "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf" in qwen
     assert "--port 8082" in qwen
 

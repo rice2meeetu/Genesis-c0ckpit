@@ -255,7 +255,7 @@ def integration_diagnostics():
                 str(COMFYUI_PYTHON),
             ),
             IntegrationDiagnostic(
-                "SillyTavern LLM",
+                "llama.cpp",
                 LLAMA_BINARY.is_file() and LLAMA_MODEL.is_file(),
                 llama_online,
                 LLAMA_URL,
@@ -264,16 +264,7 @@ def integration_diagnostics():
                 str(LLAMA_MODEL),
             ),
             IntegrationDiagnostic(
-                "GENESIS AI Local",
-                LLAMA_BINARY.is_file() and ASSISTANT_MODEL.is_file(),
-                assistant_online,
-                ASSISTANT_URL,
-                ASSISTANT_SERVICE,
-                service_state(ASSISTANT_SERVICE),
-                str(ASSISTANT_MODEL),
-            ),
-            IntegrationDiagnostic(
-                "Qwen Build Assistant",
+                "Qwen Assistant",
                 LLAMA_BINARY.is_file() and QWEN_MODEL.is_file(),
                 qwen_online,
                 QWEN_URL,
@@ -333,9 +324,9 @@ def integration_diagnostics():
 
 def status_snapshot():
     diagnostics = integration_diagnostics()
-    llama_online = diagnostics["SillyTavern LLM"]["online"]
-    assistant_online = diagnostics["GENESIS AI Local"]["online"]
-    qwen_online = diagnostics["Qwen Build Assistant"]["online"]
+    llama_online = diagnostics["llama.cpp"]["online"]
+    assistant_online = endpoint_online(ASSISTANT_URL, "/health")
+    qwen_online = diagnostics["Qwen Assistant"]["online"]
     silly_online = diagnostics["SillyTavern"]["online"]
     comfy_online = diagnostics["ComfyUI"]["online"]
     jellyfin_server = diagnostics["Jellyfin"]["online"]
