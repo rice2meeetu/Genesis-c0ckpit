@@ -10,16 +10,18 @@ ApplicationWindow {
     minimumWidth: 1120
     minimumHeight: 720
     title: "GENESIS c0ckpit · Linux"
-    color: "#181a1e"
+    color: "#141619"
     font.family: "Noto Sans"
 
     readonly property color gold: "#d2a34e"
     readonly property color brightGold: "#f3d28b"
-    readonly property color ice: "#7fc4d8"
-    readonly property color bg: "#181a1e"
-    readonly property color panel: "#23262b"
-    readonly property color raised: "#2b2f35"
-    readonly property color raised2: "#343941"
+    readonly property color blue: "#3aa7ff"
+    readonly property color blueBright: "#75c5ff"
+    readonly property color blueDeep: "#123a5a"
+    readonly property color bg: "#141619"
+    readonly property color panel: "#202328"
+    readonly property color raised: "#282c31"
+    readonly property color raised2: "#30353b"
     readonly property color line: "#454b53"
     readonly property color textMain: "#eef3f6"
     readonly property color textDim: "#91a2b2"
@@ -163,9 +165,9 @@ ApplicationWindow {
         border.width: 1
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#30343a" }
-            GradientStop { position: 0.11; color: "#292d32" }
-            GradientStop { position: 1.0; color: "#1f2226" }
+            GradientStop { position: 0.0; color: "#2b2f34" }
+            GradientStop { position: 0.11; color: "#25292e" }
+            GradientStop { position: 1.0; color: "#1b1e22" }
         }
         Rectangle {
             anchors.left: parent.left
@@ -181,22 +183,47 @@ ApplicationWindow {
     component GButton: Button {
         id: button
         property bool active: false
-        implicitHeight: 42
-        font.pixelSize: 13
-        font.weight: active ? Font.DemiBold : Font.Medium
+        property bool premium: false
+        implicitHeight: 46
+        font.pixelSize: 14
+        font.weight: active || premium ? Font.DemiBold : Font.Medium
         contentItem: Text {
             text: button.text
-            color: !button.enabled ? "#64717c" : (button.active ? "#081017" : (button.hovered ? appRoot.brightGold : appRoot.textMain))
+            color: !button.enabled ? "#64717c" : (button.premium ? appRoot.brightGold : (button.active ? "#ffffff" : (button.hovered ? appRoot.blueBright : appRoot.textMain)))
             font: button.font
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
+            transform: Translate { y: button.down ? 2 : 0 }
         }
-        background: Rectangle {
-            radius: 9
-            color: !button.enabled ? "#24272b" : (button.active ? appRoot.gold : (button.down ? "#30343a" : (button.hovered ? "#363b42" : "#2b2f34")))
-            border.color: button.active ? appRoot.brightGold : (button.hovered ? appRoot.ice : appRoot.line)
-            border.width: button.active || button.hovered ? 1.5 : 1
+        background: Item {
+            Rectangle {
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: parent.height - 3
+                radius: 10
+                color: button.premium ? "#5b431c" : (button.active ? "#0b2940" : "#10151a")
+                border.color: "#080a0d"
+            }
+            Rectangle {
+                anchors.left: parent.left; anchors.right: parent.right
+                y: button.down ? 3 : 0
+                height: parent.height - 4
+                radius: 10
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: !button.enabled ? "#282b2f" : (button.premium ? "#3b3120" : (button.active ? "#1a5278" : (button.hovered ? "#343b42" : "#2b3036"))) }
+                    GradientStop { position: 1.0; color: !button.enabled ? "#202226" : (button.premium ? "#1f1b13" : (button.active ? "#12364f" : "#20252a")) }
+                }
+                border.color: button.premium ? appRoot.gold : (button.active ? appRoot.blueBright : (button.hovered ? appRoot.blue : appRoot.line))
+                border.width: button.active || button.hovered || button.premium ? 1.5 : 1
+                Rectangle {
+                    anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                    anchors.leftMargin: 9; anchors.rightMargin: 9
+                    height: 1
+                    color: button.premium ? "#99f3d28b" : (button.active || button.hovered ? "#aa75c5ff" : "#35ffffff")
+                }
+            }
         }
     }
 
@@ -208,7 +235,7 @@ ApplicationWindow {
         contentItem: Text {
             text: nav.text
             color: nav.active ? appRoot.brightGold : (nav.hovered ? appRoot.textMain : appRoot.textDim)
-            font.pixelSize: 13
+            font.pixelSize: 14
             font.weight: nav.active ? Font.DemiBold : Font.Normal
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignVCenter
@@ -216,8 +243,8 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 8
-            color: nav.active ? "#353a40" : (nav.hovered ? "#2d3136" : "transparent")
-            border.color: nav.active ? appRoot.gold : "transparent"
+            color: nav.active ? "#17324a" : (nav.hovered ? "#242a30" : "transparent")
+            border.color: nav.active ? appRoot.blue : "transparent"
             border.width: 1
             Rectangle {
                 visible: nav.active
@@ -225,7 +252,7 @@ ApplicationWindow {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: 3
-                color: appRoot.gold
+                color: appRoot.blue
                 radius: 2
             }
         }
@@ -233,9 +260,55 @@ ApplicationWindow {
 
     component SectionLabel: Text {
         color: appRoot.brightGold
-        font.pixelSize: 11
+        font.pixelSize: 12
         font.bold: true
         font.letterSpacing: 1.1
+    }
+
+    component MediaCard: Panel {
+        id: mediaCard
+        property string titleText: "Tool"
+        property string bodyText: ""
+        property string iconText: "◆"
+        property string actionKey: ""
+        property string statusText: "LOCAL TOOL"
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        Layout.minimumHeight: 250
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 9
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: mediaCard.iconText; color: appRoot.blueBright; font.pixelSize: 22; font.bold: true }
+                Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.family: "Noto Sans Display"; font.pixelSize: 18; font.bold: true; elide: Text.ElideRight }
+                Rectangle {
+                    radius: 10; height: 22; width: statusLabel.implicitWidth + 18
+                    color: "#152b3b"; border.color: appRoot.blue
+                    Text { id: statusLabel; anchors.centerIn: parent; text: mediaCard.statusText; color: appRoot.blueBright; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
+                }
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 118
+                radius: 10
+                color: "#111418"
+                border.color: "#39424b"
+                border.width: 1
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: "#24292f" }
+                    GradientStop { position: 1.0; color: "#111418" }
+                }
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 2; color: appRoot.blue; opacity: 0.7 }
+                Text { anchors.centerIn: parent; text: mediaCard.iconText; color: "#5575c5ff"; font.pixelSize: 58; font.bold: true }
+                Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10; text: "GENESIS · " + mediaCard.titleText.toUpperCase(); color: appRoot.textDim; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.8 }
+            }
+            Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight }
+            GButton { Layout.fillWidth: true; text: "OPEN  " + mediaCard.titleText.toUpperCase(); active: true; onClicked: moduleBridge.triggerAction(mediaCard.actionKey) }
+        }
     }
 
     component PageHeader: RowLayout {
@@ -249,8 +322,8 @@ ApplicationWindow {
         Text { text: pageHeader.iconText; color: appRoot.gold; font.pixelSize: 30 }
         ColumnLayout {
             spacing: 0
-            Text { text: pageHeader.titleText; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
-            Text { text: pageHeader.subtitleText; color: appRoot.textDim; font.pixelSize: 13 }
+            Text { text: pageHeader.titleText; color: appRoot.brightGold; font.pixelSize: 29; font.bold: true }
+            Text { text: pageHeader.subtitleText; color: appRoot.textDim; font.pixelSize: 14 }
         }
         Item { Layout.fillWidth: true }
     }
@@ -260,9 +333,15 @@ ApplicationWindow {
         z: -10
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0; color: "#2d3137" }
+            GradientStop { position: 0; color: "#272b30" }
             GradientStop { position: 0.40; color: appRoot.bg }
-            GradientStop { position: 1; color: "#15171a" }
+            GradientStop { position: 1; color: "#111315" }
+        }
+        Image {
+            anchors.fill: parent
+            source: "../assets/lunacy_banner/cockpit_background_soft.jpg"
+            fillMode: Image.PreserveAspectCrop
+            opacity: 0.10
         }
     }
 
@@ -383,8 +462,8 @@ ApplicationWindow {
                                         Layout.preferredHeight: 245
                                         radius: 10
                                         color: "#1f2227"
-                                        border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
-                                        border.width: appRoot.generationSource.toString().length ? 2 : 1
+                                        border.color: appRoot.gold
+                                        border.width: 2
                                         Image { anchors.fill: parent; anchors.margins: 7; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
                                         Column {
                                             anchors.centerIn: parent
@@ -470,12 +549,41 @@ ApplicationWindow {
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        color: "#05080b"
+                                        Layout.preferredHeight: 300
+                                        Layout.minimumHeight: 240
+                                        color: "#171a1e"
                                         radius: 10
-                                        border.color: appRoot.line
+                                        border.color: "#8fd2a34e"
+                                        border.width: 1.5
                                         Image { anchors.fill: parent; anchors.margins: 8; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
-                                        Text { anchors.centerIn: parent; text: privacyMode ? "PRIVATE" : "GENERATED RESULT"; color: appRoot.textDim; font.pixelSize: 17; visible: privacyMode || genesisBridge.previewUrl.length === 0 }
+                                        Text { anchors.centerIn: parent; text: privacyMode ? "PRIVATE" : "GENERATED RESULT"; color: appRoot.textDim; font.pixelSize: 18; visible: privacyMode || genesisBridge.previewUrl.length === 0 }
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 92
+                                        spacing: 8
+                                        Repeater {
+                                            model: [
+                                                {title:"STAGE 1", name:"Phr00t / Qwen", enabled:true},
+                                                {title:"STAGE 2", name:"Lustify SDXL", enabled:appRoot.useStageTwo},
+                                                {title:"STAGE 3", name:"ReActor", enabled:appRoot.useStageThree}
+                                            ]
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                Layout.fillHeight: true
+                                                radius: 9
+                                                color: modelData.enabled ? "#2b2922" : "#202328"
+                                                border.color: modelData.enabled ? appRoot.gold : appRoot.line
+                                                border.width: modelData.enabled ? 2 : 1
+                                                Column {
+                                                    anchors.centerIn: parent
+                                                    spacing: 3
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 12; font.bold: true }
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.name; color: appRoot.textMain; font.pixelSize: 11; font.bold: true }
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9 }
+                                                }
+                                            }
+                                        }
                                     }
                                     SectionLabel { text: "PROMPT" }
                                     TextArea {
@@ -686,14 +794,14 @@ ApplicationWindow {
                             Layout.fillWidth: true; Layout.fillHeight: true; columns: 3; rowSpacing: 10; columnSpacing: 10
                             Repeater {
                                 model: [
-                                    {title:"Background Remover", body:"Create clean cut-outs and transparent assets.", action:"background remover"},
-                                    {title:"Enhance", body:"Restore detail and improve image quality.", action:"enhance"},
-                                    {title:"Upscale", body:"Increase resolution using the local image stack.", action:"upscale"},
-                                    {title:"Batch Tools", body:"Process folders and multiple images efficiently.", action:"batch"},
-                                    {title:"Media Viewer", body:"Open and inspect local images and media.", action:"media viewer"},
-                                    {title:"Canvas", body:"Arrange cut-outs, resize, rotate, layer and flatten.", action:"canvas"}
+                                    {title:"Background Remover", body:"Create transparent cut-outs and reusable assets.", action:"background remover", icon:"✂", status:"GPU / LOCAL"},
+                                    {title:"Enhance", body:"Restore detail and prepare images for finishing.", action:"enhance", icon:"✦", status:"AI TOOL"},
+                                    {title:"Upscale", body:"Increase resolution with the local image stack.", action:"upscale", icon:"⇧", status:"GPU / LOCAL"},
+                                    {title:"Batch Tools", body:"Process folders and image sets efficiently.", action:"batch", icon:"▦", status:"UTILITY"},
+                                    {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
+                                    {title:"Canvas", body:"Layer, resize, rotate, annotate and finish images.", action:"canvas", icon:"Ps", status:"EDITOR"}
                                 ]
-                                Panel { Layout.fillWidth: true; Layout.fillHeight: true; ColumnLayout { anchors.fill: parent; anchors.margins: 16; Text { text: modelData.title; color: appRoot.brightGold; font.pixelSize: 18; font.bold: true } Text { Layout.fillWidth: true; text: modelData.body; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap } Item { Layout.fillHeight: true } GButton { Layout.fillWidth: true; text: "Open"; onClicked: moduleBridge.triggerAction(modelData.action) } } }
+                                MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
                             }
                         }
                     }
@@ -705,11 +813,11 @@ ApplicationWindow {
                         PageHeader { titleText: "Photo Library"; subtitleText: "View, organise, find duplicates and group faces."; iconText: "▧" }
                         GridLayout { Layout.fillWidth: true; Layout.fillHeight: true; columns: 3; rowSpacing: 10; columnSpacing: 10
                             Repeater { model: [
-                                {title:"Media Viewer", body:"Browse your local photo collection.", action:"media viewer"},
-                                {title:"Duplicate Finder", body:"Find exact and near-duplicate images.", action:"duplicate finder"},
-                                {title:"Face Organiser", body:"Group detected faces and organise people.", action:"face organiser"}
+                                {title:"Media Viewer", body:"Thumbnail library, large preview and image metadata.", action:"media viewer", icon:"▧", status:"BROWSE"},
+                                {title:"Duplicate Finder", body:"Review exact and near duplicates side-by-side before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
+                                {title:"Face Organiser", body:"People workspace for face grouping and photo organisation.", action:"face organiser", icon:"◎", status:"PEOPLE"}
                             ]
-                            Panel { Layout.fillWidth: true; Layout.fillHeight: true; ColumnLayout { anchors.fill: parent; anchors.margins: 18; Text { text: modelData.title; color: appRoot.brightGold; font.pixelSize: 19; font.bold: true } Text { Layout.fillWidth: true; text: modelData.body; color: appRoot.textDim; wrapMode: Text.Wrap } Item { Layout.fillHeight: true } GButton { Layout.fillWidth: true; text:"Open"; onClicked: moduleBridge.triggerAction(modelData.action) } } } }
+                            MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status } }
                         }
                     }
                 }

@@ -1057,7 +1057,7 @@ def main() -> int:
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
-    engine.load(QUrl.fromLocalFile(str(UI_ROOT / "Main.qml")))
+    engine.load(QUrl.fromLocalFile(str(UI_ROOT / "MainPremiumLinux.qml")))
     if not engine.rootObjects():
         return 1
     window = engine.rootObjects()[0]
