@@ -3,7 +3,7 @@ set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$HERE/.venv"
-SERVICE_DIR="$HOME/.config/systemd/user"
+SERVICE_DIR="/etc/systemd/system"
 BRIDGE_SERVICE_SRC="$HERE/genesis-control-bridge.service"
 BRIDGE_SERVICE_DST="$SERVICE_DIR/genesis-control-bridge.service"
 REMOTE_SERVICE_SRC="$HERE/genesis-remote-control.service"
@@ -25,11 +25,11 @@ chmod +x "$HERE/install.sh" "$HERE/pair-remote.sh" "$HERE/remote-supervisor.sh"
 # Import the live graphical-session environment so screenshot/input helpers can
 # see the current Wayland/X11 session when available.
 systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS 2>/dev/null || true
-systemctl --user daemon-reload
-systemctl --user enable --now genesis-control-bridge.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now genesis-control-bridge.service
 
 printf '\nLocal bridge status:\n'
-systemctl --user --no-pager --full status genesis-control-bridge.service || true
+sudo systemctl --no-pager --full status genesis-control-bridge.service || true
 
 printf '\nLocal MCP endpoint: http://127.0.0.1:8766/mcp\n'
 printf 'Bridge logs: journalctl --user -u genesis-control-bridge -f\n\n'
