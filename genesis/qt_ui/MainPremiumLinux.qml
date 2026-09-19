@@ -327,7 +327,24 @@ ApplicationWindow {
                 Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10; text: "GENESIS · " + mediaCard.titleText.toUpperCase(); color: appRoot.textDim; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.8 }
             }
             Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight }
-            GButton { Layout.fillWidth: true; text: "OPEN  " + mediaCard.titleText.toUpperCase(); active: true; onClicked: moduleBridge.triggerAction(mediaCard.actionKey) }
+            GButton {
+                Layout.fillWidth: true
+                text: mediaBridge.busy ? "WORKING…" : "OPEN  " + mediaCard.titleText.toUpperCase()
+                active: !mediaBridge.busy
+                enabled: !mediaBridge.busy
+                onClicked: {
+                    if (mediaCard.actionKey === "background remover")
+                        mediaBridge.chooseAndRemoveBackground()
+                    else if (mediaCard.actionKey === "upscale")
+                        mediaBridge.chooseAndUpscale(2.0)
+                    else if (mediaCard.actionKey === "extract audio")
+                        mediaBridge.chooseAndExtractAudio()
+                    else if (mediaCard.actionKey === "extract video")
+                        mediaBridge.chooseAndExtractVideo()
+                    else
+                        moduleBridge.triggerAction(mediaCard.actionKey)
+                }
+            }
         }
     }
 
@@ -874,20 +891,32 @@ ApplicationWindow {
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 10
-                        PageHeader { titleText: "Media Tools"; subtitleText: "Fast access to your working image utilities."; iconText: "✦" }
+                        PageHeader { titleText: "Media Tools"; subtitleText: mediaBridge.status; iconText: "✦" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            GButton { text: "Open saved result"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: Qt.openUrlExternally(mediaBridge.resultUrl) }
+                            Text { Layout.fillWidth: true; text: mediaBridge.resultUrl; color: appRoot.textDim; elide: Text.ElideMiddle }
+                            BusyIndicator { running: mediaBridge.busy; visible: running; Layout.preferredWidth: 32; Layout.preferredHeight: 32 }
+                        }
+                        ScrollView {
+                            Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                            id: mediaScroll
+                            contentWidth: availableWidth
                         GridLayout {
-                            Layout.fillWidth: true; Layout.fillHeight: true; columns: 3; rowSpacing: 10; columnSpacing: 10
+                            width: mediaScroll.availableWidth; columns: 3; rowSpacing: 10; columnSpacing: 10
                             Repeater {
                                 model: [
                                     {title:"Background Remover", body:"Create transparent cut-outs and reusable assets.", action:"background remover", icon:"✂", status:"GPU / LOCAL"},
                                     {title:"Enhance", body:"Restore detail and prepare images for finishing.", action:"enhance", icon:"✦", status:"AI TOOL"},
                                     {title:"Upscale", body:"Increase resolution with the local image stack.", action:"upscale", icon:"⇧", status:"GPU / LOCAL"},
-                                    {title:"Batch Tools", body:"Process folders and image sets efficiently.", action:"batch", icon:"▦", status:"UTILITY"},
+                                    {title:"Extract MP3", body:"Extract an MP3 audio track from a video or audio file.", action:"extract audio", icon:"♫", status:"FFMPEG"},
+                                    {title:"Silent Video", body:"Create a video-only copy with its audio track removed.", action:"extract video", icon:"▷", status:"FFMPEG"},
                                     {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
-                                    {title:"Canvas", body:"Layer, resize, rotate, annotate and finish images.", action:"canvas", icon:"Ps", status:"EDITOR"}
+                                    {title:"Canvas", body:"Prompt-based image editing. Layer and cutout tools are not yet implemented.", action:"canvas", icon:"Ps", status:"IN DEVELOPMENT"}
                                 ]
                                 MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
                             }
+                        }
                         }
                     }
                 }

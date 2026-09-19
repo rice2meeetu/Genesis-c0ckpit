@@ -19,6 +19,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtWidgets import QApplication
 
 from genesis.assistant_bridge import AssistantBridge
+from genesis.media_bridge import MediaBridge
 from qt_cockpit import (
     ASSET_ROOT,
     PROJECT_ROOT,
@@ -252,10 +253,12 @@ def main() -> int:
     layout_bridge = LayoutSettingsBridge(app)
     module_bridge = ModuleBridge(app)
     assistant_bridge = AssistantBridge(app)
+    media_bridge = MediaBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
     context.setContextProperty("assistantBridge", assistant_bridge)
+    context.setContextProperty("mediaBridge", media_bridge)
 
     qml_path = UI_ROOT / "MainPremiumLinux.qml"
     qml_source = compose_premium_qml(qml_path.read_text(encoding="utf-8"))
