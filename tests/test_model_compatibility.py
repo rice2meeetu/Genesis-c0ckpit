@@ -4,6 +4,7 @@ from genesis.model_compatibility import (
     compatible_loras,
     is_compatible,
     lora_family,
+    lora_trigger,
     model_family,
 )
 
@@ -50,9 +51,26 @@ class ModelCompatibilityTests(unittest.TestCase):
         ]
         self.assertEqual(compatible_loras(model, verified), verified)
 
+    def test_metadata_audit_enables_verified_4b_and_regular_9b_loras(self):
+        four_b = "flux-2-klein-4b.safetensors"
+        regular_nine_b = "flux-2-klein-base-9b-Q4_K_M.gguf"
+        self.assertTrue(is_compatible(four_b, "f2k_4B_consist_20260314.safetensors"))
+        for name in (
+            "flux2klein_tocowgirl.safetensors",
+            "FK_sloppydeepthroat_epoch_10.safetensors",
+            "FK_teeththroat.safetensors",
+        ):
+            self.assertTrue(is_compatible(regular_nine_b, name))
+            self.assertFalse(is_compatible(four_b, name))
+
+    def test_metadata_triggers_are_exposed_but_not_invented(self):
+        self.assertEqual(lora_trigger("F2K4BBabe_Engel_v1.0.safetensors"), "F2K4BBabe_Engel_v1.0")
+        self.assertEqual(lora_trigger("FK_sloppydeepthroat_epoch_10.safetensors"), "FK_sloppydeepthroat")
+        self.assertEqual(lora_trigger("FK_teeththroat.safetensors"), "FK_strappadoblowjob")
+        self.assertEqual(lora_trigger("flux2klein_tocowgirl.safetensors"), "")
+
     def test_explicit_unverified_names_stay_blocked_even_if_filename_matches(self):
         self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "FLUX2_KLEIN_UNLOCKED_V1.safetensors"))
-        self.assertFalse(is_compatible("flux-2-klein-4b.safetensors", "FK_teeththroat.safetensors"))
 
     def test_community_krea_loras_are_exposed_for_regular_klein9b_only(self):
         regular = "flux-2-klein-base-9b-Q4_K_M.gguf"

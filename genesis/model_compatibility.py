@@ -13,6 +13,7 @@ WORKFLOW_DEFAULT = "Use workflow default"
 
 KLEIN_4B_LORAS = {
     "F2K4BBabe_Engel_v1.0.safetensors",
+    "f2k_4B_consist_20260314.safetensors",
     "hina_flux2klein4b_asianMix_v4.0-lora.safetensors",
     # Structurally validated and completed a coherent 512px render on
     # 2026-09-11. Keep strictly scoped to Klein 4B.
@@ -24,6 +25,18 @@ KLEIN_9B_LORAS = {
     "Flux Klein - NSFW v2.safetensors",
     "Klein_Anatomy_Revamped.safetensors",
     "flux2klein_body_version_a.safetensors",
+    # Base-family metadata recovered from the 2026-09-19 LoRA audit.
+    "flux2klein_tocowgirl.safetensors",
+    "FK_sloppydeepthroat_epoch_10.safetensors",
+    "FK_teeththroat.safetensors",
+}
+
+# Expose verified training triggers to the UI/assistant. Prompt adaptation never
+# injects these silently; the user or a preset must explicitly apply them.
+LORA_TRIGGERS = {
+    "F2K4BBabe_Engel_v1.0.safetensors": "F2K4BBabe_Engel_v1.0",
+    "FK_sloppydeepthroat_epoch_10.safetensors": "FK_sloppydeepthroat",
+    "FK_teeththroat.safetensors": "FK_strappadoblowjob",
 }
 
 # Exact local files whose base family is known to be Krea 2.
@@ -44,9 +57,6 @@ KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS = {
 # and a repeatable generation test.
 BLOCKED_UNVERIFIED_LORAS = {
     "FLUX2_KLEIN_UNLOCKED_V1.safetensors",
-    "flux2klein_tocowgirl.safetensors",
-    "FK_sloppydeepthroat_epoch_10.safetensors",
-    "FK_teeththroat.safetensors",
 }
 
 # Ordinary Klein 9B compatibility does not prove KV compatibility.
@@ -152,6 +162,12 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
 
 def compatible_loras(model: str | None, available: list[str]) -> list[str]:
     return [name for name in available if is_compatible(model, name)]
+
+
+def lora_trigger(name: str | None) -> str:
+    """Return a metadata-verified trigger without modifying a prompt."""
+
+    return LORA_TRIGGERS.get(_basename(name), "")
 
 
 def compatibility_note(model: str | None) -> str:
