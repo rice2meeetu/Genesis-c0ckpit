@@ -29,6 +29,7 @@ ApplicationWindow {
 
     property int pageIndex: 0
     property bool privacyMode: false
+    readonly property bool compactNavigation: height < 850
     property var navItems: [
         {icon:"▣", label:"Image Generation", page:0},
         {icon:"♟", label:"Pose Library", page:1},
@@ -42,6 +43,19 @@ ApplicationWindow {
         {icon:"♜", label:"Pose Maker", page:9},
         {icon:"☷", label:"Settings", page:10}
     ]
+
+    Shortcut { sequence: "Alt+1"; onActivated: appRoot.pageIndex = 0 }
+    Shortcut { sequence: "Alt+2"; onActivated: appRoot.pageIndex = 1 }
+    Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 2 }
+    Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 3 }
+    Shortcut { sequence: "Alt+5"; onActivated: appRoot.pageIndex = 4 }
+    Shortcut { sequence: "Alt+6"; onActivated: appRoot.pageIndex = 5 }
+    Shortcut { sequence: "Alt+7"; onActivated: appRoot.pageIndex = 6 }
+    Shortcut { sequence: "Alt+8"; onActivated: appRoot.pageIndex = 7 }
+    Shortcut { sequence: "Alt+9"; onActivated: appRoot.pageIndex = 8 }
+    Shortcut { sequence: "Alt+0"; onActivated: appRoot.pageIndex = 9 }
+    Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
+    Shortcut { sequence: "Alt+A"; onActivated: if (appRoot.navItems.length > 11) appRoot.pageIndex = 11 }
 
     property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
     property int selectedGenerationIndex: 0
@@ -185,6 +199,9 @@ ApplicationWindow {
         property bool active: false
         property bool premium: false
         implicitHeight: 46
+        activeFocusOnTab: true
+        Accessible.name: text
+        Accessible.role: Accessible.Button
         font.pixelSize: 14
         font.weight: active || premium ? Font.DemiBold : Font.Medium
         contentItem: Text {
@@ -231,6 +248,9 @@ ApplicationWindow {
         id: nav
         property bool active: false
         implicitHeight: 44
+        activeFocusOnTab: true
+        Accessible.name: text
+        Accessible.role: Accessible.Button
         leftPadding: 12
         contentItem: Text {
             text: nav.text
@@ -402,7 +422,7 @@ ApplicationWindow {
                     spacing: 5
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 220
+                        Layout.preferredHeight: appRoot.compactNavigation ? 96 : 220
                         radius: 14
                         color: "#202328"
                         border.color: appRoot.line
@@ -415,16 +435,28 @@ ApplicationWindow {
                         }
                         Text { anchors.centerIn: parent; text: "PRIVATE"; color: appRoot.gold; font.letterSpacing: 2; visible: privacyMode }
                     }
-                    Repeater {
-                        model: appRoot.navItems
-                        NavButton {
-                            Layout.fillWidth: true
-                            text: modelData.icon + "   " + modelData.label
-                            active: appRoot.pageIndex === modelData.page
-                            onClicked: appRoot.pageIndex = modelData.page
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        contentWidth: availableWidth
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                        Column {
+                            width: parent.width
+                            spacing: 5
+                            Repeater {
+                                model: appRoot.navItems
+                                NavButton {
+                                    width: parent.width
+                                    text: modelData.icon + "   " + modelData.label
+                                    active: appRoot.pageIndex === modelData.page
+                                    onClicked: appRoot.pageIndex = modelData.page
+                                }
+                            }
                         }
                     }
-                    Item { Layout.fillHeight: true }
                     Text { Layout.fillWidth: true; text: "LOCAL · PRIVATE · LINUX"; color: appRoot.textDim; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; font.letterSpacing: 0.8 }
                 }
             }
