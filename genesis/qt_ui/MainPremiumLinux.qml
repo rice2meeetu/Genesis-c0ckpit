@@ -372,39 +372,92 @@ ApplicationWindow {
 
         Panel {
             Layout.fillWidth: true
-            Layout.preferredHeight: 92
-            RowLayout {
+            Layout.preferredHeight: appRoot.compactNavigation ? 112 : 150
+            clip: true
+
+            Item {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 12
+                anchors.margins: 10
+
                 Rectangle {
-                    Layout.preferredWidth: 64
-                    Layout.preferredHeight: 64
-                    radius: 12
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 2
                     color: appRoot.gold
-                    Text { anchors.centerIn: parent; text: "G"; color: "#071018"; font.pixelSize: 38; font.bold: true }
                 }
-                ColumnLayout {
-                    spacing: 0
-                    Text { text: "GENESIS c0ckpit"; color: appRoot.brightGold; font.pixelSize: 27; font.bold: true }
-                    Text { text: "Keep walking Allan.  ·  Local creative workspace"; color: appRoot.textDim; font.pixelSize: 11 }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    text: "LOCAL  /  PRIVATE  /  LINUX"
+                    color: appRoot.gold
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1.2
                 }
-                Item { Layout.fillWidth: true }
-                Rectangle {
-                    Layout.preferredWidth: 190
-                    Layout.preferredHeight: 34
-                    radius: 17
-                    color: "#2b2f35"
-                    border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
-                    Text {
-                        anchors.centerIn: parent
-                        text: runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE"
-                        color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
-                        font.pixelSize: 11
-                        font.bold: true
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 10
+                    text: "Keep walking Allan.  ·  CREATIVE SYSTEM"
+                    color: appRoot.textDim
+                    font.pixelSize: 10
+                    font.letterSpacing: 1.4
+                }
+
+                Image {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(parent.width * 0.56, appRoot.compactNavigation ? 500 : 650)
+                    height: parent.height - 8
+                    source: "../assets/lunacy_banner/genesis_cockpit_wordmark_full.png"
+                    sourceClipRect: Qt.rect(0, 28, 945, 317)
+                    fillMode: Image.PreserveAspectFit
+                    mipmap: true
+                    smooth: true
+                    visible: !privacyMode
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: privacyMode
+                    text: "GENESIS  COCKPIT"
+                    color: appRoot.brightGold
+                    font.pixelSize: appRoot.compactNavigation ? 28 : 38
+                    font.bold: true
+                    font.letterSpacing: 4
+                }
+
+                Column {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: appRoot.compactNavigation ? 170 : 190
+                    spacing: 8
+
+                    Rectangle {
+                        width: parent.width
+                        height: 34
+                        radius: 17
+                        color: "#171b20"
+                        border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
+                        Text {
+                            anchors.centerIn: parent
+                            text: runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE"
+                            color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
+                    }
+
+                    GButton {
+                        width: parent.width
+                        text: privacyMode ? "Privacy On" : "Privacy Mode"
+                        active: privacyMode
+                        onClicked: privacyMode = !privacyMode
                     }
                 }
-                GButton { text: privacyMode ? "Privacy On" : "Privacy Mode"; active: privacyMode; Layout.preferredWidth: 130; onClicked: privacyMode = !privacyMode }
             }
         }
 
