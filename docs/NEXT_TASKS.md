@@ -1,5 +1,29 @@
 # GENESIS V3 — Next Tasks
 
+## Verified isolated Klein 4B baseline — 2026-09-20
+
+- Both 12-argument and 16-argument Generate calls were exercised through
+  QQmlExpression; both reached the bridge without QML dispatch errors.
+- Initial render cdb61534-bf66-4461-930a-5eed1b0aa457 failed at CLIPLoader:
+  the encoder symlink targeted the unmounted Ai partition.
+- Mounted /dev/sdc3 (label Ai) read-only at /run/media/rice2meetyou/Ai using
+  udisksctl. Existing encoder link became readable. No files moved/downloaded.
+- Retried as 5f7110eb-3a52-499f-9646-9d7762da1d26: ComfyUI success, output
+  GENESIS_VERIFY_KLEIN4B_BASELINE_00001_.png in
+  /home/rice2meetyou/AI/ComfyUI/output.
+- Visually inspected output: coherent blue ceramic teapot on wooden table,
+  matching the neutral prompt. Log reports 59.76 seconds.
+- Exact baseline: flux-2-klein-4b.safetensors, qwen_3_4b_fp4_flux2.safetensors,
+  flux2-vae.safetensors, 512x512, batch 1, seed 290829, 4 steps, Euler,
+  Flux2Scheduler, CFG 1, no LoRAs or reference image.
+- This verifies ONLY that baseline. Source editing, pose conditioning and
+  LoRA combinations are still experimental/unverified by this test.
+- Saved workflow files and ComfyUI process/flags, including
+  --disable-async-offload, were unchanged.
+- Next: make readiness check exact accessible files instead of trusting cached
+  object_info choices; preserve this baseline while testing other routes.
+
+
 Updated: 2026-09-20
 
 ## Completed 2026-09-20 — capability-aware LoRA stack controls
