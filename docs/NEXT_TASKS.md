@@ -1,5 +1,13 @@
 # GENESIS V3 — Next Tasks
 
+## Regular Klein 9B single-LoRA validation — 2026-09-20
+
+- Neutral 512x512 render completed with `Flux Klein - NSFW v2.safetensors` at 0.35 model strength. Prompt: `a33263b4-4330-4dc1-8aeb-05f72ca745fe`.
+- Output: `GENESIS_VERIFY_KLEIN9B_LORA_NEUTRAL_00001_.png` under ComfyUI output. Execution time approximately 87.1 seconds.
+- Result is a valid image but has noticeable teapot shape distortion. Keep this LoRA experimental; do not promote it as a quality preset or infer that other LoRA stacks are safe.
+- Existing ComfyUI flags, protected workflows, and model files were unchanged.
+- Single best next action: test the next approved regular-9B LoRA at the same neutral seed/prompt, then compare outputs before exposing any combination as render-tested.
+
 ## Two-image neutral Face Swap function — 2026-09-20
 
 - Added a dedicated Face Swap page with target-image and source-identity pickers. The launcher preserves GENESIS AI at page 11 and routes Face Swap to page 12.

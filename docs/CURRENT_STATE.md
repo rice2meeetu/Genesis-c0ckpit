@@ -1,5 +1,14 @@
 # GENESIS V3 — Current State
 
+## Verified regular Klein 9B single-LoRA render — 2026-09-20
+
+- Prompt `a33263b4-4330-4dc1-8aeb-05f72ca745fe` completed successfully on the existing ComfyUI GPU stack.
+- Workflow: regular Klein 9B GGUF (`flux-2-klein-base-9b-Q4_K_M.gguf`) with `qwen_3_8b_fp8mixed.safetensors`, `flux2-vae.safetensors`, and one approved LoRA: `Flux Klein - NSFW v2.safetensors` at model strength 0.35.
+- Neutral test: blue ceramic teapot product photograph; 512x512, batch 1, seed 290832, 4 steps, Euler, simple scheduler, CFG 1.0.
+- Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN9B_LORA_NEUTRAL_00001_.png`, PNG RGB 512x512, 280072 bytes, SHA-256 `3754398b0a981845e54133151c58a2372745754d97ac7e217651a655258e2eac`.
+- ComfyUI execution time was approximately 87.1 seconds. The image rendered successfully but showed noticeable teapot shape distortion, so this LoRA remains experimental and is not promoted as a quality preset.
+- ComfyUI flags remained `--lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --listen 127.0.0.1 --port 8188`.
+
 ## Two-image neutral Face Swap function — 2026-09-20
 
 - Premium Linux UI now exposes a dedicated Face Swap page at page 12, with separate target-image and source-identity pickers.
