@@ -28,6 +28,14 @@ Updated: 2026-09-20
 
 ## Readiness correction — 2026-09-20
 
+### Accessible LoRA rescan — 2026-09-20
+
+- Live inventory: 17 base models, 31 LoRAs, 6 VAEs, 5 encoders, and 35 workflows.
+- Regular Klein 9B approved compatibility: `Flux Klein - NSFW v2`, `Klein_Anatomy_Revamped`, `flux2klein_body_version_a`, `FK_sloppydeepthroat_epoch_10`, and `FK_teeththroat`.
+- Klein 4B approved experimental compatibility: `F2K4BBabe_Engel_v1.0`, `f2k_4B_consist_20260314`, `hina_flux2klein4b_asianMix_v4.0-lora`, and `klein4b-deepthroat-22epoc-k3nk`.
+- Klein 9B-KV has no approved LoRAs. Similar filenames such as `FLUX2_KLEIN_UNLOCKED_V1`, `Flux-NSFW-uncensored`, `flux2klein_bj`, `flux2klein_cowgirl`, and `FutaCockCloseUp-v2` remain blocked/unverified.
+- No files were downloaded, moved, deleted, or modified. Next action remains one controlled neutral render per experimental adapter before promotion.
+
 - Corrected `genesis/model_registry.py` so Klein 4B readiness does not require a LoRA. The previously matched `FLUX2_KLEIN_UNLOCKED_V1.safetensors` is blocked/unverified and must not make the profile appear ready.
 - Added a regression check in `tests/test_model_compatibility.py`.
 - Verification: 79 tests passed; live readiness reports Klein 4B ready with no LoRA evidence; branch pushed as `a5d0c95`.
