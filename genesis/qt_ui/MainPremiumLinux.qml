@@ -1034,10 +1034,9 @@ ApplicationWindow {
 
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing: 10
-                        PageHeader { titleText: "Entertainment"; subtitleText: "Jellyfin and SillyTavern together, separate from creative tools."; iconText: "▷" }
+                        PageHeader { titleText: "Entertainment"; subtitleText: "Local media and entertainment tools."; iconText: "▷" }
                         RowLayout { Layout.fillWidth: true; Layout.fillHeight: true; spacing:10
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.centerIn: parent; spacing:12; Text { text:"JELLYFIN"; color:appRoot.brightGold; font.pixelSize:24; font.bold:true } GButton { text:"Open Jellyfin"; Layout.preferredWidth:200; onClicked:moduleBridge.triggerAction("movie library") } } }
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.centerIn: parent; spacing:12; Text { text:"SILLYTAVERN"; color:appRoot.brightGold; font.pixelSize:24; font.bold:true } GButton { text:"Open SillyTavern"; Layout.preferredWidth:200; onClicked:moduleBridge.triggerAction("web app") } } }
                         }
                     }
                 }

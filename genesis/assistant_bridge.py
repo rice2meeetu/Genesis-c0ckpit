@@ -6,7 +6,7 @@ route is available for BUILD work, and an OpenAI-compatible cloud endpoint
 (such as RunPod) can be enabled later without changing the Feefee persona.
 
 Rocinante is intentionally excluded from this bridge; it is reserved for
-SillyTavern.
+external persona/chat frontends.
 """
 
 from __future__ import annotations

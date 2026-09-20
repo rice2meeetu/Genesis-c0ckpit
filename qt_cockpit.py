@@ -546,8 +546,6 @@ class ModuleBridge(QObject):
             self._open(PROJECT_ROOT / "backups", "GENESIS recovery")
         elif "storage" in key or "model" in key:
             self._open(Path("/mnt/AI-Storage"), "Models and storage")
-        elif "web app" in key or "connections" in key:
-            self._service(integrations.SILLYTAVERN_URL, "/", integrations.SILLYTAVERN_SERVICE, "SillyTavern")
         elif "settings" in key:
             self._open(PROJECT_ROOT, "GENESIS settings")
         else:

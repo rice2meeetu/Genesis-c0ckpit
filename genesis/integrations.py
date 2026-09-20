@@ -19,13 +19,11 @@ from pathlib import Path
 
 
 JELLYFIN_URL = "http://127.0.0.1:8096"
-# Rocinante is reserved for SillyTavern/persona chat.
 LLAMA_URL = "http://127.0.0.1:8081"
 # Heavy Qwen3 build/coding route.
 QWEN_URL = "http://127.0.0.1:8082"
 # Dedicated everyday GENESIS AI route.
 ASSISTANT_URL = "http://127.0.0.1:8083"
-SILLYTAVERN_URL = "http://127.0.0.1:8000"
 COMFYUI_URL = "http://127.0.0.1:8188"
 GO2RTC_URL = "http://127.0.0.1:1984"
 LM_STUDIO_URL = "http://127.0.0.1:1234"
@@ -35,13 +33,11 @@ SWARMUI_URL = "http://127.0.0.1:7801"
 LLAMA_SERVICE = "genesis-llama.service"
 QWEN_SERVICE = "genesis-qwen.service"
 ASSISTANT_SERVICE = "genesis-assistant.service"
-SILLYTAVERN_SERVICE = "genesis-sillytavern.service"
 COMFYUI_SERVICE = "genesis-comfyui.service"
 
 LLAMA_BINARY = Path(
     "/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server"
 )
-# SillyTavern model only. Do not route GENESIS AI through Rocinante.
 LLAMA_MODEL = Path(
     "/mnt/AI-Storage/LLM-Models/"
     "Rocinante-X-12B-v1-Heretic-Uncensored.Q5_K_M.gguf"
@@ -56,7 +52,6 @@ QWEN_MODEL = Path(
     "/mnt/AI-Storage/GENESIS-LLM/"
     "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf"
 )
-SILLYTAVERN_ROOT = Path("/mnt/C/Users/p4uln/SillyTavern")
 COMFYUI_ROOT = Path.home() / "AI" / "ComfyUI"
 COMFYUI_PYTHON_CANDIDATES = (
     Path.home() / "miniforge3/envs/comfyui-reactor-rocm/bin/python",
@@ -231,16 +226,12 @@ def integration_diagnostics():
     llama_online = endpoint_online(LLAMA_URL, "/health")
     qwen_online = endpoint_online(QWEN_URL, "/health")
     assistant_online = endpoint_online(ASSISTANT_URL, "/health")
-    silly_online = endpoint_online(SILLYTAVERN_URL, "/")
     comfy_online = endpoint_online(COMFYUI_URL, "/system_stats")
     jellyfin_online = endpoint_online(JELLYFIN_URL, "/System/Info/Public")
     go2rtc_online = endpoint_online(GO2RTC_URL, "/api/streams")
     lm_studio_online = endpoint_online(LM_STUDIO_URL, "/v1/models")
     facefusion_online = endpoint_online(FACEFUSION_URL, "/")
     swarmui_online = endpoint_online(SWARMUI_URL, "/")
-
-    silly_installed = (SILLYTAVERN_ROOT / "server.js").is_file()
-    silly_writable = mount_is_writable(SILLYTAVERN_ROOT)
 
     return {
         item.name: item.to_dict()
@@ -271,16 +262,6 @@ def integration_diagnostics():
                 QWEN_SERVICE,
                 service_state(QWEN_SERVICE),
                 str(QWEN_MODEL),
-            ),
-            IntegrationDiagnostic(
-                "SillyTavern",
-                silly_installed,
-                silly_online,
-                SILLYTAVERN_URL,
-                SILLYTAVERN_SERVICE,
-                service_state(SILLYTAVERN_SERVICE),
-                str(SILLYTAVERN_ROOT),
-                "Windows volume is read-only" if silly_installed and not silly_writable else None,
             ),
             IntegrationDiagnostic(
                 "Jellyfin",
@@ -327,7 +308,6 @@ def status_snapshot():
     llama_online = diagnostics["llama.cpp"]["online"]
     assistant_online = endpoint_online(ASSISTANT_URL, "/health")
     qwen_online = diagnostics["Qwen Assistant"]["online"]
-    silly_online = diagnostics["SillyTavern"]["online"]
     comfy_online = diagnostics["ComfyUI"]["online"]
     jellyfin_server = diagnostics["Jellyfin"]["online"]
     go2rtc_online = diagnostics["go2rtc"]["online"]
@@ -363,10 +343,6 @@ def status_snapshot():
         "qwen_model": QWEN_MODEL.name,
         "qwen_endpoint": QWEN_URL,
         "qwen_context": 8192,
-        "silly_online": silly_online,
-        "silly_installed": (SILLYTAVERN_ROOT / "server.js").is_file(),
-        "silly_writable": mount_is_writable(SILLYTAVERN_ROOT),
-        "silly_service": service_state(SILLYTAVERN_SERVICE),
         "comfy_online": comfy_online,
         "comfy_installed": COMFYUI_PYTHON.is_file() and (COMFYUI_ROOT / "main.py").is_file(),
         "comfy_service": service_state(COMFYUI_SERVICE),

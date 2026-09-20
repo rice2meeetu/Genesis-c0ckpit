@@ -23,13 +23,10 @@ Completed:
 - Cockpit dashboard shell and dark cockpit theme added
 - Configurable cockpit artwork, banner framing, zoom, and X/Y position added
 - Artwork framing Cancel/window-close now restores the prior live preview
-- Home quick-launch strip added for Media, Local AI, llama.cpp, SillyTavern,
   ComfyUI, and status refresh
 - Functional Local AI control page added with real status and launch controls
 - Existing Jellyfin Desktop/MPV/ModernZ system integrated without modification
-- Existing llama.cpp ROCm, SillyTavern, and ComfyUI installations integrated
   through guarded user services with duplicate-process prevention
-- SillyTavern RP/image/expression/TTS/memory readiness is shown explicitly
 - Silent no-selection and unavailable-camera control paths now give feedback
 - Core image-generation panel now uses existing ComfyUI workflows without
   rewriting them: workflow/model/LoRA selection, source-image upload, prompt,
@@ -51,7 +48,6 @@ Completed:
 - Cockpit Klein 4B Fast generation live-tested end to end at 512x512: queued,
   completed in 56 seconds, exported, and visually verified without modifying
   the saved workflow
-- `/mnt/C` confirmed mounted read/write and the guarded SillyTavern user service
   live-started successfully on `127.0.0.1:8000`
 - ComfyUI and llama.cpp user-service startup paths live-tested successfully;
   llama.cpp returned a healthy response and ComfyUI was restored with an empty
@@ -83,7 +79,6 @@ Next:
   pages launch, but automated Wayland/XWayland captures are black
 - Configure TTS only if the existing AllTalk/Genesis Voice backend becomes
   available; do not install a replacement implicitly
-- Configure vector/chat memory as a separate backed-up SillyTavern milestone
 - Reconcile the older experimental/untracked viewer files without deleting them
 
 ## Working Tree Note

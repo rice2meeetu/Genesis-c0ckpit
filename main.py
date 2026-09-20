@@ -839,7 +839,6 @@ class PhotoStudio(tk.Tk):
             ("canvas", "Create / Wallpaper", "canvas"),
             (None, "CONNECTED", None),
             ("cameras", "Camera Hub", "cameras"),
-            ("sillytavern", "AI Chat", "sillytavern"),
             ("media", "Media / Jellyfin", "media"),
         ]
 
@@ -859,7 +858,7 @@ class PhotoStudio(tk.Tk):
                 text=label,
                 command=lambda k=target: (
                     self._open_cockpit_target(k)
-                    if k in {"editor", "duplicates", "media", "model-manager", "prompt-manager", "sillytavern"}
+                    if k in {"editor", "duplicates", "media", "model-manager", "prompt-manager"}
                     else self._show_page(k)
                 ),
                 bg="#111722",
@@ -945,7 +944,6 @@ class PhotoStudio(tk.Tk):
 
         self.nav_silly_status = tk.Label(
             self.nav_rail,
-            text="● SillyTavern: not checked",
             bg="#0b0b0b",
             fg="#9da9b8",
             anchor="w",
@@ -1286,7 +1284,6 @@ class PhotoStudio(tk.Tk):
             "duplicates": self.open_duplicate_lab,
             "model-manager": self.open_model_manager,
             "prompt-manager": self.open_prompt_manager,
-            "sillytavern": self.launch_sillytavern,
             "comfyui": self.launch_comfyui,
         }
         if target in launchers:
@@ -1521,8 +1518,6 @@ class PhotoStudio(tk.Tk):
                     ("model_status", "WORKFLOW / MODEL MANAGER",
                      "Inspect installed models, LoRAs, VAEs and workflows.",
                      "model-manager", 2),
-                    ("sillytavern", "SILLYTAVERN",
-                     "Open the configured local roleplay interface.", "sillytavern", 1),
                 ],
             ),
         ]
@@ -4948,34 +4943,6 @@ class PhotoStudio(tk.Tk):
             command=lambda: integrations.open_url(integrations.LLAMA_URL)
         ).pack(side="left", padx=3)
 
-        silly = ttk.LabelFrame(outer, text="SILLYTAVERN · local roleplay")
-        silly.pack(fill="x", pady=5)
-        silly_info = ttk.Frame(silly)
-        silly_info.pack(side="left", fill="both", expand=True, padx=10, pady=8)
-        self.silly_status_label = ttk.Label(
-            silly_info,
-            text="Checking...",
-            font=("DejaVu Sans", 11, "bold")
-        )
-        self.silly_status_label.pack(anchor="w")
-        self.silly_detail_label = ttk.Label(
-            silly_info,
-            text="Existing SillyTavern 1.18.0 · http://127.0.0.1:8000"
-        )
-        self.silly_detail_label.pack(anchor="w", pady=(3, 0))
-        silly_actions = ttk.Frame(silly)
-        silly_actions.pack(side="right", padx=8, pady=8)
-        ttk.Button(
-            silly_actions,
-            text="Start",
-            command=self.start_sillytavern
-        ).pack(side="left", padx=3)
-        ttk.Button(
-            silly_actions,
-            text="Open",
-            command=self.launch_sillytavern
-        ).pack(side="left", padx=3)
-
         comfy = ttk.LabelFrame(outer, text="COMFYUI · existing ROCm image backend")
         comfy.pack(fill="x", pady=5)
         comfy_info = ttk.Frame(comfy)
@@ -5096,33 +5063,6 @@ class PhotoStudio(tk.Tk):
             "or inspect any downloaded ComfyUI workflow JSON."
         )
         self.workflow_lab_status.configure(state="disabled")
-
-        features = ttk.LabelFrame(outer, text="SILLYTAVERN FEATURE READINESS")
-        features.pack(fill="both", expand=True, pady=(7, 0))
-        feature_data = (
-            ("Solo RP", "READY", "Open SillyTavern and choose a character."),
-            ("Group RP", "READY", "Existing character/group support."),
-            ("Group Auto RP", "READY", "Use the configured bounded auto-turn controls in SillyTavern."),
-            ("Image generation", "READY", "Existing SillyTavern → ComfyUI backend; ComfyUI must be running."),
-            ("Character expressions", "PARTIAL", "Neutral/joy support exists; full sprite batch remains deferred."),
-            ("TTS", "UNAVAILABLE", "Existing AllTalk / Genesis Voice backend is not available on Linux."),
-            ("Vector/chat memory", "PENDING", "Not yet configured; no placeholder action is exposed."),
-        )
-        for row, (name, state, detail) in enumerate(feature_data):
-            ttk.Label(
-                features,
-                text=name,
-                font=("DejaVu Sans", 9, "bold")
-            ).grid(row=row, column=0, sticky="w", padx=(10, 12), pady=3)
-            ttk.Label(
-                features,
-                text=state
-            ).grid(row=row, column=1, sticky="w", padx=(0, 12), pady=3)
-            ttk.Label(
-                features,
-                text=detail
-            ).grid(row=row, column=2, sticky="w", padx=(0, 10), pady=3)
-        features.columnconfigure(2, weight=1)
 
     def _generation_ui(self, parent):
         frame = ttk.LabelFrame(parent, text="IMAGE GENERATION · existing ComfyUI workflows")
@@ -5858,27 +5798,6 @@ class PhotoStudio(tk.Tk):
             "llama.cpp"
         )
 
-    def start_sillytavern(self):
-        if not (integrations.SILLYTAVERN_ROOT / "server.js").is_file():
-            messagebox.showwarning(APP_NAME, "Existing SillyTavern is unavailable.")
-            return
-        if not integrations.mount_is_writable(integrations.SILLYTAVERN_ROOT):
-            messagebox.showwarning(
-                APP_NAME,
-                "SillyTavern is on the Windows NTFS volume, which is currently "
-                "read-only. GENESIS will not start it until Windows clears the "
-                "dirty flag and the volume is mounted read/write."
-            )
-            return
-        self._start_service_async(
-            integrations.SILLYTAVERN_SERVICE,
-            lambda: integrations.endpoint_online(
-                integrations.SILLYTAVERN_URL,
-                "/"
-            ),
-            "SillyTavern"
-        )
-
     def start_comfyui(self):
         if not (
             integrations.COMFYUI_PYTHON.is_file()
@@ -5896,20 +5815,6 @@ class PhotoStudio(tk.Tk):
                 "/system_stats"
             ),
             "ComfyUI"
-        )
-
-    def launch_sillytavern(self):
-        if integrations.endpoint_online(integrations.SILLYTAVERN_URL, "/"):
-            integrations.open_url(integrations.SILLYTAVERN_URL)
-            return
-        if not integrations.mount_is_writable(integrations.SILLYTAVERN_ROOT):
-            self.start_sillytavern()
-            return
-        self.start_sillytavern()
-        self._wait_for_endpoint_and_open(
-            integrations.SILLYTAVERN_URL,
-            "/",
-            "SillyTavern"
         )
 
     def launch_comfyui(self):
@@ -6173,13 +6078,6 @@ class PhotoStudio(tk.Tk):
             snapshot["llama_installed"]
         )
         nav(
-            self.nav_silly_status,
-            "SillyTavern",
-            snapshot["silly_online"],
-            snapshot["silly_installed"],
-            snapshot["silly_installed"] and not snapshot["silly_writable"]
-        )
-        nav(
             self.nav_media_status,
             "Media",
             snapshot["jellyfin_server"],
@@ -6197,16 +6095,6 @@ class PhotoStudio(tk.Tk):
                 "RX 9060 XT / ROCm build"
             )
         )
-
-        if snapshot["silly_online"]:
-            silly_state = "ONLINE"
-        elif snapshot["silly_installed"] and not snapshot["silly_writable"]:
-            silly_state = "INSTALLED · WINDOWS VOLUME READ-ONLY"
-        elif snapshot["silly_installed"]:
-            silly_state = "STOPPED"
-        else:
-            silly_state = "UNAVAILABLE"
-        self.silly_status_label.config(text=f"SillyTavern {silly_state}")
 
         comfy_state = "ONLINE" if snapshot["comfy_online"] else (
             "STOPPED" if snapshot["comfy_installed"] else "UNAVAILABLE"

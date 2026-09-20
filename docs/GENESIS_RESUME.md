@@ -37,7 +37,7 @@ Do not reset/clean the working tree: unrelated service edits and artwork are int
 5. Hybrid local/RunPod: user has an account, but this milestone did not provision GPUs, configure credentials or verify a hosted endpoint. Confirm costs/data routing before deployment.
 6. Visual polish last: graphite/black, antique gold dimensional buttons, larger GENESIS logo, retain Lunacy banner option and small cat avatar. Missing original uploads need reattachment if absent from assets.
 
-Pre-existing changes left unstaged: systemd/genesis-assistant.service, systemd/genesis-llama.service, systemd/genesis-sillytavern.service, genesis/assets/lunacy_banner/pose-library-banner-reference.png.
+Pre-existing changes left unstaged: systemd/genesis-assistant.service, systemd/genesis-llama.service, former systemd/genesis-sillytavern.service (detached), genesis/assets/lunacy_banner/pose-library-banner-reference.png.
 Existing extra scan/duplicate/face/camera helpers in media_functions.py are not all connected to this new bridge; do not claim otherwise.
 No reliable countdown to chat limits is available. This Git checkpoint and document are the recovery mechanism, not automatic session migration.
 

@@ -46,7 +46,6 @@ class IntegrationTests(unittest.TestCase):
                 "ComfyUI",
                 "llama.cpp",
                 "Qwen Assistant",
-                "SillyTavern",
                 "Jellyfin",
                 "go2rtc",
                 "LM Studio",
@@ -55,10 +54,6 @@ class IntegrationTests(unittest.TestCase):
             },
         )
         self.assertFalse(any(item["online"] for item in diagnostics.values()))
-        self.assertEqual(
-            diagnostics["SillyTavern"]["blocked_reason"],
-            "Windows volume is read-only",
-        )
 
     @patch("genesis.integrations.integration_diagnostics")
     @patch("genesis.integrations._request_json")
@@ -80,7 +75,6 @@ class IntegrationTests(unittest.TestCase):
                 "ComfyUI",
                 "llama.cpp",
                 "Qwen Assistant",
-                "SillyTavern",
                 "Jellyfin",
                 "go2rtc",
             )
@@ -90,7 +84,6 @@ class IntegrationTests(unittest.TestCase):
             "jellyfin_server",
             "llama_online",
             "qwen_online",
-            "silly_online",
             "comfy_online",
             "go2rtc_online",
             "integrations",

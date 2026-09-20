@@ -83,7 +83,7 @@ Updated: 2026-09-19
 - Live dirty tree at handover creation:
   - modified `systemd/genesis-assistant.service`
   - modified `systemd/genesis-llama.service`
-  - modified `systemd/genesis-sillytavern.service`
+  - modified `former systemd/genesis-sillytavern.service (detached)`
   - untracked `genesis/assets/lunacy_banner/pose-library-banner-reference.png`
 - Do not reset/clean these blindly.
 
