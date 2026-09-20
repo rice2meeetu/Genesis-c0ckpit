@@ -91,6 +91,23 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertEqual(prompt["genesis_lora_2"]["inputs"]["model"], ["genesis_lora_1", 0])
         self.assertEqual(prompt["sampler"]["inputs"]["model"], ["genesis_lora_2", 0])
 
+    def test_lora_stacking_preserves_individual_strengths(self):
+        prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
+        insert_model_only_loras(
+            prompt, "model", "sampler", "model",
+            ["one.safetensors", "two.safetensors"], [0.35, 0.8],
+        )
+        self.assertEqual(prompt["genesis_lora_1"]["inputs"]["strength_model"], 0.35)
+        self.assertEqual(prompt["genesis_lora_2"]["inputs"]["strength_model"], 0.8)
+
+    def test_duplicate_lora_is_rejected(self):
+        prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
+        with self.assertRaisesRegex(Exception, "only once"):
+            insert_model_only_loras(
+                prompt, "model", "sampler", "model",
+                ["one.safetensors", "one.safetensors"], [0.5, 0.7],
+            )
+
     def test_module_pages_route_buttons_through_qt_bridge(self):
         root = Path(__file__).resolve().parents[1]
         qml = (root / "genesis/qt_ui/Main.qml").read_text(encoding="utf-8")

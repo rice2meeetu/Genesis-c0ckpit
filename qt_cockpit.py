@@ -150,6 +150,8 @@ def build_generation_profiles(
             "ready": ready,
             "runnable": runnable,
             "sourceRequired": model_name == QWEN_MODEL,
+            "maxLoras": 3 if model_name == REGULAR_9B_MODEL else (1 if model_name == FOUR_B_MODEL else 0),
+            "experimentalLoras": model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL},
         })
     priority = {FOUR_B_MODEL: 0, REGULAR_9B_MODEL: 1, KV_9B_MODEL: 2, QWEN_MODEL: 3}
     profiles.sort(key=lambda item: (priority.get(item["model"], 99), item["label"].casefold()))
@@ -231,22 +233,31 @@ def insert_model_only_loras(
     consumer_node: str,
     consumer_input: str,
     loras: list[str],
+    strengths: list[float] | None = None,
     strength: float = 0.65,
 ) -> dict:
-    """Chain model-only LoRAs in selection order with independent-safe defaults."""
-    selected = [name for name in loras if name and name != "None"]
-    if len(selected) > 3:
+    """Chain model-only LoRAs in selection order with per-slot strengths."""
+    pairs = [
+        (name, float((strengths or [])[index] if index < len(strengths or []) else strength))
+        for index, name in enumerate(loras)
+        if name and name != "None"
+    ]
+    if len(pairs) > 3:
         raise workflow_lab.ComfyError("GENESIS currently allows at most 3 stacked LoRAs.")
+    if len({name for name, _ in pairs}) != len(pairs):
+        raise workflow_lab.ComfyError("Select each LoRA only once.")
+    if any(value < 0.0 or value > 1.0 for _, value in pairs):
+        raise workflow_lab.ComfyError("LoRA strengths must be between 0.00 and 1.00.")
 
     model_link: list = [str(source_node), 0]
-    for index, name in enumerate(selected, 1):
+    for index, (name, value) in enumerate(pairs, 1):
         node_id = f"genesis_lora_{index}"
         prompt[node_id] = {
             "class_type": "LoraLoaderModelOnly",
             "inputs": {
                 "model": model_link,
                 "lora_name": name,
-                "strength_model": float(strength),
+                "strength_model": value,
             },
             "_meta": {"title": f"GENESIS LoRA {index}: {name}"},
         }
@@ -262,6 +273,7 @@ def build_create_prompt(
     height: int,
     model_name: str,
     loras: list[str] | None = None,
+    lora_strengths: list[float] | None = None,
 ) -> dict:
     """Build one of the two live-validated Create graphs selected in QML."""
     width = max(256, min(1536, int(width)))
@@ -280,7 +292,7 @@ def build_create_prompt(
         prompt["134"]["inputs"].update({"steps": 4, "cfg": 1.0})
         prompt["105"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["9"]["inputs"]["filename_prefix"] = "GENESIS-Klein9B-Regular"
-        insert_model_only_loras(prompt, "126", "134", "model", loras)
+        insert_model_only_loras(prompt, "126", "134", "model", loras, lora_strengths)
     elif model_name == KV_9B_MODEL:
         selected = [name for name in loras if name and name != "None"]
         if selected:
@@ -304,7 +316,7 @@ def build_create_prompt(
         prompt["9"]["inputs"].update({"steps": 4, "width": width, "height": height})
         prompt["10"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["14"]["inputs"]["filename_prefix"] = "GENESIS-Klein4B-Fast"
-        insert_model_only_loras(prompt, "1", "6", "model", loras, strength=0.5)
+        insert_model_only_loras(prompt, "1", "6", "model", loras, lora_strengths, strength=0.5)
     else:
         raise workflow_lab.ComfyError(f"No validated Create workflow for {model_name}.")
 
@@ -689,7 +701,7 @@ class GenerationBridge(QObject):
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(source))):
             self._set_status("Could not open the generated image.")
 
-    @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool)
+    @pyqtSlot(str, str, int, int, str, str, str, str, float, float, float, str, str, bool, bool, bool)
     def queueGenerate(
         self,
         prompt_text: str,
@@ -699,6 +711,10 @@ class GenerationBridge(QObject):
         model_name: str,
         lora_one: str,
         lora_two: str,
+        lora_three: str,
+        lora_one_strength: float,
+        lora_two_strength: float,
+        lora_three_strength: float,
         source_url: str,
         pose_url: str,
         use_stage_two: bool,
@@ -735,7 +751,12 @@ class GenerationBridge(QObject):
             self._set_status("Upscale is blocked: its checkpoint, VAE, or 4x-UltraSharp asset is missing.")
             return
         try:
-            compatible_selection(model_name, [lora_one, lora_two])
+            selected_loras = compatible_selection(model_name, [lora_one, lora_two, lora_three])
+            max_loras = 3 if model_name == REGULAR_9B_MODEL else (1 if model_name == FOUR_B_MODEL else 0)
+            if len(selected_loras) > max_loras:
+                raise ValueError(f"{model_name} allows {max_loras} LoRA slot(s).")
+            if any(value < 0.0 or value > 1.0 for value in (lora_one_strength, lora_two_strength, lora_three_strength)):
+                raise ValueError("LoRA strengths must be between 0.00 and 1.00.")
         except ValueError as exc:
             self._set_status(str(exc))
             return
@@ -750,7 +771,9 @@ class GenerationBridge(QObject):
         threading.Thread(
             target=self._run_generate,
             args=(prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
-                  lora_two, source, pose, bool(use_stage_two), bool(use_stage_three),
+                  lora_two, lora_three, float(lora_one_strength), float(lora_two_strength),
+                  float(lora_three_strength), source, pose,
+                  bool(use_stage_two), bool(use_stage_three),
                   bool(use_upscale)),
             daemon=True,
         ).start()
@@ -802,6 +825,10 @@ class GenerationBridge(QObject):
         model_name: str,
         lora_one: str,
         lora_two: str,
+        lora_three: str,
+        lora_one_strength: float,
+        lora_two_strength: float,
+        lora_three_strength: float,
         source: Path | None,
         pose: Path | None,
         use_stage_two: bool,
@@ -819,7 +846,8 @@ class GenerationBridge(QObject):
             if source is not None and model_name == FOUR_B_MODEL:
                 current = self._run_4b_source(
                     client, info, source, adapt_prompt(prompt_text, FOUR_B_MODEL, source_image=True),
-                    [lora_one, lora_two], width, height, stamp,
+                    [lora_one, lora_two, lora_three],
+                    [lora_one_strength, lora_two_strength, lora_three_strength], width, height, stamp,
                 )
             elif source is not None:
                 current = self._run_reference_stage(
@@ -830,7 +858,8 @@ class GenerationBridge(QObject):
             else:
                 prompt = build_create_prompt(
                     info, adapt_prompt(prompt_text, model_name), width, height,
-                    model_name, [lora_one, lora_two]
+                    model_name, [lora_one, lora_two, lora_three],
+                    [lora_one_strength, lora_two_strength, lora_three_strength]
                 )
                 # The validated distilled create graphs intentionally zero negative
                 # conditioning. Keep the user's text in state for compatible stages.
@@ -861,14 +890,17 @@ class GenerationBridge(QObject):
 
     def _run_4b_source(
         self, client, info: dict, source: Path, prompt_text: str,
-        loras: list[str], width: int, height: int, stamp: str,
+        loras: list[str], strengths: list[float], width: int, height: int, stamp: str,
     ) -> Path:
         prompt = workflow_lab.workflow_to_prompt(FOUR_B_SOURCE_WORKFLOW, info)
         selected = compatible_selection(FOUR_B_MODEL, loras)
+        if len(selected) > 1:
+            raise workflow_lab.ComfyError("Klein 4B remains isolated to one experimental LoRA.")
         lora = selected[0] if selected else "klein4b-deepthroat-22epoc-k3nk.safetensors"
+        selected_strength = strengths[loras.index(lora)] if selected else 0.0
         prompt["4"]["inputs"].update({
             "lora_name": lora,
-            "strength_model": 0.5 if selected else 0.0,
+            "strength_model": selected_strength,
             "strength_clip": 0.0,
         })
         prompt["5"]["inputs"]["text"] = prompt_text

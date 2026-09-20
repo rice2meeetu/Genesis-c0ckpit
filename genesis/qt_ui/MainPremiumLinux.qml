@@ -63,6 +63,11 @@ ApplicationWindow {
         ? generationModel[selectedGenerationIndex]
         : ({label:"No local model", model:"", note:"No validated local model", loras:["None"], runnable:false, sourceRequired:false})
     property string selectedLora: "None"
+    property string selectedLoraTwo: "None"
+    property string selectedLoraThree: "None"
+    property real selectedLoraStrength: 0.65
+    property real selectedLoraTwoStrength: 0.65
+    property real selectedLoraThreeStrength: 0.65
     property url generationSource: ""
     property string generationPrompt: ""
     property string generationNegativePrompt: ""
@@ -102,6 +107,11 @@ ApplicationWindow {
     function selectGeneration(index) {
         selectedGenerationIndex = index
         selectedLora = "None"
+        selectedLoraTwo = "None"
+        selectedLoraThree = "None"
+        selectedLoraStrength = 0.65
+        selectedLoraTwoStrength = 0.65
+        selectedLoraThreeStrength = 0.65
     }
 
     function applyPreset(row) {
@@ -163,7 +173,11 @@ ApplicationWindow {
             generationHeight,
             selectedGenerationProfile.model,
             selectedLora,
-            "None",
+            selectedLoraTwo,
+            selectedLoraThree,
+            selectedLoraStrength,
+            selectedLoraTwoStrength,
+            selectedLoraThreeStrength,
             generationSource.toString(),
             selectedPoseSource.toString(),
             useStageTwo,
@@ -733,10 +747,64 @@ ApplicationWindow {
                                     }
                                     Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
                                     SectionLabel { text: "COMPATIBLE LORA" }
-                                    ComboBox {
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        model: appRoot.selectedGenerationProfile.loras || ["None"]
-                                        onActivated: appRoot.selectedLora = currentText
+                                        ComboBox {
+                                            Layout.fillWidth: true
+                                            model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            onActivated: appRoot.selectedLora = currentText
+                                        }
+                                        SpinBox {
+                                            from: 0; to: 100; value: Math.round(appRoot.selectedLoraStrength * 100)
+                                            editable: true
+                                            enabled: appRoot.selectedLora !== "None"
+                                            onValueModified: appRoot.selectedLoraStrength = value / 100.0
+                                            textFromValue: function(value) { return (value / 100.0).toFixed(2) }
+                                            valueFromText: function(text) { return Math.round(Number(text) * 100) }
+                                        }
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 1
+                                        ComboBox {
+                                            Layout.fillWidth: true
+                                            model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            onActivated: appRoot.selectedLoraTwo = currentText
+                                        }
+                                        SpinBox {
+                                            from: 0; to: 100; value: Math.round(appRoot.selectedLoraTwoStrength * 100)
+                                            editable: true
+                                            enabled: appRoot.selectedLoraTwo !== "None"
+                                            onValueModified: appRoot.selectedLoraTwoStrength = value / 100.0
+                                            textFromValue: function(value) { return (value / 100.0).toFixed(2) }
+                                            valueFromText: function(text) { return Math.round(Number(text) * 100) }
+                                        }
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 2
+                                        ComboBox {
+                                            Layout.fillWidth: true
+                                            model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            onActivated: appRoot.selectedLoraThree = currentText
+                                        }
+                                        SpinBox {
+                                            from: 0; to: 100; value: Math.round(appRoot.selectedLoraThreeStrength * 100)
+                                            editable: true
+                                            enabled: appRoot.selectedLoraThree !== "None"
+                                            onValueModified: appRoot.selectedLoraThreeStrength = value / 100.0
+                                            textFromValue: function(value) { return (value / 100.0).toFixed(2) }
+                                            valueFromText: function(text) { return Math.round(Number(text) * 100) }
+                                        }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: appRoot.selectedLora !== "None" || appRoot.selectedLoraTwo !== "None" || appRoot.selectedLoraThree !== "None"
+                                        text: (appRoot.selectedGenerationProfile.experimentalLoras ? "EXPERIMENTAL · " : "")
+                                            + "LoRAs run in picker order with independent strengths."
+                                        color: appRoot.selectedGenerationProfile.experimentalLoras ? appRoot.gold : appRoot.textDim
+                                        font.pixelSize: 10
+                                        wrapMode: Text.Wrap
                                     }
                                     SectionLabel { text: "QUALITY" }
                                     RowLayout {

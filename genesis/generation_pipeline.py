@@ -114,6 +114,8 @@ def build_pipeline_plan(state: GenerationState, workflow_root: str | Path = "") 
 def compatible_selection(model: str, selected_loras: Iterable[str]) -> list[str]:
     """Reject, rather than silently discard, an incompatible selection."""
     selected = [name for name in selected_loras if name and name != "None"]
+    if len(set(selected)) != len(selected):
+        raise ValueError("Select each LoRA only once.")
     blocked = [name for name in selected if not is_compatible(model, name)]
     if blocked:
         raise ValueError("Incompatible model/LoRA selection: " + ", ".join(blocked))

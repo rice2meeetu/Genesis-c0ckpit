@@ -1,6 +1,15 @@
 # GENESIS V3 — Next Tasks
 
-Updated: 2026-09-19
+Updated: 2026-09-20
+
+## Completed 2026-09-20 — capability-aware LoRA stack controls
+
+- Image Generation now exposes up to three ordered LoRA slots for regular Klein 9B Base, each with an independent 0.00–1.00 strength.
+- Klein 4B remains isolated to one experimental LoRA; Klein 9B-KV and Phr00t/Qwen expose no LoRA slots because those routes are not validated.
+- Duplicate selections and invalid strengths fail closed. Existing Phr00t/Qwen, SDXL/OpenPoseXL2, and staged workflow routes were not changed.
+- Verification: 95 pytest tests passed; Python compile passed; premium QML offscreen startup remained alive for five seconds with no QML error output.
+- Files changed: `genesis/qt_ui/MainPremiumLinux.qml`, `qt_cockpit.py`, `genesis/generation_pipeline.py`, and `tests/test_qt_generation_profiles.py`.
+- Best next action: run isolated controlled renders for each newly exposed experimental LoRA and each proposed stack before promoting any combination to render-tested.
 
 ## Immediate takeover sequence
 
