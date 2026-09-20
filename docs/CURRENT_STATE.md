@@ -1,5 +1,24 @@
 # GENESIS V3 — Current State
 
+## Verified isolated Klein 4B adapter render — 2026-09-20
+
+- ComfyUI prompt `f17b0ed4-f341-4ec5-a1bb-5b2cdf5c083e` completed successfully on the existing GPU stack.
+- Workflow was `FLUX2_Klein_Deepthroat_FaceSwap.json` with the face-swap stage bypassed for an adapter-only check.
+- Adapter: `hina_flux2klein4b_asianMix_v4.0-lora.safetensors`, model strength 0.45, CLIP strength 0.45.
+- Neutral prompt: blue ceramic teapot product photograph; 512x512, seed 290830, 4 steps, CFG 1.0, `res_multistep` / `simple`.
+- Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN4B_HINAFP_NEUTRAL_00001_.png`, PNG RGB 512x512, 325211 bytes, SHA-256 `f47e99920fc8f78531c9b3455db575d0ab870ccf04ee5265f71efaa142584d28`.
+- ComfyUI execution time was approximately 49.6 seconds. This verifies one neutral 4B adapter render only; it does not promote other adapters or multi-LoRA combinations.
+- No workflow files, model files, or launch flags changed.
+
+## Verified source-image routing — 2026-09-20
+
+- Attached source image was transferred to `/home/rice2meetyou/AI/ComfyUI/input/GENESIS_SOURCE_JENNY.jpeg` with matching SHA-256 `cb401844d261259ae7b46b6103a66b7f3f942ebe8ed1746dcc2d9b987642c2ec`.
+- Prompt `f475c076-8247-4273-aead-3908a9bf3a5a` completed successfully using the Klein 4B workflow's native ReActor source-image path.
+- Face-swap stage used the uploaded source image; generated target prompt was a neutral shoulder-up portrait. Adapter was removed for this routing check.
+- Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_SOURCE_JENNY_NEUTRAL_00001_.png`, PNG RGB 512x512, 305758 bytes, SHA-256 `77c4b12ca34c922c99d4cdef472b8734fe558c17e24717117993a858ed85fba4`.
+- ComfyUI execution time was approximately 77.7 seconds. This verifies source-image routing only; it does not promote explicit prompts, other face-swap inputs, or multi-LoRA combinations.
+- The uploaded source remains in ComfyUI input storage and is not committed to GitHub.
+
 ## Verified isolated Klein 4B baseline — 2026-09-20
 
 - Both 12-argument and 16-argument Generate calls were exercised through

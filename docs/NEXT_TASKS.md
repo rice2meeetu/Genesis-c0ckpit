@@ -36,6 +36,14 @@ Updated: 2026-09-20
 - Klein 9B-KV has no approved LoRAs. Similar filenames such as `FLUX2_KLEIN_UNLOCKED_V1`, `Flux-NSFW-uncensored`, `flux2klein_bj`, `flux2klein_cowgirl`, and `FutaCockCloseUp-v2` remain blocked/unverified.
 - No files were downloaded, moved, deleted, or modified. Next action remains one controlled neutral render per experimental adapter before promotion.
 
+### Attached source-image validation — 2026-09-20
+
+- Transferred the attached `jenny.jpeg` to ComfyUI input as `GENESIS_SOURCE_JENNY.jpeg`; local and remote SHA-256 both equal `cb401844d261259ae7b46b6103a66b7f3f942ebe8ed1746dcc2d9b987642c2ec`.
+- Ran prompt `f475c076-8247-4273-aead-3908a9bf3a5a` through the Klein 4B native ReActor source-image route with a neutral shoulder-up portrait prompt and no adapter.
+- Render completed in approximately 77.7 seconds. Output: `GENESIS_VERIFY_SOURCE_JENNY_NEUTRAL_00001_.png`, 512x512 PNG, SHA-256 `77c4b12ca34c922c99d4cdef472b8734fe558c17e24717117993a858ed85fba4`.
+- This validates source-image routing only. The source image is retained in ComfyUI input storage and excluded from the repository.
+- No protected pose routes, workflows, or launch flags changed.
+
 - Corrected `genesis/model_registry.py` so Klein 4B readiness does not require a LoRA. The previously matched `FLUX2_KLEIN_UNLOCKED_V1.safetensors` is blocked/unverified and must not make the profile appear ready.
 - Added a regression check in `tests/test_model_compatibility.py`.
 - Verification: 79 tests passed; live readiness reports Klein 4B ready with no LoRA evidence; branch pushed as `a5d0c95`.
