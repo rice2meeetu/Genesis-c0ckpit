@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 
@@ -12,6 +13,52 @@ class AssetRecord:
     kind: str
     name: str
     source: str
+
+
+def unavailable_local_assets(prompt, roots):
+    """Report demonstrably broken local loader files, without loading tensors.
+
+    Unknown/custom search roots remain ComfyUI's responsibility. A working
+    copy in any configured root takes precedence over a broken alias.
+    """
+    folders = {
+        "unet_name": ("diffusion_models", "unet"),
+        "clip_name": ("text_encoders", "clip"),
+        "clip_name1": ("text_encoders", "clip"),
+        "clip_name2": ("text_encoders", "clip"),
+        "ckpt_name": ("checkpoints",),
+        "vae_name": ("vae",),
+        "lora_name": ("loras",),
+        "control_net_name": ("controlnet",),
+    }
+    issues = []
+    for node_id, node in prompt.items():
+        for key, name in node.get("inputs", {}).items():
+            if key not in folders or not isinstance(name, str):
+                continue
+            relative = Path(name)
+            if relative.is_absolute() or ".." in relative.parts:
+                continue
+            candidates = [
+                Path(root) / folder / relative
+                for root in roots for folder in folders[key]
+            ]
+            known = []
+            usable = False
+            for path in candidates:
+                try:
+                    if path.is_file() and path.stat().st_size > 0:
+                        with path.open("rb") as handle:
+                            usable = bool(handle.read(1))
+                        if usable:
+                            break
+                    if path.is_symlink() or path.exists():
+                        known.append(str(path))
+                except OSError:
+                    known.append(str(path))
+            if known and not usable:
+                issues.append(f"Node {node_id}: {name} is unreadable, empty, or has a broken link ({known[0]}). Check its storage mount.")
+    return issues
 
 
 def inventory_records(inventory):

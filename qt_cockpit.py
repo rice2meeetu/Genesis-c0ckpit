@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QListView
 
 from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
+from genesis.asset_inventory import unavailable_local_assets
 from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import adapt_prompt, compatible_selection
 from genesis import integrations, workflow_lab
@@ -931,6 +932,9 @@ class GenerationBridge(QObject):
         return self._submit_and_save(client, prompt, stamp, "Klein4B")
 
     def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
+        problems = unavailable_local_assets(prompt, MODEL_ROOTS)
+        if problems:
+            raise workflow_lab.ComfyError("Local asset check failed: " + " ".join(problems))
         prompt_id = client.submit(prompt)
         self._set_status(f"{stage} queued {prompt_id[:8]}…")
         result = client.wait(
