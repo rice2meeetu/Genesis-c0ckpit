@@ -8,6 +8,9 @@
 - Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN9B_LORA_NEUTRAL_00001_.png`, PNG RGB 512x512, 280072 bytes, SHA-256 `3754398b0a981845e54133151c58a2372745754d97ac7e217651a655258e2eac`.
 - ComfyUI execution time was approximately 87.1 seconds. The image rendered successfully but showed noticeable teapot shape distortion, so this LoRA remains experimental and is not promoted as a quality preset.
 - ComfyUI flags remained `--lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --listen 127.0.0.1 --port 8188`.
+- Comparison render with `Klein_Anatomy_Revamped.safetensors` at the same strength, seed, prompt, and settings also completed successfully in approximately 46.4 seconds. Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN9B_ANATOMY_NEUTRAL_00001_.png`, SHA-256 `993a50933fe02d8fad9e618636fa195ea799b13db084c5f33284e7fb6ead4c77`.
+- No-LoRA control completed in approximately 42.3 seconds. Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN9B_BASE_NEUTRAL_00001_.png`, SHA-256 `c644695c54c6cb68c0ac6a2193f320c7c39a565556ddf544c5393ffc5455ab9b`.
+- All three regular 9B images share the same distorted teapot silhouette. This points to the current low-step regular 9B workflow/profile rather than a single LoRA. No sampler, step count, guidance, or saved workflow was changed.
 
 ## Two-image neutral Face Swap function — 2026-09-20
 

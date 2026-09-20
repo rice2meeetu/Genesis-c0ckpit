@@ -6,7 +6,9 @@
 - Output: `GENESIS_VERIFY_KLEIN9B_LORA_NEUTRAL_00001_.png` under ComfyUI output. Execution time approximately 87.1 seconds.
 - Result is a valid image but has noticeable teapot shape distortion. Keep this LoRA experimental; do not promote it as a quality preset or infer that other LoRA stacks are safe.
 - Existing ComfyUI flags, protected workflows, and model files were unchanged.
-- Single best next action: test the next approved regular-9B LoRA at the same neutral seed/prompt, then compare outputs before exposing any combination as render-tested.
+- `Klein_Anatomy_Revamped.safetensors` completed under the same conditions in approximately 46.4 seconds, and the no-LoRA control completed in approximately 42.3 seconds.
+- The base control and both LoRA renders share the same distorted teapot silhouette. Treat this as a regular 9B low-step workflow/profile issue until a higher-step neutral control is tested; do not blame or promote an individual LoRA from these results.
+- Single best next action: run one higher-step regular 9B no-LoRA control at the same seed/prompt, without changing the saved workflow or protected routes.
 
 ## Two-image neutral Face Swap function — 2026-09-20
 
