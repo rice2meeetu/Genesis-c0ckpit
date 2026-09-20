@@ -94,3 +94,32 @@ deliberate milestone files.
 - Do not mix GENESIS Mini
 - Do not mix Pose Maker branch
 - Use Git commits after major milestones
+
+## GPU Safety Incident — 2026-09-21
+
+- Safety reproduction used one isolated Klein 4B baseline only: 512x512, 4 steps,
+  no LoRA. It completed successfully in 80.45 seconds and produced
+  `gpu_test_outputs/klein4b-lora-benchmark/baseline-safety.png` (512x512 PNG).
+- During that single ComfyUI/ROCm workload, kernel 7.0.0-31 reproduced the
+  AMDGPU/KFD workqueue warning sequence in `svm_range_restore_work`,
+  `amdgpu_amdkfd_restore_userptr_worker`, and `svm_range_deferred_list_work`.
+  `svm_range_restore_work` escalated through 11, 19, 35, 67 and 131 reports.
+- No GPU reset, ring timeout, GPU page fault, OOM kill, or machine check was
+  observed in the controlled test window. The warning pattern nevertheless
+  matches the family seen before the earlier machine freeze, so it is treated
+  as a safety signal rather than a harmless benchmark result.
+- The same warning family occurred on the previous boot. The isolated 4B test
+  reproduced it without TTS, llama.cpp, Builder, or another heavy GPU service,
+  so simultaneous GENESIS services are not required to trigger the condition.
+- ROCm package audit found 225 `amdrocm-*` packages, all version 7.14.1; the
+  active HIP/HSA libraries resolve to `/opt/rocm/core-7.14`. The configured old
+  ROCm 7.2 Noble repository is not supplying the active runtime packages.
+- All heavy GPU services were stopped after the test and remain disabled/inactive.
+  No further SVM/KFD warnings appeared while idle.
+- Keep the existing mutual-exclusion and 8-second transition guard. Do not run
+  Klein 9B, full LoRA benchmark suites, GPU stress tests, or overlapping ROCm
+  workloads until the kernel/KFD SVM issue has a verified mitigation.
+- Do not change ROCm, AMDGPU, firmware, or kernel merely to experiment. Current
+  evidence points toward the kernel AMDGPU/KFD SVM/userptr path under ROCm
+  memory activity; it does not establish hardware failure or a definitive root
+  cause.
