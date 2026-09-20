@@ -45,6 +45,10 @@ Registry scan reports 6 reachable LoRAs and 35 workflow files, not a complete se
 - [AMD current compatibility matrix](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html): current page is ROCm 10.0. Do not upgrade the installed 7.14 environment solely because a newer version exists; exact Radeon/OS support still requires checking.
 - Civitai retrieval failed; no Civitai metadata was verified in this pass. Searches also returned irrelevant hits, excluded from conclusions.
 
+## SDXL Stage-1 pose verification — 2026-09-20
+
+The Pose Library skeleton -> OpenPoseXL2 -> Lustify SDXL Lightning Stage-1 route completed two independent ComfyUI renders successfully. Outputs were `GENESIS_STAGE1_SDXL_POSE_00001_.png` and `GENESIS_STAGE1_SDXL_POSE_00002_.png`. The existing Phr00t/Qwen route was not changed. Status: render-verified on the local RX 9060 XT ROCm system.
+
 ## Proposed next milestone
 
 1. Confirm whether Ai should be mounted or models intentionally relocated. Do not download replacements until this is resolved.
