@@ -1,5 +1,6 @@
 import unittest
 
+from genesis.model_registry import MODEL_PROFILES
 from genesis.model_compatibility import (
     compatible_loras,
     is_compatible,
@@ -10,6 +11,10 @@ from genesis.model_compatibility import (
 
 
 class ModelCompatibilityTests(unittest.TestCase):
+    def test_klein4b_readiness_does_not_require_blocked_adapter(self):
+        profile = next(item for item in MODEL_PROFILES if item["name"] == "FLUX.2 Klein 4B")
+        self.assertEqual(profile["lora"], ())
+
     def test_model_families_are_distinct(self):
         self.assertEqual(model_family("flux-2-klein-4b.safetensors"), "flux2_klein_4b")
         self.assertEqual(model_family("flux-2-klein-9b-kv-fp8.safetensors"), "flux2_klein_9b_kv")

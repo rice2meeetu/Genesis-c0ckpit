@@ -61,7 +61,9 @@ MODEL_PROFILES = (
     {
         "name": "FLUX.2 Klein 4B",
         "model": ("klein-4b", "klein_4b", "klein 4b"),
-        "lora": ("klein4b", "klein_4b", "flux2_klein"),
+        # 4B baseline generation does not require an adapter. Experimental
+        # adapters are surfaced separately by model_compatibility.py.
+        "lora": (),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_4b", "qwen3_4b"),
         "workflow": ("klein_img", "klein_4b", "klein-4b", "klein 4b"),
