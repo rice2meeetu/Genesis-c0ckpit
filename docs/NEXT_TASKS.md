@@ -11,6 +11,17 @@ Updated: 2026-09-20
 - Files changed: `genesis/qt_ui/MainPremiumLinux.qml`, `qt_cockpit.py`, `genesis/generation_pipeline.py`, and `tests/test_qt_generation_profiles.py`.
 - Best next action: run isolated controlled renders for each newly exposed experimental LoRA and each proposed stack before promoting any combination to render-tested.
 
+## Follow-up — legacy Generate compatibility
+
+- Restored the original 12-argument QML Generate overload alongside the new
+  16-argument overload. The existing Main.qml pose buttons retain their source,
+  pose, stage switches, and original model-specific strength defaults.
+- Added regression tests for forwarding and both exported Qt signatures.
+- Verification: 97 tests passed. No GPU render was submitted for this fix.
+- Changed: qt_cockpit.py and tests/test_qt_generation_profiles.py.
+- Next: exercise both QML calls with a mocked submitter, then run an isolated
+  non-explicit baseline render. Preserve current ComfyUI flags and saved graphs.
+
 ## Immediate takeover sequence
 
 1. Recheck live mounts, especially `/run/media/rice2meetyou/Ai/AI-Models`, and reconcile the 2026-09-19 audit with current storage state.

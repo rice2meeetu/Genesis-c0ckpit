@@ -701,6 +701,20 @@ class GenerationBridge(QObject):
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(source))):
             self._set_status("Could not open the generated image.")
 
+    @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool, name="queueGenerate")
+    def queueGenerateLegacy(
+        self, prompt_text, negative_prompt, width, height, model_name,
+        lora_one, lora_two, source_url, pose_url,
+        use_stage_two, use_stage_three, use_upscale,
+    ) -> None:
+        """Preserve the original QML pose-button contract and model defaults."""
+        strength = 0.5 if model_name == FOUR_B_MODEL else 0.65
+        self.queueGenerate(
+            prompt_text, negative_prompt, width, height, model_name,
+            lora_one, lora_two, "None", strength, strength, strength,
+            source_url, pose_url, use_stage_two, use_stage_three, use_upscale,
+        )
+
     @pyqtSlot(str, str, int, int, str, str, str, str, float, float, float, str, str, bool, bool, bool)
     def queueGenerate(
         self,

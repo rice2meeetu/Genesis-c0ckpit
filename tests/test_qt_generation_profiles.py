@@ -75,6 +75,31 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertFalse(profile["runnable"])
         self.assertIn("not yet validated", profile["note"])
 
+    def test_legacy_generate_forwards_original_pose_contract(self):
+        from qt_cockpit import GenerationBridge, FOUR_B_MODEL
+        class Recorder:
+            def queueGenerate(self, *args):
+                self.args = args
+        recorder = Recorder()
+        GenerationBridge.queueGenerateLegacy(
+            recorder, "A ceramic vase", "", 512, 512, FOUR_B_MODEL,
+            "None", "None", "file:///source.png", "file:///pose.png",
+            False, False, False,
+        )
+        self.assertEqual(len(recorder.args), 16)
+        self.assertEqual(recorder.args[7:11], ("None", 0.5, 0.5, 0.5))
+        self.assertEqual(recorder.args[11:13], ("file:///source.png", "file:///pose.png"))
+
+    def test_generate_exposes_both_qml_signatures(self):
+        from qt_cockpit import GenerationBridge
+        meta = GenerationBridge.staticMetaObject
+        counts = {
+            meta.method(i).parameterCount()
+            for i in range(meta.methodOffset(), meta.methodCount())
+            if bytes(meta.method(i).name()) == b"queueGenerate"
+        }
+        self.assertEqual(counts, {12, 16})
+
     def test_single_lora_is_inserted(self):
         prompt = {"model": {"inputs": {}}, "sampler": {"inputs": {}}}
         insert_model_only_loras(
