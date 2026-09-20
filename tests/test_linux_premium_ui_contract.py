@@ -116,3 +116,9 @@ def test_page_header_binds_to_component_properties():
 def test_shell_launcher_uses_premium_entrypoint():
     shell = SHELL_LAUNCHER.read_text(encoding="utf-8")
     assert "qt_cockpit_linux_premium.py" in shell
+
+
+def test_image_studio_launcher_uses_guarded_gpu_start():
+    launcher = (ROOT / "launch-image-studio.sh").read_text(encoding="utf-8")
+    assert "integrations.start_user_service" in launcher
+    assert "systemctl --user start genesis-comfyui.service" not in launcher
