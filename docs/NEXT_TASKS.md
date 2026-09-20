@@ -26,6 +26,14 @@
 
 Updated: 2026-09-20
 
+## Readiness correction — 2026-09-20
+
+- Corrected `genesis/model_registry.py` so Klein 4B readiness does not require a LoRA. The previously matched `FLUX2_KLEIN_UNLOCKED_V1.safetensors` is blocked/unverified and must not make the profile appear ready.
+- Added a regression check in `tests/test_model_compatibility.py`.
+- Verification: 79 tests passed; live readiness reports Klein 4B ready with no LoRA evidence; branch pushed as `a5d0c95`.
+- No model files, workflows, or ComfyUI launch flags changed.
+- Single best next action: rescan exact accessible model assets and run one controlled neutral render per newly exposed experimental LoRA before promoting combinations.
+
 ## Completed 2026-09-20 — capability-aware LoRA stack controls
 
 - Image Generation now exposes up to three ordered LoRA slots for regular Klein 9B Base, each with an independent 0.00–1.00 strength.
