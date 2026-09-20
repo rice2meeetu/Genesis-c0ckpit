@@ -15,10 +15,10 @@ import threading
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QSettings, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, QSettings, QSize, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
-from PyQt6.QtWidgets import QApplication, QFileDialog
+from PyQt6.QtWidgets import QApplication, QFileDialog, QListView
 
 from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
@@ -554,6 +554,9 @@ class GenerationBridge(QObject):
         self._status = "Ready"
         self._busy = False
         self._preview = ""
+        self._settings = QSettings("GENESIS", "c0ckpit")
+        configured_output = str(self._settings.value("generation/output_dir", str(OUTPUT_DIR)))
+        self._output_dir = Path(configured_output).expanduser()
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
@@ -627,19 +630,55 @@ class GenerationBridge(QObject):
 
     @pyqtSlot(result=str)
     def chooseSourceImage(self) -> str:
-        path, _ = QFileDialog.getOpenFileName(
-            None,
-            "Choose a source image",
-            str(Path.home()),
-            "Images (*.png *.jpg *.jpeg *.webp *.bmp)",
+        dialog = QFileDialog(None, "Choose a source image", str(Path.home()))
+        dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.webp *.bmp)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setViewMode(QFileDialog.ViewMode.List)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        for view in dialog.findChildren(QListView):
+            view.setViewMode(QListView.ViewMode.IconMode)
+            view.setIconSize(QSize(180, 135))
+            view.setGridSize(QSize(210, 175))
+            view.setResizeMode(QListView.ResizeMode.Adjust)
+            view.setWordWrap(True)
+        if dialog.exec() != QFileDialog.DialogCode.Accepted:
+            return ""
+        selected = dialog.selectedFiles()
+        return QUrl.fromLocalFile(selected[0]).toString() if selected else ""
+
+    @pyqtProperty(str, notify=statusChanged)
+    def outputFolder(self) -> str:
+        return str(self._output_dir)
+
+    @pyqtSlot(result=str)
+    def chooseOutputFolder(self) -> str:
+        path = QFileDialog.getExistingDirectory(
+            None, "Choose GENESIS output folder", str(self._output_dir),
+            QFileDialog.Option.ShowDirsOnly,
         )
-        return QUrl.fromLocalFile(path).toString() if path else ""
+        if path:
+            self._output_dir = Path(path).expanduser()
+            self._settings.setValue("generation/output_dir", str(self._output_dir))
+            self._settings.sync()
+            self._set_status(f"Output folder · {self._output_dir}")
+        return str(self._output_dir)
 
     @pyqtSlot()
     def openOutputFolder(self) -> None:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(OUTPUT_DIR))):
-            self._set_status("Could not open the GENESIS-Exports folder.")
+        self._output_dir.mkdir(parents=True, exist_ok=True)
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._output_dir))):
+            self._set_status("Could not open the selected output folder.")
+
+    @pyqtSlot()
+    def showPreviewInFolder(self) -> None:
+        source = Path(QUrl(self._preview).toLocalFile())
+        if not self._preview or not source.is_file():
+            self._set_status("No generated preview is available yet.")
+            return
+        try:
+            subprocess.Popen(["xdg-open", str(source.parent)], start_new_session=True)
+        except OSError as exc:
+            self._set_status(f"Could not show the generated image folder · {exc}")
 
     @pyqtSlot()
     def openPreview(self) -> None:
@@ -775,7 +814,7 @@ class GenerationBridge(QObject):
             if not workflow_lab.gpu_acceleration_available(stats):
                 raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
             info = client.object_info()
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            self._output_dir.mkdir(parents=True, exist_ok=True)
             stamp = time.strftime("%Y%m%d-%H%M%S")
             if source is not None and model_name == FOUR_B_MODEL:
                 current = self._run_4b_source(
@@ -862,7 +901,7 @@ class GenerationBridge(QObject):
             if output.get("kind") != "images":
                 continue
             suffix = Path(output.get("filename", "image.png")).suffix or ".png"
-            target = OUTPUT_DIR / f"GENESIS-{stage}-{stamp}-{index}{suffix}"
+            target = self._output_dir / f"GENESIS-{stage}-{stamp}-{index}{suffix}"
             target.write_bytes(client.view(output))
             saved.append(target)
         if not saved:
@@ -1005,14 +1044,14 @@ class GenerationBridge(QObject):
             if result.status != "completed":
                 raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")
 
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            self._output_dir.mkdir(parents=True, exist_ok=True)
             saved: list[Path] = []
             stamp = time.strftime("%Y%m%d-%H%M%S")
             for index, output in enumerate(result.outputs, 1):
                 if output.get("kind") != "images":
                     continue
                 suffix = Path(output.get("filename", "image.png")).suffix or ".png"
-                target = OUTPUT_DIR / f"GENESIS-Edit-{stamp}-{index}{suffix}"
+                target = self._output_dir / f"GENESIS-Edit-{stamp}-{index}{suffix}"
                 target.write_bytes(client.view(output))
                 saved.append(target)
             if not saved:

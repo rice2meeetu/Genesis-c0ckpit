@@ -647,8 +647,9 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         SectionLabel { text: "RESULT" }
                                         Item { Layout.fillWidth: true }
-                                        GButton { text: "Open"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
-                                        GButton { text: "Folder"; onClicked: genesisBridge.openOutputFolder() }
+                                        GButton { text: "Open / Full Size"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
+                                        GButton { text: "Show in Folder"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.showPreviewInFolder() }
+                                        GButton { text: "Open Output"; onClicked: genesisBridge.openOutputFolder() }
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
@@ -763,7 +764,9 @@ ApplicationWindow {
                                         onClicked: appRoot.generateCurrent()
                                     }
                                     Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
-                                    GButton { Layout.fillWidth: true; text: "Send Result to Canvas"; enabled: genesisBridge.previewUrl.length > 0; onClicked: { appRoot.editSource = genesisBridge.previewUrl; appRoot.pageIndex = 8 } }
+                                    Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 9; elide: Text.ElideMiddle }
+                                    GButton { Layout.fillWidth: true; text: "Choose Output Folder"; onClicked: genesisBridge.chooseOutputFolder() }
+                                    GButton { Layout.fillWidth: true; text: "Send Result to Edit"; enabled: genesisBridge.previewUrl.length > 0; onClicked: { appRoot.editSource = genesisBridge.previewUrl; appRoot.pageIndex = 8 } }
                                 }
                             }
                         }
