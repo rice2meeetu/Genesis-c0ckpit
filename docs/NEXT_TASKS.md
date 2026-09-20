@@ -46,6 +46,14 @@ Updated: 2026-09-20
 - Next: exercise both QML calls with a mocked submitter, then run an isolated
   non-explicit baseline render. Preserve current ComfyUI flags and saved graphs.
 
+## Protected route live validation — 2026-09-20
+
+- Live ComfyUI object inventory validated the saved STAGE 1 Phr00t/Qwen,
+  STAGE 2 Lustify SDXL, and STAGE 3 ReActor ROCm workflows.
+- All three workflow graphs reported valid with no missing nodes or inputs.
+- GPU acceleration reported available and the ComfyUI queue was empty.
+- No route files, model files, or launch settings were changed.
+
 ## Immediate takeover sequence
 
 1. Recheck live mounts, especially `/run/media/rice2meetyou/Ai/AI-Models`, and reconcile the 2026-09-19 audit with current storage state.
