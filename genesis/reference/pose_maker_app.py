@@ -919,8 +919,8 @@ def _run_stage1_sdxl(source, pose, pose_prompt, negative_prompt, pose_mode, pose
         pose_prompt, "", bool(strict_identity_lock), strength_profile,
         prompt_strength, pose_strength, identity_strength, 0.0, True, True,
     )
-    prompt["13"] = make_node("ImageScale", {"image": ["2", 0], "width": int(width), "height": int(height), "crop": "center"})
-    prompt["14"] = make_node("ImageScale", {"image": pose_link, "width": int(width), "height": int(height), "crop": "center"})
+    prompt["13"] = make_node("ImageScale", {"image": ["2", 0], "upscale_method": "lanczos", "width": int(width), "height": int(height), "crop": "center"})
+    prompt["14"] = make_node("ImageScale", {"image": pose_link, "upscale_method": "lanczos", "width": int(width), "height": int(height), "crop": "center"})
     pose_link = ["14", 0]
     prompt["4"] = make_node("CLIPTextEncode", {"clip": ["1", 1], "text": positive})
     prompt["5"] = make_node("CLIPTextEncode", {"clip": ["1", 1], "text": negative_prompt or STAGE1_NEGATIVE_DEFAULT})
