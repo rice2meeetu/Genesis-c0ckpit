@@ -63,6 +63,7 @@ class RunCancelled(RuntimeError):
     pass
 
 PREFERRED_STAGE1 = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+STAGE1_SDXL_CONTROLNET = "OpenPoseXL2.safetensors"
 PREFERRED_STAGE2 = [
     "lustifySDXLNSFW_endgame.safetensors",
     "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors",
@@ -872,17 +873,94 @@ def _dwpose_desired(image_link):
     }
 
 
+def _is_sdxl_stage1_model(model_name: str) -> bool:
+    name = (model_name or "").lower()
+    return any(token in name for token in ("sdxl", "lustify", "realistic_vision", "biglust", "juggernaut"))
+
+
+def stage1_pose_models() -> list[str]:
+    models = []
+    for name in available_checkpoints():
+        low = name.lower()
+        if "qwen" in low or "rapid" in low or _is_sdxl_stage1_model(name):
+            models.append(name)
+    return models or [PREFERRED_STAGE1]
+
+
+def _run_stage1_sdxl(source, pose, pose_prompt, negative_prompt, pose_mode, pose_source_kind,
+                     strength_profile, prompt_strength, pose_strength, identity_strength, negative_strength,
+                     model_name, width, height, seed, steps, cfg, sampler, scheduler,
+                     strict_identity_lock=True, progress_cb=None):
+    """SDXL Stage-1 route: source img2img + the preset skeleton through OpenPoseXL2."""
+    if pose is None or (pose_mode or "").upper().startswith("PROMPT ONLY"):
+        raise RuntimeError("SDXL preset generation requires a Pose Library skeleton or pose image.")
+
+    ckpt = pick_checkpoint(model_name)
+    source_name = upload_image(source, "source")
+    pose_name = upload_image(pose, "pose")
+    prompt = {
+        "1": make_node("CheckpointLoaderSimple", {"ckpt_name": ckpt}),
+        "2": make_node("LoadImage", {"image": source_name}),
+        "3": make_node("LoadImage", {"image": pose_name}),
+    }
+
+    kind = (pose_source_kind or "photo").lower()
+    mode = (pose_mode or POSE_MODES[0]).upper()
+    pose_link = ["3", 0]
+    pose_note = "Pose Library skeleton"
+    if kind != "skeleton" or mode.startswith("EXTRACT"):
+        if "DWPreprocessor" not in object_info():
+            raise RuntimeError("SDXL pose route needs DWPose for uploaded pose photos.")
+        prompt["10"] = make_node("DWPreprocessor", _dwpose_desired(["3", 0]))
+        pose_link = ["10", 0]
+        pose_note = "DWPose extracted skeleton"
+
+    positive = _compose_stage1_prompt(
+        pose_prompt, "", bool(strict_identity_lock), strength_profile,
+        prompt_strength, pose_strength, identity_strength, 0.0, True, True,
+    )
+    prompt["13"] = make_node("ImageScale", {"image": ["2", 0], "width": int(width), "height": int(height), "crop": "center"})
+    prompt["14"] = make_node("ImageScale", {"image": pose_link, "width": int(width), "height": int(height), "crop": "center"})
+    pose_link = ["14", 0]
+    prompt["4"] = make_node("CLIPTextEncode", {"clip": ["1", 1], "text": positive})
+    prompt["5"] = make_node("CLIPTextEncode", {"clip": ["1", 1], "text": negative_prompt or STAGE1_NEGATIVE_DEFAULT})
+    prompt["6"] = make_node("ControlNetLoader", {"control_net_name": STAGE1_SDXL_CONTROLNET})
+    prompt["7"] = make_node("ControlNetApplyAdvanced", {
+        "positive": ["4", 0], "negative": ["5", 0], "control_net": ["6", 0], "image": pose_link,
+        "strength": max(0.0, min(float(pose_strength), 2.0)), "start_percent": 0.0, "end_percent": 0.90,
+    })
+    prompt["8"] = make_node("VAEEncode", {"pixels": ["13", 0], "vae": ["1", 2]})
+    prompt["9"] = make_node("KSampler", {
+        "model": ["1", 0], "positive": ["7", 0], "negative": ["7", 1], "latent_image": ["8", 0],
+        "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
+        "sampler_name": str(sampler), "scheduler": str(scheduler), "denoise": 0.72,
+    })
+    prompt["11"] = make_node("VAEDecode", {"samples": ["9", 0], "vae": ["1", 2]})
+    prompt["12"] = make_node("SaveImage", {"images": ["11", 0], "filename_prefix": "GENESIS_STAGE1_SDXL_POSE"})
+    _, outputs = queue_and_wait(prompt, progress_cb, "Stage 1 · SDXL Pose")
+    image = fetch_output_image(outputs, "12")
+    issue = _generated_image_issue(image)
+    if issue:
+        raise RuntimeError(f"SDXL Stage 1 completed but {issue}.")
+    return image, ckpt, f"{pose_note} · OpenPoseXL2 pose control"
+
+
 def run_stage1(source, pose, pose_prompt, negative_prompt, pose_mode, pose_source_kind,
                strength_profile, prompt_strength, pose_strength, identity_strength, negative_strength,
                model_name, width, height, seed, steps, cfg, sampler, scheduler,
                strict_identity_lock=True, progress_cb=None):
     ckpt = pick_checkpoint(model_name or PREFERRED_STAGE1)
     profile = _model_profile_name(ckpt)
-    if not ("qwen" in ckpt.lower() or "rapid" in ckpt.lower()):
-        raise RuntimeError(
-            f"Stage 1 is currently the Qwen/Phr00t edit engine, but '{ckpt}' does not look Qwen-compatible. "
-            "Use the Phr00t/Qwen checkpoint here; Lustify belongs in Stage 2."
+    use_sdxl_route = _is_sdxl_stage1_model(ckpt)
+    if use_sdxl_route:
+        return _run_stage1_sdxl(
+            source, pose, pose_prompt, negative_prompt, pose_mode, pose_source_kind,
+            strength_profile, prompt_strength, pose_strength, identity_strength, negative_strength,
+            ckpt, width, height, seed, steps, cfg, sampler, scheduler,
+            strict_identity_lock, progress_cb,
         )
+    if not ("qwen" in ckpt.lower() or "rapid" in ckpt.lower()):
+        raise RuntimeError(f"Stage 1 model '{ckpt}' has no verified preset pose-control route.")
 
     source_name = upload_image(source, "source")
     prompt = {}
@@ -3327,7 +3405,7 @@ with gr.Blocks(title="GENESIS Pose Maker — V14") as demo:
                 choices=["NATURAL","BALANCED","STRONG","STRICT","MAX POSE","MAX IDENTITY","HYBRID STRONG","CUSTOM"],
                 value="BALANCED", label="Prompt / Control Profile", scale=2
             )
-            stage1_model = gr.Textbox(value=PREFERRED_STAGE1, label="Stage 1 model", scale=3)
+            stage1_model = gr.Dropdown(choices=stage1_pose_models(), value=PREFERRED_STAGE1, label="Stage 1 pose model", scale=3, allow_custom_value=True)
             vram_mode = gr.Radio(choices=list(VRAM_PRESETS.keys()), value="BALANCED · 768×1152", label="RX 9060 XT quality / speed mode", scale=2)
         model_profile_info = gr.Textbox(value=model_profile_status(PREFERRED_STAGE1), label="Model-aware preset profile", interactive=False)
         grok_profile_note = gr.Textbox(value="MAIN: Phr00t/Qwen Rapid v19 · GENESIS proven low-CFG profile. GROK legacy Phr00t numbers stay separate/reference-only (7 steps, CFG 4.5, Euler/Normal).", label="Main vs Grok reference", interactive=False)
