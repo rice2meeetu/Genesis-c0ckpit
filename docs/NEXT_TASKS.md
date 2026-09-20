@@ -7,8 +7,9 @@
 - Result is a valid image but has noticeable teapot shape distortion. Keep this LoRA experimental; do not promote it as a quality preset or infer that other LoRA stacks are safe.
 - Existing ComfyUI flags, protected workflows, and model files were unchanged.
 - `Klein_Anatomy_Revamped.safetensors` completed under the same conditions in approximately 46.4 seconds, and the no-LoRA control completed in approximately 42.3 seconds.
-- The base control and both LoRA renders share the same distorted teapot silhouette. Treat this as a regular 9B low-step workflow/profile issue until a higher-step neutral control is tested; do not blame or promote an individual LoRA from these results.
-- Single best next action: run one higher-step regular 9B no-LoRA control at the same seed/prompt, without changing the saved workflow or protected routes.
+- The base control and both LoRA renders share the same distorted teapot silhouette. An 8-step no-LoRA control also retained the same silhouette, so steps alone did not resolve it.
+- Do not blame or promote an individual LoRA from these results. Regular 9B remains render-tested but not quality-promoted; preserve the verified 4B baseline and protected routes.
+- Single best next action: inspect the regular 9B workflow's model/encoder/guidance mapping against its source graph before changing any sampler or UI defaults.
 
 ## Two-image neutral Face Swap function — 2026-09-20
 
