@@ -90,6 +90,26 @@ class IntegrationTests(unittest.TestCase):
         }
         self.assertTrue(required.issubset(snapshot))
 
+    @patch("genesis.integrations.service_state", return_value="inactive")
+    @patch("genesis.integrations.time.sleep")
+    def test_gpu_service_start_has_cooldown(self, sleep, service_state):
+        with patch("genesis.integrations.subprocess.run") as run:
+            run.return_value.returncode = 0
+            result = integrations.start_user_service(integrations.COMFYUI_SERVICE)
+        self.assertEqual(result, (True, "Start requested."))
+        sleep.assert_any_call(integrations.GPU_TRANSITION_COOLDOWN_SECONDS)
+
+    def test_gpu_service_start_refuses_overlap(self):
+        def state(name):
+            return "active" if name == integrations.QWEN_SERVICE else "inactive"
+        with patch("genesis.integrations.service_state", side_effect=state), patch(
+            "genesis.integrations.subprocess.run"
+        ) as run:
+            ok, detail = integrations.start_user_service(integrations.COMFYUI_SERVICE)
+        self.assertFalse(ok)
+        self.assertIn(integrations.QWEN_SERVICE, detail)
+        run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

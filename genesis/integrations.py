@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
+import time
 import webbrowser
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -169,9 +170,38 @@ def service_state(name: str):
         return "unavailable"
 
 
+GPU_SERVICES = {LLAMA_SERVICE, QWEN_SERVICE, ASSISTANT_SERVICE, COMFYUI_SERVICE}
+GPU_TRANSITION_COOLDOWN_SECONDS = 8
+
+
+def _gpu_services_active(exclude=None):
+    exclude = exclude or set()
+    return [name for name in GPU_SERVICES if name not in exclude and service_state(name) == "active"]
+
+
+def _wait_for_gpu_services_idle(exclude=None, timeout=15):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        active = _gpu_services_active(exclude)
+        if not active:
+            return True, []
+        time.sleep(0.25)
+    return False, _gpu_services_active(exclude)
+
+
 def start_user_service(name: str, already_online=False):
     if already_online:
         return True, "Already running — no duplicate started."
+    if name in GPU_SERVICES:
+        active = _gpu_services_active({name})
+        if active:
+            return False, "GPU busy: stop " + ", ".join(sorted(active)) + " before switching workloads."
+        idle, active = _wait_for_gpu_services_idle({name})
+        if not idle:
+            return False, "GPU transition blocked; still active: " + ", ".join(sorted(active))
+        # KFD/SVM has shown warnings during rapid large ROCm workload transitions.
+        # A short idle window reduces allocation churn without probing/stressing GPU.
+        time.sleep(GPU_TRANSITION_COOLDOWN_SECONDS)
     try:
         reload_result = subprocess.run(
             ["systemctl", "--user", "daemon-reload"],

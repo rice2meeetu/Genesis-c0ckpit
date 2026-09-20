@@ -1,5 +1,6 @@
 [Unit]
 Description=GENESIS existing ComfyUI ROCm backend
+Conflicts=genesis-llama.service genesis-assistant.service genesis-qwen.service genesis-voice.service
 ConditionPathExists=%h/miniforge3/envs/comfyui-reactor-rocm/bin/python
 ConditionPathExists=%h/AI/ComfyUI/main.py
 

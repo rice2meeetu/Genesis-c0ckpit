@@ -1,6 +1,6 @@
 [Unit]
 Description=GENESIS Qwen3 local assistant
-Conflicts=genesis-llama.service
+Conflicts=genesis-comfyui.service genesis-llama.service genesis-assistant.service genesis-voice.service
 ConditionPathExists=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server
 ConditionPathExists=/mnt/AI-Storage/GENESIS-LLM/Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf
 
