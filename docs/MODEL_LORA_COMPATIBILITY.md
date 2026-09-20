@@ -96,3 +96,39 @@ model family, or have not completed the required render test:
 - `k_blackanal.safetensors`
 - `lenovo_krea2.safetensors`, `lenovo_krea2_2.safetensors`
 - `snofs_krea_v1_3D.safetensors`
+
+## External candidate research — 2026-09-20
+
+This is discovery evidence only. No candidate below is installed, compatible, or
+render-tested merely because a hosting page exists.
+
+- The official FLUX.2 Klein 9B model card confirms unified text-to-image and
+  multi-reference editing, a four-step distilled route, an 8B Qwen3 encoder,
+  and an approximately 29 GB unquantized VRAM requirement. GENESIS should keep
+  using measured quantized/FP8 routes on this 16 GB GPU.
+- A Civitai-tracked archive identifies PornMaster Flux2 Klein V3 as a Klein 9B
+  Base checkpoint (Civitai version 2763416; SHA256
+  `F5B479C7F5B49BC7E0F1A163186C5C583B744A77BDF337CA9BB5B0DBE98E60C7`).
+  An independently hosted FP8 derivative is about 9.57 GB, but provenance,
+  workflow settings, and output quality still require local verification.
+- The Aisha publisher's repository lists the installed V8 FP8 (9.43 GB), newer
+  V9.7 distilled FP8 (9.43 GB), and multiple 18.2 GB BF16 variants. Newer
+  filename/version alone is not proof that V9.7 is better or runnable.
+- Other 9.08–9.57 GB FP8 candidates visible in current community archives
+  include MoodyDesireMix v30, Snofs v12/v14, Miracle v20, KleiNova, and
+  PornMaster v4/Turbo. These are benchmark candidates, not recommendations.
+- Hugging Face history confirms the regular-9B files
+  `FK_sloppydeepthroat_epoch_10.safetensors` and
+  `FK_teeththroat.safetensors` exist in Klein 9B collections. That confirms
+  provenance/family naming, not local render quality.
+- Community reports are mixed: Klein 9B is praised for speed, prompt adherence,
+  editing and text, while anatomy, skin texture, and character-LoRA consistency
+  remain recurring complaints. Local fixed-seed adult-only comparison renders
+  are required before replacing the current baseline.
+
+Sources:
+- https://huggingface.co/black-forest-labs/FLUX.2-klein-9B
+- https://huggingface.co/Aisha-AI-Official/flux-2-klein-models
+- https://huggingface.co/ApacheOne/TBA_quants_Klein/blob/main/Flux_2_Klein_9B-base_info.md
+- https://huggingface.co/Kerstal/f2-klein-9b_model/tree/main
+- https://huggingface.co/codeShare/flux-klein-9B-loras
