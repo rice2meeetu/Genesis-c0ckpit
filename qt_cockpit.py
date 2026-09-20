@@ -659,6 +659,43 @@ class GenerationBridge(QObject):
         selected = dialog.selectedFiles()
         return QUrl.fromLocalFile(selected[0]).toString() if selected else ""
 
+    @pyqtSlot(str, str)
+    def queueFaceSwap(self, target_url: str, source_url: str) -> None:
+        """Run the isolated two-image ReActor route for ordinary images."""
+        if self._busy:
+            return
+        target = Path(QUrl(target_url).toLocalFile()) if target_url else Path()
+        source = Path(QUrl(source_url).toLocalFile()) if source_url else Path()
+        if not target.is_file() or not source.is_file():
+            self._set_status("Choose both a target image and a source image.")
+            return
+        self._set_busy(True)
+        self._set_status("Preparing two-image face swap…")
+        threading.Thread(
+            target=self._run_face_swap,
+            args=(target, source),
+            daemon=True,
+        ).start()
+
+    def _run_face_swap(self, target: Path, source: Path) -> None:
+        try:
+            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
+            stats = client.system_stats()
+            if not workflow_lab.gpu_acceleration_available(stats):
+                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            info = client.object_info()
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            current = self._run_reference_stage(
+                client, info, STAGE_3_WORKFLOW, target, "", stamp,
+                "FaceSwap", secondary_image=source,
+            )
+            self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._set_status(f"Complete · {current.name}")
+        except Exception as exc:
+            self._set_status(f"Face swap failed · {exc}")
+        finally:
+            self._set_busy(False)
+
     @pyqtProperty(str, notify=statusChanged)
     def outputFolder(self) -> str:
         return str(self._output_dir)

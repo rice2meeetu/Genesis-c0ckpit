@@ -49,10 +49,12 @@ PAGE_INDEXES = {
     "posemaker": 9,
     "settings": 10,
     "ai": 11,
+    "face-swap": 12,
 }
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
 STACK_END_MARKER = "\n            }\n        }\n    }\n}"
+FACE_SWAP_STACK_MARKER = '                        PageHeader { titleText:"Face Swap";'
 
 AI_PAGE_QML = r'''
 
@@ -221,6 +223,11 @@ def compose_premium_qml(source: str) -> str:
         '        {icon:"✦", label:"GENESIS AI", page:11},\n' + AI_NAV_MARKER,
         1,
     )
+    face_swap_start = source.find(FACE_SWAP_STACK_MARKER)
+    if face_swap_start >= 0:
+        # Keep the injected AI page at its established index 11. Face Swap
+        # follows it at page 12 without disturbing existing page routing.
+        return source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
     stack_end = source.rfind(STACK_END_MARKER)
     if stack_end < 0:
         raise ValueError("Premium Linux QML stack boundary changed.")

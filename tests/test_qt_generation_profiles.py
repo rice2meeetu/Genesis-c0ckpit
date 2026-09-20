@@ -133,6 +133,22 @@ class QtGenerationProfileTests(unittest.TestCase):
                 ["one.safetensors", "one.safetensors"], [0.5, 0.7],
             )
 
+    def test_two_image_face_swap_route_is_exposed(self):
+        from qt_cockpit import GenerationBridge
+        meta = GenerationBridge.staticMetaObject
+        counts = {
+            meta.method(i).parameterCount()
+            for i in range(meta.methodOffset(), meta.methodCount())
+            if bytes(meta.method(i).name()) == b"queueFaceSwap"
+        }
+        self.assertEqual(counts, {2})
+        root = Path(__file__).resolve().parents[1]
+        qml = (root / "genesis/qt_ui/MainPremiumLinux.qml").read_text(encoding="utf-8")
+        self.assertIn('label:"Face Swap"', qml)
+        self.assertIn("faceSwapTarget", qml)
+        self.assertIn("faceSwapSource", qml)
+        self.assertIn("genesisBridge.queueFaceSwap", qml)
+
     def test_module_pages_route_buttons_through_qt_bridge(self):
         root = Path(__file__).resolve().parents[1]
         qml = (root / "genesis/qt_ui/Main.qml").read_text(encoding="utf-8")

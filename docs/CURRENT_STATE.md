@@ -1,5 +1,14 @@
 # GENESIS V3 — Current State
 
+## Two-image neutral Face Swap function — 2026-09-20
+
+- Premium Linux UI now exposes a dedicated Face Swap page at page 12, with separate target-image and source-identity pickers.
+- `GenerationBridge.queueFaceSwap(target_url, source_url)` runs the preserved `STAGE_3_REACTOR_ROCM.json` route without changing Image Generation or the staged pose buttons.
+- The route uses `ReActorFaceSwap`, `inswapper_128.onnx`, and `retinaface_resnet50`; restoration remains disabled by default so the result can be inspected before any enhancement.
+- Neutral two-image validation passed with prompt `a1e824cb-09f7-4548-a539-a90830382422`. Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_FACESWAP_TWO_IMAGE_NEUTRAL_00001_.png`.
+- The UI states that the isolated tool is for ordinary, non-explicit images and warns that extreme angles, occlusion, hands, hair, and lighting mismatch can distort faces.
+- Normal cockpit outputs default to `/home/rice2meetyou/GENESIS-Exports`; direct ComfyUI validation outputs remain under `/home/rice2meetyou/AI/ComfyUI/output`.
+
 ## Verified isolated Klein 4B adapter render — 2026-09-20
 
 - ComfyUI prompt `f17b0ed4-f341-4ec5-a1bb-5b2cdf5c083e` completed successfully on the existing GPU stack.

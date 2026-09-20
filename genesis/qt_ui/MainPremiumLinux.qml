@@ -41,7 +41,8 @@ ApplicationWindow {
         {icon:"⚙", label:"System Tools", page:7},
         {icon:"Ps", label:"Canvas / Edit", page:8},
         {icon:"♜", label:"Pose Maker", page:9},
-        {icon:"☷", label:"Settings", page:10}
+        {icon:"☷", label:"Settings", page:10},
+        {icon:"↺", label:"Face Swap", page:12}
     ]
 
     Shortcut { sequence: "Alt+1"; onActivated: appRoot.pageIndex = 0 }
@@ -69,6 +70,8 @@ ApplicationWindow {
     property real selectedLoraTwoStrength: 0.65
     property real selectedLoraThreeStrength: 0.65
     property url generationSource: ""
+    property url faceSwapTarget: ""
+    property url faceSwapSource: ""
     property string generationPrompt: ""
     property string generationNegativePrompt: ""
     property int generationWidth: 768
@@ -97,6 +100,20 @@ ApplicationWindow {
     function chooseSource() {
         var chosen = genesisBridge.chooseSourceImage()
         if (chosen.length) generationSource = chosen
+    }
+
+    function chooseFaceSwapTarget() {
+        var chosen = genesisBridge.chooseSourceImage()
+        if (chosen.length) faceSwapTarget = chosen
+    }
+
+    function chooseFaceSwapSource() {
+        var chosen = genesisBridge.chooseSourceImage()
+        if (chosen.length) faceSwapSource = chosen
+    }
+
+    function runFaceSwap() {
+        genesisBridge.queueFaceSwap(faceSwapTarget.toString(), faceSwapSource.toString())
     }
 
     function chooseEditSource() {
@@ -1064,6 +1081,41 @@ ApplicationWindow {
                     ColumnLayout { anchors.fill:parent; spacing:10
                         PageHeader { titleText:"Settings"; subtitleText:"Local services and GENESIS workspace settings."; iconText:"☷" }
                         Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:20; spacing:12; Text { text:"GENESIS LINUX"; color:appRoot.brightGold; font.pixelSize:24; font.bold:true } Text { text:"Backend status: " + moduleBridge.status; color:appRoot.textDim; font.pixelSize:13; wrapMode:Text.Wrap; Layout.fillWidth:true } RowLayout { GButton { text:"Refresh Health"; onClicked:moduleBridge.triggerAction("refresh") } GButton { text:"Open Settings Folder"; onClicked:moduleBridge.triggerAction("settings") } } Item { Layout.fillHeight:true } Text { text:"The source image, selected preset/pose and prompt are preserved while you move between Create and Pose Library."; color:appRoot.textDim; font.pixelSize:12; wrapMode:Text.Wrap; Layout.fillWidth:true } } }
+                    }
+                }
+
+                Item {
+                    ColumnLayout { anchors.fill:parent; spacing:10
+                        PageHeader { titleText:"Face Swap"; subtitleText:"Load a target image and a source identity image, then run the isolated ReActor route."; iconText:"↺" }
+                        RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
+                                SectionLabel { text:"TARGET IMAGE · WHERE THE FACE GOES" }
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.faceSwapTarget.toString().length ? appRoot.gold : appRoot.line
+                                    Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapTarget; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapTarget.toString().length > 0 && !privacyMode }
+                                    Text { anchors.centerIn:parent; text:appRoot.faceSwapTarget.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO TARGET IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
+                                }
+                                RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Load Target Image"; onClicked:appRoot.chooseFaceSwapTarget() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapTarget.toString().length>0; onClicked:appRoot.faceSwapTarget="" } }
+                            } }
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
+                                SectionLabel { text:"SOURCE IDENTITY · FACE TO USE" }
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.faceSwapSource.toString().length ? appRoot.gold : appRoot.line
+                                    Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapSource; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapSource.toString().length > 0 && !privacyMode }
+                                    Text { anchors.centerIn:parent; text:appRoot.faceSwapSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
+                                }
+                                RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Load Source Image"; onClicked:appRoot.chooseFaceSwapSource() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.faceSwapSource="" } }
+                            } }
+                            Panel { Layout.preferredWidth:360; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
+                                SectionLabel { text:"RESULT" }
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.line
+                                    Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit; visible:!privacyMode }
+                                    Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
+                                }
+                                GButton { Layout.fillWidth:true; text:genesisBridge.busy ? "RUNNING…" : "RUN FACE SWAP"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
+                                GButton { Layout.fillWidth:true; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
+                            } }
+                        }
+                        Text { Layout.fillWidth:true; text:"Use images you own or have permission to use. Neutral portraits work best; extreme angles, occlusion, hands, hair, and mismatched lighting can still cause distortion. This isolated tool is for ordinary, non-explicit images."; color:appRoot.gold; font.pixelSize:11; wrapMode:Text.Wrap }
+                        Text { Layout.fillWidth:true; text:genesisBridge.status; color:genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap }
                     }
                 }
             }

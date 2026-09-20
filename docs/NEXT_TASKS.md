@@ -1,5 +1,16 @@
 # GENESIS V3 — Next Tasks
 
+## Two-image neutral Face Swap function — 2026-09-20
+
+- Added a dedicated Face Swap page with target-image and source-identity pickers. The launcher preserves GENESIS AI at page 11 and routes Face Swap to page 12.
+- Added `GenerationBridge.queueFaceSwap(target_url, source_url)` using the preserved `STAGE_3_REACTOR_ROCM.json` workflow. Existing Image Generation, Qwen/Phr00t, SDXL/Lustify, and pose routes are unchanged.
+- ReActor configuration: `inswapper_128.onnx`, `retinaface_resnet50`, restoration disabled by default.
+- Neutral two-image validation passed: prompt `a1e824cb-09f7-4548-a539-a90830382422`; output `GENESIS_VERIFY_FACESWAP_TWO_IMAGE_NEUTRAL_00001_.png` under ComfyUI output.
+- UI guidance limits this isolated function to ordinary, non-explicit images and explains likely distortion from occlusion, extreme angles, hands, hair, or lighting mismatch.
+- Verification: 80 tests passed; offscreen Face Swap page stayed alive for the timeout with no QML errors; composed launcher QML keeps AI before Face Swap.
+- Files changed: `qt_cockpit.py`, `genesis/qt_ui/MainPremiumLinux.qml`, `qt_cockpit_linux_premium.py`, `tests/test_qt_generation_profiles.py`.
+- Single best next action: run the new Face Swap page with two neutral images from the UI and inspect the result before any further polish.
+
 ## Verified isolated Klein 4B baseline — 2026-09-20
 
 - Both 12-argument and 16-argument Generate calls were exercised through
