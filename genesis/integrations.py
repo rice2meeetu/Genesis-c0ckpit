@@ -35,6 +35,7 @@ LLAMA_SERVICE = "genesis-llama.service"
 QWEN_SERVICE = "genesis-qwen.service"
 ASSISTANT_SERVICE = "genesis-assistant.service"
 COMFYUI_SERVICE = "genesis-comfyui.service"
+BUILDER_SERVICE = "genesis-builder.service"
 
 LLAMA_BINARY = Path(
     "/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server"
@@ -170,7 +171,7 @@ def service_state(name: str):
         return "unavailable"
 
 
-GPU_SERVICES = {LLAMA_SERVICE, QWEN_SERVICE, ASSISTANT_SERVICE, COMFYUI_SERVICE}
+GPU_SERVICES = {LLAMA_SERVICE, QWEN_SERVICE, ASSISTANT_SERVICE, COMFYUI_SERVICE, BUILDER_SERVICE}
 GPU_TRANSITION_COOLDOWN_SECONDS = 8
 
 
