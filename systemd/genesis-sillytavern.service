@@ -1,12 +1,10 @@
 [Unit]
-Description=GENESIS existing SillyTavern server
-ConditionPathExists=/mnt/C/Users/p4uln/SillyTavern/server.js
-ConditionPathIsReadWrite=/mnt/C/Users/p4uln/SillyTavern
+Description=GENESIS SillyTavern local server
 After=genesis-llama.service
 
 [Service]
 Type=simple
-WorkingDirectory=/mnt/C/Users/p4uln/SillyTavern
+WorkingDirectory=/home/rice2meetyou/AI/SillyTavern
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node server.js
 Restart=on-failure

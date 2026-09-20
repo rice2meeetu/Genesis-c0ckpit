@@ -10,12 +10,13 @@ the existing cockpit backend.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtCore import QObject, QTimer, QUrl
 from PyQt6.QtGui import QIcon
-from PyQt6.QtQml import QQmlApplicationEngine
+from PyQt6.QtQml import QQmlApplicationEngine, QQmlExpression
 from PyQt6.QtWidgets import QApplication
 
 from genesis.assistant_bridge import AssistantBridge
@@ -277,18 +278,31 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            screen = window.screen() or app.primaryScreen()
-            image = screen.grabWindow(int(window.winId())) if screen else None
-            if image is None or image.isNull() or not image.save(str(target)):
+            # Capture our own scene graph. This also works when the distro has
+            # Qt Quick QML plugins but no Python PyQt6.QtQuick bindings.
+            capture_item = window.findChild(QObject, "genesisMainWorkspace")
+            if capture_item is None:
                 app.exit(2)
                 return
-            app.quit()
+            expression = QQmlExpression(
+                engine.rootContext(), capture_item,
+                "grabToImage(function(result) { "
+                "result.saveToFile(" + json.dumps(str(target)) + "); Qt.quit(); })",
+            )
+            expression.evaluate()
+            if expression.hasError():
+                print(expression.error().toString(), file=sys.stderr)
+                app.exit(2)
 
         QTimer.singleShot(2500, save_screenshot)
+        QTimer.singleShot(15000, lambda: app.exit(2))
     else:
         window.showMaximized()
 
-    return app.exec()
+    result = app.exec()
+    if args.screenshot and not target.is_file():
+        return 2
+    return result
 
 
 if __name__ == "__main__":

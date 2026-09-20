@@ -383,6 +383,7 @@ ApplicationWindow {
     }
 
     ColumnLayout {
+        objectName: "genesisMainWorkspace"
         anchors.fill: parent
         anchors.margins: 12
         spacing: 10

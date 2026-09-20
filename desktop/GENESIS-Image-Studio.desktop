@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=GENESIS Image Studio
+Comment=Open Image Generation with the local ComfyUI backend
+Exec=/home/rice2meetyou/Genesis-c0ckpit/launch-image-studio.sh
+TryExec=/home/rice2meetyou/Genesis-c0ckpit/launch-image-studio.sh
+Path=/home/rice2meetyou/Genesis-c0ckpit
+Icon=/home/rice2meetyou/Genesis-c0ckpit/genesis/assets/genesis-cockpit-icon-balanced-final.png
+Terminal=false
+StartupNotify=true
+Categories=Graphics;Photography;
