@@ -157,10 +157,19 @@ def process_running(pattern: str):
         return False
 
 
+def _user_systemd_env():
+    env = os.environ.copy()
+    uid = os.getuid()
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
+    env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path=/run/user/{uid}/bus")
+    return env
+
+
 def service_state(name: str):
     try:
         result = subprocess.run(
             ["systemctl", "--user", "is-active", name],
+            env=_user_systemd_env(),
             capture_output=True,
             text=True,
             timeout=3,
@@ -206,6 +215,7 @@ def start_user_service(name: str, already_online=False):
     try:
         reload_result = subprocess.run(
             ["systemctl", "--user", "daemon-reload"],
+            env=_user_systemd_env(),
             capture_output=True,
             text=True,
             timeout=8,
@@ -219,6 +229,7 @@ def start_user_service(name: str, already_online=False):
             )
         result = subprocess.run(
             ["systemctl", "--user", "start", name],
+            env=_user_systemd_env(),
             capture_output=True,
             text=True,
             timeout=12,

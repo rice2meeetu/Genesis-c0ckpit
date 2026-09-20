@@ -15,6 +15,12 @@ class IntegrationTests(unittest.TestCase):
                 Path("/available/fallback"),
             )
 
+    def test_user_systemd_env_supplies_remote_session_bus(self):
+        with patch.dict("os.environ", {}, clear=True), patch("os.getuid", return_value=1000):
+            env = integrations._user_systemd_env()
+        self.assertEqual(env["XDG_RUNTIME_DIR"], "/run/user/1000")
+        self.assertEqual(env["DBUS_SESSION_BUS_ADDRESS"], "unix:path=/run/user/1000/bus")
+
     def test_start_user_service_does_not_duplicate_online_service(self):
         with patch("genesis.integrations.subprocess.run") as run:
             result = integrations.start_user_service(
