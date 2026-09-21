@@ -12,6 +12,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from genesis import workflow_lab  # noqa: E402
+from genesis.model_compatibility import is_compatible  # noqa: E402
 from tests.gpu_klein9b_benchmark import make_prompt  # noqa: E402
 
 
@@ -20,6 +21,7 @@ APPROVED_LORAS = {
     "nsfw-v2": "Flux Klein - NSFW v2.safetensors",
     "anatomy": "Klein_Anatomy_Revamped.safetensors",
 }
+MODEL = "flux-2-klein-base-9b-Q4_K_M.gguf"
 OUT = REPO / "gpu_test_outputs" / "klein9b-lora-benchmark"
 
 
@@ -32,6 +34,8 @@ def main() -> int:
     client = workflow_lab.ComfyClient(timeout=60)
     info = client.object_info()
     lora = APPROVED_LORAS[args.profile]
+    if not is_compatible(MODEL, lora):
+        raise SystemExit(f"Blocked incompatible LoRA for {MODEL}: {lora}")
     seed = 390829
     prompt = make_prompt(info, 512, 512, seed, f"lora-{args.profile}")
     prompt["genesis_lora_probe"] = {
@@ -58,7 +62,7 @@ def main() -> int:
     report_path = OUT / f"{args.profile}.json"
     report = {
         "profile": args.profile,
-        "model": "flux-2-klein-base-9b-Q4_K_M.gguf",
+        "model": MODEL,
         "encoder": "qwen_3_8b_fp8mixed.safetensors",
         "lora": lora,
         "strength": args.strength,

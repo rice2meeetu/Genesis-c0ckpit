@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PIL import Image, ImageChops, ImageStat
 
 from genesis import workflow_lab
+from genesis.model_compatibility import is_compatible
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,8 +22,8 @@ BASE_WORKFLOW = (
 )
 OUTPUT = ROOT / "gpu_test_outputs/klein4b-lora-benchmark"
 REPORT = OUTPUT / "report.json"
+MODEL = "flux-2-klein-4b.safetensors"
 LORAS = (
-    ("unlocked", "FLUX2_KLEIN_UNLOCKED_V1.safetensors", 0.5),
     ("asianmix", "hina_flux2klein4b_asianMix_v4.0-lora.safetensors", 0.5),
     ("deepthroat", "klein4b-deepthroat-22epoc-k3nk.safetensors", 0.5),
 )
@@ -30,7 +31,7 @@ LORAS = (
 
 def make_prompt(info: dict, lora: tuple[str, str, float] | None) -> dict:
     prompt = workflow_lab.workflow_to_prompt(BASE_WORKFLOW, info)
-    prompt["1"]["inputs"]["unet_name"] = "flux-2-klein-4b.safetensors"
+    prompt["1"]["inputs"]["unet_name"] = MODEL
     prompt["2"]["inputs"]["clip_name"] = "qwen_3_4b_fp4_flux2.safetensors"
     prompt.pop("5")
     prompt["6"]["inputs"]["model"] = ["1", 0]
@@ -39,6 +40,8 @@ def make_prompt(info: dict, lora: tuple[str, str, float] | None) -> dict:
     label = "baseline"
     if lora:
         label, filename, strength = lora
+        if not is_compatible(MODEL, filename):
+            raise workflow_lab.ComfyError(f"Blocked incompatible LoRA for {MODEL}: {filename}")
         prompt["15"] = {
             "class_type": "LoraLoaderModelOnly",
             "inputs": {"model": ["1", 0], "lora_name": filename, "strength_model": strength},
