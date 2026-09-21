@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 114 tests
+- Current automated suite passes: 116 tests
 
 ## Current Architecture
 
@@ -117,8 +117,10 @@ deliberate milestone files.
 - All heavy GPU services were stopped after the test and remain disabled/inactive.
   No further SVM/KFD warnings appeared while idle.
 - Live ComfyUI now uses `--disable-async-offload --disable-pinned-memory`
-  `--disable-dynamic-vram`, a 10-second KFD/SVM settle delay, and 30-second
-  restart backoff. The same 10-second transition guard is committed for the
+  `--disable-dynamic-vram --disable-mmap`, a 10-second KFD/SVM settle delay,
+  and 30-second restart backoff. `--disable-mmap` is the current low-risk
+  RX 9060 XT/gfx1200 workaround for the mmap/HMM/KFD SVM path reported in
+  upstream ROCm issue #6606. The same 10-second transition guard is committed for the
   other ROCm services. Heavy GPU services remain disabled/inactive by default.
 - A backend-idle ComfyUI startup with those flags completed cleanly and was
   stopped again: current-boot counts remain zero for `svm_range_restore_work`,

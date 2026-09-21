@@ -1,5 +1,11 @@
 # CPU/GPU runtime checkpoint — 2026-09-20
 
+> **Safety addendum — 2026-09-21:** the current RX 9060 XT profile additionally
+> disables pinned memory, dynamic VRAM and safetensors mmap. Live ComfyUI now
+> includes `--disable-pinned-memory --disable-dynamic-vram --disable-mmap` and
+> remains on-demand/inactive while idle. This supersedes the launch line below
+> for current operation; the 2026-09-20 text is retained as historical evidence.
+
 Scope: general runtime stability only. No preset, LoRA, image workflow, driver,
 CPU clock, voltage, thread-count or power-limit changes.
 

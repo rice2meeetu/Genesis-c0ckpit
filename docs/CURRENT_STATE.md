@@ -19,8 +19,10 @@ This checkpoint supersedes the older render-next instructions below.
   Chat label now matches its Qwen backend rather than Rocinante.
 - No inference, generation, GPU benchmark, driver or ROCm changes in this session.
 - GPU HOLD: GENESIS_STATUS.md records reproduced KFD SVM warnings during the
-  isolated Klein 4B test. Do not follow historical render/benchmark next steps
-  until a mitigation is verified and GPU work is authorized.
+  isolated Klein 4B test. Current ComfyUI startup adds `--disable-mmap` alongside
+  `--disable-pinned-memory`, `--disable-dynamic-vram` and disabled async offload;
+  this is a mitigation only, not yet a loaded-workload verification. Do not follow
+  historical render/benchmark next steps until GPU work is explicitly authorized.
 
 ## Verified regular Klein 9B single-LoRA render — 2026-09-20
 

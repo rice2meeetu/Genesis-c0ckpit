@@ -21,9 +21,21 @@ Validated 2026-09-06 against ComfyUI 0.34.0 on the local AMD Radeon RX
 
 ## ComfyUI launch profile
 
+The block below is the historical render-tested profile from 2026-09-06. It is
+now superseded for live GENESIS use by the SVM-safe additions shown afterward.
+
 ```text
 --lowvram --force-fp16 --preview-method none --cache-none
 ```
+
+Current live safety additions (2026-09-21):
+
+```text
+--disable-async-offload --disable-pinned-memory --disable-dynamic-vram --disable-mmap
+```
+
+`--disable-mmap` is retained while the RX 9060 XT/gfx1200 mmap/HMM/KFD SVM
+issue remains under investigation; do not remove it based on the older benchmark.
 
 `--async-offload` is excluded because this exact ROCm/PyTorch build produced a
 repeatable `hipErrorIllegalAddress` during sampler cleanup with it enabled.

@@ -9,7 +9,7 @@ Type=simple
 # KFD/SVM safety: allow mappings from the previous ROCm workload to settle.
 ExecStartPre=/bin/sleep 10
 WorkingDirectory=%h/AI/ComfyUI
-ExecStart=%h/miniforge3/envs/comfyui-reactor-rocm/bin/python %h/AI/ComfyUI/main.py --lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --listen 127.0.0.1 --port 8188
+ExecStart=%h/miniforge3/envs/comfyui-reactor-rocm/bin/python %h/AI/ComfyUI/main.py --lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --disable-mmap --listen 127.0.0.1 --port 8188
 Restart=on-failure
 RestartSec=30
 StandardOutput=append:%h/.local/state/genesis/comfyui.log

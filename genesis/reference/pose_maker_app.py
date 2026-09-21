@@ -421,7 +421,7 @@ def start_comfyui() -> str:
     cmd = (
         f'source "{CONDA_SH}" && '
         f'conda activate "{COMFY_ENV}" && '
-        'exec python main.py --lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --listen 127.0.0.1 --port 8188'
+        'exec python main.py --lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --disable-mmap --listen 127.0.0.1 --port 8188'
     )
 
     log_fh = open(COMFY_MANAGED_LOG, "a", buffering=1)
