@@ -133,8 +133,14 @@ deliberate milestone files.
   `f466479c485c285f24c2677c48d0e4e845ffcfacd674543e3e2859a26638e2fa`.
   After completion ComfyUI stopped normally, and current-boot counts remained
   zero for all three KFD/SVM warnings, GPU reset/ring timeout/page fault, and
-  SATA `BadCRC`/`ICRC`/hard-reset events. This validates one 4B baseline only;
-  it does not prove all 9B, LoRA or multi-stage workloads are safe.
+  SATA `BadCRC`/`ICRC`/hard-reset events. A second identical guarded baseline
+  later repeated the result: prompt `d4ed984d-49b1-4a64-ba53-3b68f718da90`,
+  108.97-second ComfyUI execution / 144.541 seconds including startup, full
+  7392.01 MB Flux2 load, normal shutdown, and the same zero fault counters.
+  Repeat output SHA-256 is
+  `a9fad2581e9ddb90bb0fc1f08c0543c29f9bdc9053c49dcb5776062c01f8699f`.
+  This validates the 4B no-LoRA baseline twice; it does not yet prove all 9B,
+  LoRA or multi-stage workloads are safe.
 - GENESIS now has a boot-scoped GPU safety latch: GPU-service starts and every
   ComfyUI submit check the current kernel log for those KFD/SVM warning names.
   If any has appeared, further GPU work is refused with a reboot-required
