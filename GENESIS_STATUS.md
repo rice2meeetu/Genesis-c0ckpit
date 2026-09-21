@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 120 tests
+- Current automated suite passes: 121 tests
 
 ## Current Architecture
 
@@ -141,6 +141,19 @@ deliberate milestone files.
   `a9fad2581e9ddb90bb0fc1f08c0543c29f9bdc9053c49dcb5776062c01f8699f`.
   This validates the 4B no-LoRA baseline twice; it does not yet prove all 9B,
   LoRA or multi-stage workloads are safe.
+- A subsequent single-LoRA neutral 4B test with
+  `hina_flux2klein4b_asianMix_v4.0-lora.safetensors` at 0.5 completed all
+  four sampler steps but at 20:27:56 produced
+  `amdgpu_amdkfd_restore_userptr_worker` workqueue warnings escalating
+  4 -> 5 -> 7 -> 11. The mid-run safety latch interrupted the job and systemd
+  stopped ComfyUI immediately. There was no GPU reset, ring timeout, page fault,
+  `BadCRC`, `ICRC` or SATA reset. The current boot is now GPU-locked by the
+  reboot-required kernel latch.
+- Because the baseline is repeatably clean while the first adapter test restored
+  the KFD warning path, all Klein 4B LoRAs are on a runtime hold. Family metadata
+  remains recorded, but `compatible_loras()` exposes none until an adapter is
+  individually re-verified after a clean reboot under the current safe profile.
+  AsianMix is additionally runtime-quarantined by exact filename.
 - GENESIS now has a boot-scoped GPU safety latch: GPU-service starts and every
   ComfyUI submit check the current kernel log for those KFD/SVM warning names.
   If any has appeared, further GPU work is refused with a reboot-required

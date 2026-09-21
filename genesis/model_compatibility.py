@@ -14,11 +14,16 @@ WORKFLOW_DEFAULT = "Use workflow default"
 KLEIN_4B_LORAS = {
     "F2K4BBabe_Engel_v1.0.safetensors",
     "f2k_4B_consist_20260314.safetensors",
-    "hina_flux2klein4b_asianMix_v4.0-lora.safetensors",
     # Structurally validated and completed a coherent 512px render on
     # 2026-09-11. Keep strictly scoped to Klein 4B.
     "klein4b-deepthroat-22epoc-k3nk.safetensors",
 }
+
+# Family compatibility is not enough after the 2026-09-21 KFD/SVM incident.
+# Keep this empty until a LoRA completes a guarded current-profile render
+# without any KFD/SVM warning.  This makes ordinary 4B baseline generation
+# usable while preventing unverified adapter memory transitions.
+KLEIN_4B_RUNTIME_VERIFIED_LORAS: set[str] = set()
 
 # Metadata-verified on the GENESIS machine as flux2_klein_9b.
 KLEIN_9B_LORAS = {
@@ -54,6 +59,15 @@ KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS: set[str] = set()
 # and a repeatable generation test.
 BLOCKED_UNVERIFIED_LORAS = {
     "FLUX2_KLEIN_UNLOCKED_V1.safetensors",
+}
+
+# Files with matching family metadata that nevertheless produced a runtime
+# safety signal on the GENESIS RX 9060 XT are quarantined separately from
+# structurally unverified adapters.
+RUNTIME_QUARANTINED_LORAS = {
+    # 2026-09-21: neutral Klein 4B render completed sampling, then triggered
+    # amdgpu_amdkfd_restore_userptr_worker workqueue warnings (4/5/7/11).
+    "hina_flux2klein4b_asianMix_v4.0-lora.safetensors",
 }
 
 # Ordinary Klein 9B compatibility does not prove KV compatibility.
@@ -117,6 +131,8 @@ def model_family(name: str | None) -> str:
 def lora_family(name: str | None) -> str:
     value = (name or "").replace("\\", "/")
     base = _basename(value)
+    if base in RUNTIME_QUARANTINED_LORAS:
+        return "runtime_quarantined"
     if base in BLOCKED_UNVERIFIED_LORAS:
         return "unverified"
     if value in KLEIN_4B_LORAS or base in KLEIN_4B_LORAS:
@@ -147,9 +163,11 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     if not lora or lora == WORKFLOW_DEFAULT or lora == "None":
         return True
     base = _basename(lora)
-    if base in BLOCKED_UNVERIFIED_LORAS:
+    if base in BLOCKED_UNVERIFIED_LORAS or base in RUNTIME_QUARANTINED_LORAS:
         return False
     family = model_family(model)
+    if family == "flux2_klein_4b":
+        return base in KLEIN_4B_RUNTIME_VERIFIED_LORAS
     if family == "flux2_klein_9b_kv":
         return base in KLEIN_9B_KV_VERIFIED_LORAS
     return lora_family(lora) == family
@@ -168,7 +186,7 @@ def lora_trigger(name: str | None) -> str:
 def compatibility_note(model: str | None) -> str:
     family = model_family(model)
     return {
-        "flux2_klein_4b": "Klein 4B · only verified 4B LoRAs",
+        "flux2_klein_4b": "Klein 4B · LoRAs held until current-profile runtime verification",
         "flux2_klein_9b_base": "Klein 9B Base · native verified 9B LoRAs only",
         "flux2_klein_9b_kv": "Klein 9B-KV · LoRAs disabled until KV render verification",
         "krea2": "Krea 2 · only Krea 2 LoRAs",

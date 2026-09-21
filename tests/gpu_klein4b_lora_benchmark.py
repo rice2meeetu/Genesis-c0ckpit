@@ -23,10 +23,9 @@ BASE_WORKFLOW = (
 OUTPUT = ROOT / "gpu_test_outputs/klein4b-lora-benchmark"
 REPORT = OUTPUT / "report.json"
 MODEL = "flux-2-klein-4b.safetensors"
-LORAS = (
-    ("asianmix", "hina_flux2klein4b_asianMix_v4.0-lora.safetensors", 0.5),
-    ("deepthroat", "klein4b-deepthroat-22epoc-k3nk.safetensors", 0.5),
-)
+# Runtime hold: add a LoRA here only after explicitly selecting it for a
+# guarded post-reboot verification under the current SVM-safe profile.
+LORAS = ()
 
 
 def make_prompt(info: dict, lora: tuple[str, str, float] | None) -> dict:

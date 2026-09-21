@@ -10,21 +10,29 @@ This checkpoint supersedes the older render-next instructions below.
 - qt_cockpit_linux_premium.py uses QML sourceClipRect to display the cat region
   without the screenshot's surrounding viewer controls; Chat/Build/Studio remain intact.
 - Replaced the unconditional Online label with Idle; no backend health is implied.
-- Validation: 105 pytest tests passed (one existing pkg_resources deprecation
-  warning); software/offscreen AI-page screenshot completed with no QML errors.
+- Current validation: 121 pytest tests pass (one existing pkg_resources
+  deprecation warning). Earlier software/offscreen AI-page screenshot completed
+  with no QML errors.
   Visual inspection passed via a smaller remote preview. It exposed a pre-existing
   page-routing bug: AI Assistant opened Face Swap. Fixed insertion using a stable
   top-level page marker and fail-closed handling if that marker is absent.
   A new software-only runtime test verifies visibility of both page 11 and 12.
   Chat label now matches its Qwen backend rather than Rocinante.
-- No driver, ROCm, firmware or kernel changes were made. The only new inference
-  was the single guarded Klein 4B mitigation baseline described below.
+- No driver, ROCm, firmware or kernel changes were made. Guarded inference was
+  limited to two Klein 4B no-LoRA baselines plus one single-LoRA diagnostic;
+  the LoRA diagnostic triggered the safety latch and no further GPU work is
+  permitted in the current boot.
 - GPU HOLD is partially relaxed for the verified 4B baseline only. Current
   ComfyUI startup adds `--disable-mmap` alongside `--disable-pinned-memory`,
-  `--disable-dynamic-vram` and disabled async offload. On 2026-09-21 one guarded
-  Klein 4B 512x512 / 4-step / no-LoRA run completed cleanly with zero KFD/SVM,
-  GPU-reset/page-fault and SATA CRC/reset events. Keep 9B, LoRA, multi-stage and
-  stress workloads on hold until separately validated under the same safeguards.
+  `--disable-dynamic-vram` and disabled async offload. Two guarded Klein 4B
+  512x512 / 4-step / no-LoRA runs completed cleanly with zero KFD/SVM,
+  GPU-reset/page-fault and SATA CRC/reset events.
+- The next neutral 4B test added AsianMix at 0.5. Sampling completed, but the
+  post-sampling transition emitted `amdgpu_amdkfd_restore_userptr_worker`
+  warnings (4/5/7/11). GENESIS interrupted and stopped ComfyUI as designed.
+  The boot-level GPU latch is now closed until reboot. All Klein 4B LoRAs are
+  runtime-held; AsianMix is additionally exact-name quarantined. Keep 9B,
+  multi-stage and stress workloads on hold until separately validated.
 - The 4B model resides behind a symlink into the Windows `Ai` volume. GENESIS now
   restores that volume on demand by label with a read-only `udisksctl` mount and
   refuses an existing read-write mount, avoiding the broken-symlink failure seen
@@ -60,8 +68,11 @@ This checkpoint supersedes the older render-next instructions below.
 - Adapter: `hina_flux2klein4b_asianMix_v4.0-lora.safetensors`, model strength 0.45, CLIP strength 0.45.
 - Neutral prompt: blue ceramic teapot product photograph; 512x512, seed 290830, 4 steps, CFG 1.0, `res_multistep` / `simple`.
 - Output: `/home/rice2meetyou/AI/ComfyUI/output/GENESIS_VERIFY_KLEIN4B_HINAFP_NEUTRAL_00001_.png`, PNG RGB 512x512, 325211 bytes, SHA-256 `f47e99920fc8f78531c9b3455db575d0ab870ccf04ee5265f71efaa142584d28`.
-- ComfyUI execution time was approximately 49.6 seconds. This verifies one neutral 4B adapter render only; it does not promote other adapters or multi-LoRA combinations.
-- No workflow files, model files, or launch flags changed.
+- ComfyUI execution time was approximately 49.6 seconds. This was a historical
+  successful adapter render under the older runtime state; it is superseded for
+  safety decisions by the 2026-09-21 current-profile test that triggered KFD
+  restore-userptr warnings. AsianMix is now runtime-quarantined.
+- No workflow files or model files were changed by that historical render.
 
 ## Verified source-image routing — 2026-09-20
 

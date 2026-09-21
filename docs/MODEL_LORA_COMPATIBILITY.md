@@ -8,7 +8,7 @@ complete local GPU image was produced with the current GENESIS profile.
 
 | Family | Installed models | LoRA policy |
 | --- | --- | --- |
-| FLUX.2 Klein 4B | `flux-2-klein-4b.safetensors` | Offer metadata-confirmed 4B adapters |
+| FLUX.2 Klein 4B | `flux-2-klein-4b.safetensors` | Baseline allowed; all 4B LoRAs runtime-held pending guarded re-verification |
 | FLUX.2 Klein 9B Base | `flux-2-klein-base-9b-Q4_K_M.gguf` | Baseline and three regular-9B LoRAs render verified |
 | FLUX.2 Klein 9B-KV | `flux-2-klein-9b-kv-fp8.safetensors` | Baseline render verified; LoRAs blocked |
 | Aisha 9B | `aisha_nsfw_beta_v8_fp8.safetensors` | LoRAs blocked |
@@ -20,11 +20,19 @@ complete local GPU image was produced with the current GENESIS profile.
 
 ### FLUX.2 Klein 4B
 
-- `F2K4BBabe_Engel_v1.0.safetensors` — metadata: `flux2_klein_4b`
-- `hina_flux2klein4b_asianMix_v4.0-lora.safetensors` — metadata: `flux2_klein_4b`
+Family metadata / historical evidence still identifies these as 4B candidates:
 
-The downloaded `klein4b-deepthroat-22epoc-k3nk.safetensors` remains blocked:
-its filename says 4B but its embedded metadata does not identify a base model.
+- `F2K4BBabe_Engel_v1.0.safetensors` — metadata: `flux2_klein_4b`
+- `f2k_4B_consist_20260314.safetensors` — metadata: `flux2_klein_4b`
+- `klein4b-deepthroat-22epoc-k3nk.safetensors` — historical structural/render evidence
+- `hina_flux2klein4b_asianMix_v4.0-lora.safetensors` — metadata: `flux2_klein_4b`, but runtime-quarantined
+
+**Current runtime policy (2026-09-21): no Klein 4B LoRA is selectable.** Two
+no-LoRA 4B baselines passed under the RX 9060 XT SVM-safe profile, while the
+first current-profile AsianMix adapter test triggered
+`amdgpu_amdkfd_restore_userptr_worker` warnings after sampling. Each adapter
+must therefore complete a guarded post-reboot verification before being added
+to the runtime-verified allowlist.
 
 ### FLUX.2 Klein 9B Base
 

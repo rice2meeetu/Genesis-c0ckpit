@@ -20,12 +20,20 @@ class ModelCompatibilityTests(unittest.TestCase):
         self.assertEqual(model_family("flux-2-klein-9b-kv-fp8.safetensors"), "flux2_klein_9b_kv")
         self.assertEqual(model_family("flux-2-klein-base-9b-Q4_K_M.gguf"), "flux2_klein_9b_base")
 
-    def test_four_b_and_nine_b_loras_do_not_cross(self):
+    def test_four_b_loras_are_on_runtime_hold_and_do_not_cross(self):
         model = "flux-2-klein-4b.safetensors"
-        self.assertTrue(is_compatible(model, "hina_flux2klein4b_asianMix_v4.0-lora.safetensors"))
-        self.assertTrue(is_compatible(model, "klein4b-deepthroat-22epoc-k3nk.safetensors"))
+        self.assertFalse(is_compatible(model, "hina_flux2klein4b_asianMix_v4.0-lora.safetensors"))
+        self.assertFalse(is_compatible(model, "klein4b-deepthroat-22epoc-k3nk.safetensors"))
+        self.assertFalse(is_compatible(model, "f2k_4B_consist_20260314.safetensors"))
         self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "klein4b-deepthroat-22epoc-k3nk.safetensors"))
         self.assertFalse(is_compatible(model, "Klein_Anatomy_Revamped.safetensors"))
+
+    def test_runtime_quarantined_4b_lora_is_excluded(self):
+        model = "flux-2-klein-4b.safetensors"
+        name = "hina_flux2klein4b_asianMix_v4.0-lora.safetensors"
+        self.assertEqual(lora_family(name), "runtime_quarantined")
+        self.assertFalse(is_compatible(model, name))
+        self.assertEqual(compatible_loras(model, [name]), [])
 
     def test_kv_rejects_unverified_regular_nine_b_lora(self):
         model = "flux-2-klein-9b-kv-fp8.safetensors"
@@ -56,10 +64,11 @@ class ModelCompatibilityTests(unittest.TestCase):
         ]
         self.assertEqual(compatible_loras(model, verified), verified)
 
-    def test_metadata_audit_enables_verified_4b_and_regular_9b_loras(self):
+    def test_metadata_audit_keeps_4b_on_runtime_hold_but_enables_regular_9b(self):
         four_b = "flux-2-klein-4b.safetensors"
         regular_nine_b = "flux-2-klein-base-9b-Q4_K_M.gguf"
-        self.assertTrue(is_compatible(four_b, "f2k_4B_consist_20260314.safetensors"))
+        self.assertEqual(lora_family("f2k_4B_consist_20260314.safetensors"), "flux2_klein_4b")
+        self.assertFalse(is_compatible(four_b, "f2k_4B_consist_20260314.safetensors"))
         for name in (
             "flux2klein_tocowgirl.safetensors",
             "FK_sloppydeepthroat_epoch_10.safetensors",
