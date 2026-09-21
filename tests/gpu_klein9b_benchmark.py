@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from genesis import workflow_lab
+from genesis import integrations, workflow_lab
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,7 +80,11 @@ def main() -> int:
             started = time.monotonic()
             entry = {"profile": label, "width": width, "height": height, "seed": seed, "before": before}
             try:
-                result = client.wait(client.submit(make_prompt(info, width, height, seed, label)), timeout=1800)
+                result = client.wait(
+                    client.submit(make_prompt(info, width, height, seed, label)),
+                    timeout=1800,
+                    abort_check=integrations.gpu_kernel_abort_reason,
+                )
                 entry.update({"status": result.status, "elapsed": round(time.monotonic() - started, 3)})
                 if result.status != "completed":
                     raise workflow_lab.ComfyError(result.error or result.status)

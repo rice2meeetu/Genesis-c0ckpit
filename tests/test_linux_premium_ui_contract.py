@@ -118,7 +118,18 @@ def test_shell_launcher_uses_premium_entrypoint():
     assert "qt_cockpit_linux_premium.py" in shell
 
 
-def test_image_studio_launcher_uses_guarded_gpu_start():
+def test_image_studio_launcher_keeps_gpu_backend_off_until_work_is_requested():
     launcher = (ROOT / "launch-image-studio.sh").read_text(encoding="utf-8")
-    assert "integrations.start_user_service" in launcher
+    backend = (ROOT / "qt_cockpit.py").read_text(encoding="utf-8")
+    assert "integrations.start_user_service" not in launcher
     assert "systemctl --user start genesis-comfyui.service" not in launcher
+    assert "_connect_comfyui" in backend
+    assert "integrations.start_user_service" in backend
+    assert "abort_check=integrations.gpu_kernel_abort_reason" in backend
+
+
+def test_premium_launcher_is_single_instance_guarded():
+    launcher = LAUNCHER.read_text(encoding="utf-8")
+    assert "QLockFile" in launcher
+    assert "genesis-cockpit-premium.lock" in launcher
+    assert "tryLock(0)" in launcher

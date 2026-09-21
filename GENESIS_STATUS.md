@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 109 tests
+- Current automated suite passes: 114 tests
 
 ## Current Architecture
 
@@ -127,6 +127,18 @@ deliberate milestone files.
   ComfyUI submit check the current kernel log for those KFD/SVM warning names.
   If any has appeared, further GPU work is refused with a reboot-required
   safety message instead of continuing repeated jobs in the same boot.
+- ComfyUI wait polling now also accepts a mid-run abort check. If a KFD/SVM
+  warning appears while a prompt is running, GENESIS sends ComfyUI interrupt
+  and queue-delete requests and returns the job as interrupted rather than
+  allowing subsequent work to continue. Manual GPU benchmark/smoke scripts use
+  the same watchdog.
+- Image Studio no longer starts ComfyUI merely by opening the Create UI. Generate,
+  Edit, Inpaint and Face Swap now acquire the guarded ComfyUI service on demand,
+  so browsing the cockpit leaves the ROCm backend inactive.
+- The premium Linux cockpit launcher now uses a runtime `QLockFile` singleton
+  guard to prevent duplicate cockpit instances. A duplicate pair had been seen
+  immediately before an unexpected ComfyUI start; the later duplicate was
+  closed and no premium cockpit process was left running after verification.
 - Do not run Klein 9B, full LoRA benchmark suites, GPU stress tests, or
   overlapping ROCm workloads until a controlled loaded-workload retest is
   explicitly approved after the kernel/KFD SVM mitigation review.

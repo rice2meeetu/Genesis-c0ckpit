@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from genesis import workflow_lab
+from genesis import integrations, workflow_lab
 
 
 ROOT = Path("/home/rice2meetyou/AI/ComfyUI/user/default/workflows")
@@ -77,7 +77,11 @@ def render(client: workflow_lab.ComfyClient, name: str, prompt: dict) -> list[Pa
     if not validation["valid"]:
         raise workflow_lab.ComfyError(json.dumps(validation))
     started = time.monotonic()
-    result = client.wait(client.submit(prompt), timeout=1800)
+    result = client.wait(
+        client.submit(prompt),
+        timeout=1800,
+        abort_check=integrations.gpu_kernel_abort_reason,
+    )
     if result.status != "completed":
         raise workflow_lab.ComfyError(result.error or result.status)
     OUTPUT.mkdir(exist_ok=True)

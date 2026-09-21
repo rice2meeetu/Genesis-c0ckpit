@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from genesis import workflow_lab  # noqa: E402
+from genesis import integrations, workflow_lab  # noqa: E402
 from genesis.model_compatibility import is_compatible  # noqa: E402
 from tests.gpu_klein9b_benchmark import make_prompt  # noqa: E402
 
@@ -72,7 +72,11 @@ def main() -> int:
     }
     started = time.monotonic()
     try:
-        result = client.wait(client.submit(prompt), timeout=1800)
+        result = client.wait(
+            client.submit(prompt),
+            timeout=1800,
+            abort_check=integrations.gpu_kernel_abort_reason,
+        )
         report["status"] = result.status
         report["elapsed"] = round(time.monotonic() - started, 3)
         report["error"] = result.error

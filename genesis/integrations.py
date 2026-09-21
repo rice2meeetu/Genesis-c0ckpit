@@ -224,6 +224,11 @@ def gpu_kernel_preflight():
     return True, "GPU kernel preflight clean."
 
 
+def gpu_kernel_abort_reason() -> str | None:
+    safe, detail = gpu_kernel_preflight()
+    return None if safe else detail
+
+
 def start_user_service(name: str, already_online=False):
     if already_online:
         return True, "Already running — no duplicate started."

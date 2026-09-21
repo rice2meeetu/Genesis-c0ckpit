@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from qt_cockpit import build_generation_profiles, insert_model_only_loras
 
@@ -132,6 +133,30 @@ class QtGenerationProfileTests(unittest.TestCase):
                 prompt, "model", "sampler", "model",
                 ["one.safetensors", "one.safetensors"], [0.5, 0.7],
             )
+
+    def test_on_demand_comfy_connector_starts_guarded_backend(self):
+        from qt_cockpit import GenerationBridge
+        client = Mock()
+        client.system_stats.return_value = {"devices": []}
+        with patch("qt_cockpit.integrations.gpu_kernel_preflight", return_value=(True, "clean")), \
+             patch("qt_cockpit.integrations.endpoint_online", return_value=False), \
+             patch("qt_cockpit.integrations.start_user_service", return_value=(True, "Start requested.")) as start, \
+             patch("qt_cockpit.workflow_lab.ComfyClient", return_value=client), \
+             patch("qt_cockpit.workflow_lab.gpu_acceleration_available", return_value=True):
+            resolved, stats = GenerationBridge._connect_comfyui(object())
+        self.assertIs(resolved, client)
+        self.assertEqual(stats, {"devices": []})
+        start.assert_called_once()
+
+    def test_on_demand_comfy_connector_obeys_kernel_latch_before_start(self):
+        from qt_cockpit import GenerationBridge, workflow_lab
+        with patch(
+            "qt_cockpit.integrations.gpu_kernel_preflight",
+            return_value=(False, "GPU safety latch: reboot required"),
+        ), patch("qt_cockpit.integrations.start_user_service") as start:
+            with self.assertRaisesRegex(workflow_lab.ComfyError, "reboot required"):
+                GenerationBridge._connect_comfyui(object())
+        start.assert_not_called()
 
     def test_two_image_face_swap_route_is_exposed(self):
         from qt_cockpit import GenerationBridge

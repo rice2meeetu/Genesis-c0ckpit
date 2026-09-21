@@ -200,10 +200,22 @@ class ComfyClient:
         poll_interval: float = 0.75,
         timeout: float = 1800,
         progress: Callable[[dict], None] | None = None,
+        abort_check: Callable[[], str | None] | None = None,
     ) -> PromptResult:
         started = time.monotonic()
         while True:
             elapsed = time.monotonic() - started
+            reason = abort_check() if abort_check else None
+            if reason:
+                try:
+                    self.interrupt()
+                except ComfyError:
+                    pass
+                try:
+                    self.cancel([prompt_id])
+                except ComfyError:
+                    pass
+                return PromptResult(prompt_id, "interrupted", elapsed=elapsed, error=reason)
             if elapsed > timeout:
                 return PromptResult(prompt_id, "timeout", elapsed=elapsed, error="Timed out")
             history = self.history(prompt_id)

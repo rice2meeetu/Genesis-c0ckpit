@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, QUrl
+from PyQt6.QtCore import QObject, QLockFile, QTimer, QUrl
 from PyQt6.QtGui import QIcon
 from PyQt6.QtQml import QQmlApplicationEngine, QQmlExpression
 from PyQt6.QtWidgets import QApplication
@@ -96,6 +97,13 @@ def main() -> int:
     parser.add_argument("--height", type=int)
     parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="create")
     args, qt_args = parser.parse_known_args()
+
+    runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    singleton_lock = QLockFile(str(runtime_dir / "genesis-cockpit-premium.lock"))
+    singleton_lock.setStaleLockTime(0)
+    if not singleton_lock.tryLock(0):
+        return 0
 
     sys.argv = [sys.argv[0], *qt_args]
     app = QApplication(sys.argv)

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from PIL import Image, ImageChops, ImageStat
 
-from genesis import workflow_lab
+from genesis import integrations, workflow_lab
 from genesis.model_compatibility import is_compatible
 
 
@@ -82,7 +82,11 @@ def main() -> int:
         started = time.monotonic()
         entry = {"label": label, "lora": lora[1] if lora else None, "strength": lora[2] if lora else 0.0}
         try:
-            result = client.wait(client.submit(make_prompt(info, lora)), timeout=1800)
+            result = client.wait(
+                client.submit(make_prompt(info, lora)),
+                timeout=1800,
+                abort_check=integrations.gpu_kernel_abort_reason,
+            )
             if result.status != "completed":
                 raise workflow_lab.ComfyError(result.error or result.status)
             path = save_result(client, result, label)

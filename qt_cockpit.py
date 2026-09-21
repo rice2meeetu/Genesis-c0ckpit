@@ -659,6 +659,32 @@ class GenerationBridge(QObject):
         self._preview = value
         self.previewChanged.emit()
 
+    def _connect_comfyui(self):
+        safe, detail = integrations.gpu_kernel_preflight()
+        if not safe:
+            raise workflow_lab.ComfyError(detail)
+        online = integrations.endpoint_online(
+            integrations.COMFYUI_URL, "/system_stats", timeout=0.8
+        )
+        ok, detail = integrations.start_user_service(
+            integrations.COMFYUI_SERVICE, already_online=online
+        )
+        if not ok:
+            raise workflow_lab.ComfyError(detail)
+        client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
+        deadline = time.monotonic() + 30
+        last_error = "backend not ready"
+        while time.monotonic() < deadline:
+            try:
+                stats = client.system_stats()
+                if workflow_lab.gpu_acceleration_available(stats):
+                    return client, stats
+                last_error = "GPU acceleration unavailable"
+            except Exception as exc:
+                last_error = str(exc)
+            time.sleep(0.5)
+        raise workflow_lab.ComfyError(f"ComfyUI did not become GPU-ready: {last_error}")
+
     @pyqtProperty("QVariantList", notify=charactersChanged)
     def characters(self):
         return character_items()
@@ -731,10 +757,7 @@ class GenerationBridge(QObject):
 
     def _run_face_swap(self, target: Path, source: Path) -> None:
         try:
-            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
-            stats = client.system_stats()
-            if not workflow_lab.gpu_acceleration_available(stats):
-                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            client, stats = self._connect_comfyui()
             info = client.object_info()
             stamp = time.strftime("%Y%m%d-%H%M%S")
             current = self._run_reference_stage(
@@ -940,10 +963,7 @@ class GenerationBridge(QObject):
         use_upscale: bool,
     ) -> None:
         try:
-            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
-            stats = client.system_stats()
-            if not workflow_lab.gpu_acceleration_available(stats):
-                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            client, stats = self._connect_comfyui()
             info = client.object_info()
             self._output_dir.mkdir(parents=True, exist_ok=True)
             stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -1035,6 +1055,7 @@ class GenerationBridge(QObject):
             progress=lambda value: self._set_status(
                 f"{stage} {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
             ),
+            abort_check=integrations.gpu_kernel_abort_reason,
         )
         if result.status != "completed":
             raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
@@ -1083,10 +1104,7 @@ class GenerationBridge(QObject):
 
     def _run_inpaint(self, source: Path, mask: Path, prompt_text: str, strength: float) -> None:
         try:
-            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
-            stats = client.system_stats()
-            if not workflow_lab.gpu_acceleration_available(stats):
-                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            client, stats = self._connect_comfyui()
             info = client.object_info()
             checkpoints = (
                 info.get("CheckpointLoaderSimple", {})
@@ -1136,10 +1154,7 @@ class GenerationBridge(QObject):
 
     def _run_edit(self, source: Path, prompt_text: str, strength: float) -> None:
         try:
-            client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
-            stats = client.system_stats()
-            if not workflow_lab.gpu_acceleration_available(stats):
-                raise workflow_lab.ComfyError("ComfyUI GPU acceleration is unavailable.")
+            client, stats = self._connect_comfyui()
             info = client.object_info()
             base = workflow_lab.workflow_to_prompt(EDIT_WORKFLOW, info)
             controls = workflow_lab.discover_workflow_controls(base)
@@ -1182,6 +1197,7 @@ class GenerationBridge(QObject):
                 progress=lambda value: self._set_status(
                     f"Image edit {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
                 ),
+                abort_check=integrations.gpu_kernel_abort_reason,
             )
             if result.status != "completed":
                 raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")
