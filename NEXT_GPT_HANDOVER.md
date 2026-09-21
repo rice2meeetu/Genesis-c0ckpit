@@ -45,3 +45,17 @@
 ## Handoff rule
 
 Lead with a read-only state check. Explain any risk before mutation, obtain explicit approval for destructive work, and preserve the current rollback path.
+
+
+## UI takeover update — 2026-09-21
+
+- Read the final UI review checkpoint in GENESIS_STATUS.md as well as the safety
+  checkpoint. Safety limits and migration decisions are unchanged.
+- Shared Qt Thumbnail Grid + large preview + remembered view are implemented.
+  Media Viewer and Canvas layouts are now available through Media Tools.
+  Design remains pending Paul's visual review. Canvas GPU edits stay on hold.
+- Static suite is now 126 passed, one existing deprecation warning; software
+  screenshots work without the earlier black Wayland capture limitation.
+- Existing uncommitted genesis/media_functions.py changes predated this takeover
+  and were deliberately left untouched. Do not assume the working tree is clean.
+- No push was performed. Keep Jellyfin work in the other chat.

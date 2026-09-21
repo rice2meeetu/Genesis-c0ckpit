@@ -81,11 +81,10 @@ class MediaBridge(QObject):
         self._set_status(f"Failed: {message}")
 
     def _choose_image(self, title: str) -> Path | None:
-        value, _ = QFileDialog.getOpenFileName(
-            None, title, str(Path.home()),
-            "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)",
-        )
+        from genesis.qt_media_picker import choose_image
+        value = choose_image(title)
         return Path(value) if value else None
+
     @pyqtSlot()
     def chooseAndRemoveBackground(self) -> None:
         if self._busy:

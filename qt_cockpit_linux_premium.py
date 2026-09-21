@@ -93,6 +93,7 @@ def compose_premium_qml(source: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--screenshot")
+    parser.add_argument("--review-image", help="Local image for CPU-only screenshot review")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
     parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="create")
@@ -139,6 +140,13 @@ def main() -> int:
 
     window = engine.rootObjects()[0]
     window.setProperty("pageIndex", PAGE_INDEXES[args.page])
+    if args.screenshot and args.review_image:
+        review_image = Path(args.review_image).expanduser().resolve()
+        if not review_image.is_file():
+            raise ValueError("Review image must be an existing local file")
+        review_url = QUrl.fromLocalFile(str(review_image))
+        window.setProperty("viewerSource", review_url)
+        window.setProperty("editSource", review_url)
     if args.width or args.height:
         window.resize(max(1120, args.width or window.width()), max(720, args.height or window.height()))
 

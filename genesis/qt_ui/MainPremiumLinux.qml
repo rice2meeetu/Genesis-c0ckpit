@@ -92,6 +92,7 @@ ApplicationWindow {
     property string poseSearch: ""
     property string poseCategory: "All"
 
+    property url viewerSource: ""
     property url editSource: ""
     property url editMask: ""
     property string editPrompt: ""
@@ -399,6 +400,8 @@ ApplicationWindow {
                         mediaBridge.chooseAndExtractVideo()
                     else if (mediaCard.actionKey === "face swap")
                         appRoot.pageIndex = 12
+                    else if (mediaCard.actionKey === "media viewer")
+                        appRoot.pageIndex = 4
                     else if (mediaCard.actionKey === "canvas")
                         appRoot.pageIndex = 8
                     else
@@ -1114,7 +1117,7 @@ ApplicationWindow {
                                     {title:"Duplicate Finder", body:"Review exact and near duplicates before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
                                     {title:"Face Organiser", body:"Group and organise photos by people.", action:"face organiser", icon:"◎", status:"PEOPLE"},
                                     {title:"Face Swap", body:"Swap a source identity onto a target image using the dedicated local workflow.", action:"face swap", icon:"◎", status:"LOCAL"},
-                                    {title:"Canvas", body:"Prompt-based image editing. Layer and cutout tools are not yet implemented.", action:"canvas", icon:"Ps", status:"IN DEVELOPMENT"}
+                                    {title:"Canvas", body:"Inspect your source and plan an edit in the full Canvas workspace.", action:"canvas", icon:"Ps", status:"DESIGN REVIEW"}
                                 ]
                                 MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
                             }
@@ -1123,9 +1126,19 @@ ApplicationWindow {
                     }
                 }
 
-                // Page 4 retained for compatibility with older saved navigation state.
-                Item {
-                    Component.onCompleted: if (appRoot.pageIndex === 4) appRoot.pageIndex = 3
+                MediaWorkspace {
+                    sourceUrl: appRoot.viewerSource
+                    resultUrl: genesisBridge.previewUrl
+                    statusText: "Local image review · no generation service required."
+                    onBrowseRequested: {
+                        var chosen = genesisBridge.chooseSourceImage()
+                        if (chosen.length) appRoot.viewerSource = chosen
+                    }
+                    onResultsRequested: {
+                        var chosen = genesisBridge.chooseResultImage()
+                        if (chosen.length) appRoot.viewerSource = chosen
+                    }
+                    onCanvasRequested: function(imageUrl) { appRoot.editSource = imageUrl; appRoot.pageIndex = 8 }
                 }
 
                 Item {
@@ -1157,12 +1170,17 @@ ApplicationWindow {
                     }
                 }
 
-                Item {
-                    ColumnLayout { anchors.fill: parent; spacing:10
-                        RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
-                            Panel { Layout.preferredWidth:340; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"SOURCE" } Rectangle { Layout.fillWidth:true; Layout.preferredHeight:150; Layout.minimumHeight:130; color:"#0c0c0c"; radius:8; border.color:appRoot.editSource.toString().length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:6; source:appRoot.editSource; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:appRoot.editSource.toString().length===0; text:"NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:13 } } GButton { Layout.preferredWidth: implicitWidth; text:"Load Image"; onClicked:appRoot.chooseEditSource() } SectionLabel { text:"EDIT INSTRUCTIONS" } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.editPrompt; color:appRoot.textMain; placeholderText:"Describe the edit…"; onTextChanged:if(activeFocus) appRoot.editPrompt=text; background:Rectangle{color:"#0c0c0c"; border.color:appRoot.line; radius:8} } GButton { Layout.preferredWidth: implicitWidth; text:"Run Image Edit"; active:true; enabled:appRoot.editSource.toString().length>0 && appRoot.editPrompt.trim().length>0 && !genesisBridge.busy; onClicked:genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength) } } }
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"RESULT" } Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; color:"#05080b"; radius:10; border.color:genesisBridge.previewUrl.length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:genesisBridge.previewUrl.length===0; text:"EDIT RESULT"; color:appRoot.textDim; font.pixelSize:16 } MouseArea { anchors.fill:parent; enabled:genesisBridge.previewUrl.length>0; cursorShape:Qt.PointingHandCursor; onClicked:genesisBridge.openPreview() } } RowLayout { Layout.fillWidth:true; GButton { Layout.preferredWidth: implicitWidth; text:"Open Result"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() } GButton { Layout.preferredWidth: implicitWidth; text:"Output Folder"; onClicked:genesisBridge.openOutputFolder() } } } }
-                        }
+                MediaWorkspace {
+                    canvasMode: true
+                    sourceUrl: appRoot.editSource
+                    resultUrl: genesisBridge.previewUrl
+                    prompt: appRoot.editPrompt
+                    onPromptChanged: appRoot.editPrompt = prompt
+                    statusText: "CPU-only design review. Source and latest result remain separate."
+                    onBrowseRequested: appRoot.chooseEditSource()
+                    onResultsRequested: {
+                        var chosen = genesisBridge.chooseResultImage()
+                        if (chosen.length) appRoot.editSource = chosen
                     }
                 }
 

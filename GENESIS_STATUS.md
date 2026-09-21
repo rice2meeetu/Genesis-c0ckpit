@@ -3,7 +3,7 @@
 ## Current Version
 GENESIS v0.10 + Cockpit stabilization
 Branch: main
-Latest checkpoint: dbc170c
+Latest checkpoint: UI review milestone after 0796928 (see final checkpoint below)
 
 ## Project Root
 /home/rice2meetyou/Genesis-c0ckpit
@@ -83,9 +83,10 @@ Next:
 
 ## Working Tree Note
 
-The branch is currently clean and synchronized with `origin/main`. Preserve this
-verified baseline: back up touched files before risky changes and stage only
-deliberate milestone files.
+The earlier clean/synchronized statement is historical. At the 2026-09-21 UI
+takeover, main was at 0796928, two commits ahead of origin/main, with an existing
+uncommitted change in genesis/media_functions.py. Preserve that change and stage
+only deliberate milestone files. Nothing from this UI session has been pushed.
 
 ## Rules
 
@@ -239,3 +240,34 @@ deliberate milestone files.
   improved `input.conf` handling and tested Wayland support. Test native MPV
   mouse bindings first, then one clean v3 installation; do not reinstall
   competing Desktop/Flatpak/pipx variants simultaneously.
+
+
+## GENESIS UI review checkpoint — 2026-09-21
+
+- Remote Desktop Commander verified the online rice2meetyou-B550M-K host and
+  read both handover documents completely before mutation. Initial main HEAD
+  was 0796928, ahead two; genesis/media_functions.py already had uncommitted
+  alpha-preservation/batch-operation work. It was not edited or staged here.
+- Shared Qt image picker now defaults to real Thumbnail Grid, provides a large
+  selected-image preview and dimensions, and remembers Grid/List plus the folder
+  through QSettings, including after Cancel. Source, media-tool and saved-result
+  selection share this picker; the curated pose page retains its thumbnail grid.
+- Media Tools now opens an internal Media Viewer workspace with source/result
+  thumbnails, a large fit/zoom/pan stage and Send to Canvas. Saved results opens
+  GENESIS-Exports. Canvas has a matching full layout and editable instructions.
+  AI editing is visibly on hold; layer/cutout compositing remains planned.
+- These layouts are implemented for Paul's visual review, not design approval.
+  CPU/software-rendered screenshots succeeded at 1536×960 and Canvas 1120×720.
+  This does not claim a live Wayland interaction pass. Neutral temporary image
+  fixtures were used; no model inference or GPU service was started.
+- Static suite: 126 passed, one existing pkg_resources deprecation warning.
+  Added widget tests cover Grid/List persistence, invalid settings, read-only
+  bounded previews and thumbnail invalidation after an image changes.
+- End-of-work read-only checks: only GENESIS control bridge and remote control
+  active; heavy services still inactive. Current-boot fault-pattern count zero.
+  Root was 91% used with 13 GB free at takeover. Drives and the new-SSD Ubuntu
+  24.04.4 migration plan remain untouched. Jellyfin is outside this session.
+- Review images: /tmp/genesis-picker-review.png,
+  /tmp/genesis-media-viewer-review.png, /tmp/genesis-canvas-review.png.
+  These temporary files are not committed. Use --screenshot with --review-image
+  and QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software to repeat visual QA.

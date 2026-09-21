@@ -15,10 +15,10 @@ import threading
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QSettings, QSize, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, QSettings, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
-from PyQt6.QtWidgets import QApplication, QFileDialog, QListView
+from PyQt6.QtWidgets import QApplication, QFileDialog
 
 from genesis.model_compatibility import compatibility_note, compatible_loras
 from genesis.model_registry import MODEL_ROOTS, readiness_report
@@ -721,21 +721,15 @@ class GenerationBridge(QObject):
 
     @pyqtSlot(result=str)
     def chooseSourceImage(self) -> str:
-        dialog = QFileDialog(None, "Choose a source image", str(Path.home()))
-        dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.webp *.bmp)")
-        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        dialog.setViewMode(QFileDialog.ViewMode.List)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        for view in dialog.findChildren(QListView):
-            view.setViewMode(QListView.ViewMode.IconMode)
-            view.setIconSize(QSize(180, 135))
-            view.setGridSize(QSize(210, 175))
-            view.setResizeMode(QListView.ResizeMode.Adjust)
-            view.setWordWrap(True)
-        if dialog.exec() != QFileDialog.DialogCode.Accepted:
-            return ""
-        selected = dialog.selectedFiles()
-        return QUrl.fromLocalFile(selected[0]).toString() if selected else ""
+        from genesis.qt_media_picker import choose_image
+        selected = choose_image("GENESIS · Choose a source image")
+        return QUrl.fromLocalFile(selected).toString() if selected else ""
+
+    @pyqtSlot(result=str)
+    def chooseResultImage(self) -> str:
+        from genesis.qt_media_picker import choose_image
+        selected = choose_image("GENESIS · Saved results", folder=str(OUTPUT_DIR))
+        return QUrl.fromLocalFile(selected).toString() if selected else ""
 
     @pyqtSlot(str, str)
     def queueFaceSwap(self, target_url: str, source_url: str) -> None:
