@@ -54,11 +54,12 @@ PAGE_INDEXES = {
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
 STACK_END_MARKER = "\n            }\n        }\n    }\n}"
-FACE_SWAP_STACK_MARKER = '                        PageHeader { titleText:"Face Swap";'
+FACE_SWAP_STACK_MARKER = "\n                // GENESIS_FACE_SWAP_PAGE"
 
 AI_PAGE_QML = r'''
 
                 Item {
+                    objectName: "assistantWorkspace"
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 10
@@ -109,13 +110,13 @@ AI_PAGE_QML = r'''
                                     SectionLabel { text: "ASSISTANT MODE" }
                                     GButton {
                                         Layout.fillWidth: true
-                                        text: "CHAT · ROCINANTE"
+                                        text: "CHAT · QWEN"
                                         active: assistantBridge.mode === "CHAT"
                                         onClicked: assistantBridge.setMode("CHAT")
                                     }
                                     Text {
                                         Layout.fillWidth: true
-                                        text: "General private conversation · Rocinante-X-12B Q5_K_M"
+                                        text: "General private conversation · Qwen2.5-Coder-14B"
                                         color: appRoot.textDim
                                         font.pixelSize: 11
                                         wrapMode: Text.Wrap
@@ -260,14 +261,10 @@ def compose_premium_qml(source: str) -> str:
         1,
     )
     face_swap_start = source.find(FACE_SWAP_STACK_MARKER)
-    if face_swap_start >= 0:
-        # Keep the injected AI page at its established index 11. Face Swap
-        # follows it at page 12 without disturbing existing page routing.
-        return source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
-    stack_end = source.rfind(STACK_END_MARKER)
-    if stack_end < 0:
-        raise ValueError("Premium Linux QML stack boundary changed.")
-    return source[:stack_end] + AI_PAGE_QML + source[stack_end:]
+    if source.count(FACE_SWAP_STACK_MARKER) != 1:
+        raise ValueError("Premium Linux QML Face Swap page boundary changed.")
+    # Insert before the complete top-level page, never inside its layout.
+    return source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
 
 
 def main() -> int:

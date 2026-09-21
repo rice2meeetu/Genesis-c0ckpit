@@ -1144,7 +1144,9 @@ ApplicationWindow {
                     }
                 }
 
+                // GENESIS_FACE_SWAP_PAGE
                 Item {
+                    objectName: "faceSwapWorkspace"
                     ColumnLayout { anchors.fill:parent; spacing:10
                         RowLayout {
                             Layout.fillWidth: true

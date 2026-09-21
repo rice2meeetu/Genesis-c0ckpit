@@ -3,17 +3,19 @@
 ## Immediate priority — 2026-09-21
 
 This section supersedes older GPU/render-next tasks below.
-1. Visually inspect FeeFee in the AI Assistant page using software rendering.
+1. FeeFee avatar visually verified in the corrected AI Assistant page.
    The exact uploaded cat is now bundled; do not replace it with a random cat.
 2. Preserve Chat/Build/Studio, the graphite/gold UI and consolidated Media Tools.
 3. Keep GPU inference/generation paused; see GENESIS_STATUS.md safety incident.
    Do not change ROCm, AMDGPU, firmware or kernel as an experiment.
 
 Completed: avatar asset integration and honest Idle label in
-qt_cockpit_linux_premium.py. 104 tests passed; software QML screenshot succeeded.
-Remote screenshot retrieval timed out; visual verification is still pending.
-Best next action: inspect the AI page screenshot or open the AI page with
-QT_QUICK_BACKEND=software, without starting assistant/model services.
+qt_cockpit_linux_premium.py. 105 tests passed; software QML screenshot succeeded.
+Visual verification passed via smaller preview. Fixed pre-existing AI/Face Swap
+navigation using a stable top-level boundary; added a real software QML routing test.
+Chat label now matches the Qwen backend.
+Best next action: open the updated AI page with QT_QUICK_BACKEND=software for user
+review, without starting assistant/model services.
 
 ## Regular Klein 9B single-LoRA validation — 2026-09-20
 

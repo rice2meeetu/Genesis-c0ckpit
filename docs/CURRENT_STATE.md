@@ -10,9 +10,13 @@ This checkpoint supersedes the older render-next instructions below.
 - qt_cockpit_linux_premium.py uses QML sourceClipRect to display the cat region
   without the screenshot's surrounding viewer controls; Chat/Build/Studio remain intact.
 - Replaced the unconditional Online label with Idle; no backend health is implied.
-- Validation: 104 pytest tests passed (one existing pkg_resources deprecation
+- Validation: 105 pytest tests passed (one existing pkg_resources deprecation
   warning); software/offscreen AI-page screenshot completed with no QML errors.
-  Remote screenshot retrieval timed out, so visual inspection remains pending.
+  Visual inspection passed via a smaller remote preview. It exposed a pre-existing
+  page-routing bug: AI Assistant opened Face Swap. Fixed insertion using a stable
+  top-level page marker and fail-closed handling if that marker is absent.
+  A new software-only runtime test verifies visibility of both page 11 and 12.
+  Chat label now matches its Qwen backend rather than Rocinante.
 - No inference, generation, GPU benchmark, driver or ROCm changes in this session.
 - GPU HOLD: GENESIS_STATUS.md records reproduced KFD SVM warnings during the
   isolated Klein 4B test. Do not follow historical render/benchmark next steps
