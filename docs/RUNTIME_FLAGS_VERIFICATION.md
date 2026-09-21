@@ -1,3 +1,7 @@
+# Runtime Flags Verification
+
+> **2026-09-22 GPU hardening update:** References below to `--n-gpu-layers 99` describe the pre-hardening configuration observed during the incident investigation. Forced 99-layer GPU offload was removed from the deployed Builder, Assistant, and Qwen services, and from the repository Assistant/Qwen unit definitions after repeated ROCm VRAM allocation failures were correlated with KFD/SVM instability. Builder now has a permanent 30-second restart backoff; the other heavy GPU services also resolve to 30-second backoffs. No GPU workload was started as part of this change, and post-change static safety tests passed.
+
 # CPU/GPU runtime checkpoint — 2026-09-20
 
 > **Safety addendum — 2026-09-21:** the current RX 9060 XT profile additionally
