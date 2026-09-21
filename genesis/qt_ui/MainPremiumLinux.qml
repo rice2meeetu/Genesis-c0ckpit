@@ -10,24 +10,35 @@ ApplicationWindow {
     minimumWidth: 1120
     minimumHeight: 720
     title: "GENESIS c0ckpit · Linux"
-    color: "#070809"
+    color: "#080808"
     font.family: "Noto Sans"
 
     readonly property color gold: "#d2a34e"
     readonly property color brightGold: "#f3d28b"
-    readonly property color blue: "#3aa7ff"
-    readonly property color blueBright: "#75c5ff"
-    readonly property color blueDeep: "#123a5a"
-    readonly property color bg: "#070809"
-    readonly property color panel: "#0e1012"
-    readonly property color raised: "#151719"
-    readonly property color raised2: "#1c1f22"
-    readonly property color line: "#34393f"
+    readonly property color blue: "#bc9458"
+    readonly property color blueBright: "#e0bc7c"
+    readonly property color blueDeep: "#302719"
+    readonly property color bg: "#080808"
+    readonly property color panel: "#101010"
+    readonly property color raised: "#171717"
+    readonly property color raised2: "#202020"
+    readonly property color line: "#343434"
     readonly property color textMain: "#eef3f6"
-    readonly property color textDim: "#91a2b2"
+    readonly property color textDim: "#aaa7a1"
     readonly property color success: "#62d27a"
 
     property int pageIndex: 0
+    property bool feefeeOpen: false
+    property int lastWorkspacePage: 0
+    onPageIndexChanged: if (pageIndex !== 11) lastWorkspacePage = pageIndex
+    palette.window: "#101010"
+    palette.base: "#161616"
+    palette.button: "#202020"
+    palette.text: "#e9e6df"
+    palette.buttonText: "#e9e6df"
+    palette.windowText: "#e9e6df"
+    palette.highlight: "#79603b"
+    palette.highlightedText: "#fff3d8"
     property bool privacyMode: false
     readonly property bool compactNavigation: height < 850
     property var navItems: [
@@ -71,6 +82,7 @@ ApplicationWindow {
     property var poseModel: typeof poseItems !== "undefined" ? poseItems : []
     property var easyPresetModel: typeof curatedPosePresets !== "undefined" ? curatedPosePresets : []
     property url selectedPoseSource: poseModel.length ? poseModel[0].source : ""
+    property url selectedPoseThumbnail: poseModel.length ? (poseModel[0].thumbnail || poseModel[0].source) : ""
     property string selectedPoseName: poseModel.length ? poseModel[0].name : "No pose selected"
     property string selectedPoseCategory: poseModel.length ? poseModel[0].category : ""
     property string selectedPosePrompt: poseModel.length ? poseModel[0].prompt : ""
@@ -129,6 +141,7 @@ ApplicationWindow {
     function applyPose(row) {
         if (!row) return
         selectedPoseSource = row.source || ""
+        selectedPoseThumbnail = row.thumbnail || row.source || ""
         selectedPoseName = row.name || "Pose"
         selectedPoseCategory = row.category || ""
         selectedPosePrompt = row.prompt || ""
@@ -198,9 +211,9 @@ ApplicationWindow {
         border.width: 1
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#2b2f34" }
-            GradientStop { position: 0.11; color: "#25292e" }
-            GradientStop { position: 1.0; color: "#1b1e22" }
+            GradientStop { position: 0.0; color: "#191919" }
+            GradientStop { position: 0.11; color: "#151515" }
+            GradientStop { position: 1.0; color: "#101010" }
         }
         Rectangle {
             anchors.left: parent.left
@@ -217,11 +230,13 @@ ApplicationWindow {
         id: button
         property bool active: false
         property bool premium: false
-        implicitHeight: 48
+        implicitHeight: 36
+        implicitWidth: Math.max(86, contentItem.implicitWidth + 28)
+        Layout.maximumWidth: 190
         activeFocusOnTab: true
         Accessible.name: text
         Accessible.role: Accessible.Button
-        font.pixelSize: 14
+        font.pixelSize: 13
         font.weight: active || premium ? Font.Bold : Font.DemiBold
         contentItem: Text {
             text: button.text
@@ -410,14 +425,18 @@ ApplicationWindow {
         Item { Layout.fillWidth: true }
     }
 
+    Item {
+        id: genesisScene
+        objectName: "genesisScene"
+        anchors.fill: parent
     Rectangle {
         anchors.fill: parent
         z: -10
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0; color: "#101214" }
+            GradientStop { position: 0; color: "#101010" }
             GradientStop { position: 0.40; color: appRoot.bg }
-            GradientStop { position: 1; color: "#050607" }
+            GradientStop { position: 1; color: "#080808" }
         }
         Image {
             anchors.fill: parent
@@ -438,6 +457,14 @@ ApplicationWindow {
             Layout.preferredHeight: appRoot.compactNavigation ? 112 : 146
             clip: true
 
+            Image {
+                anchors.fill: parent
+                source: "../assets/lunacy_banner/genesis-cockpit-banner-lunacy-final.png"
+                fillMode: Image.PreserveAspectCrop
+                verticalAlignment: Image.AlignTop
+                opacity: 0.42
+                visible: !privacyMode
+            }
             Item {
                 anchors.fill: parent
                 anchors.margins: 10
@@ -473,11 +500,11 @@ ApplicationWindow {
                 Image {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(parent.width * 0.66, appRoot.compactNavigation ? 590 : 760)
+                    width: Math.min(parent.width - 420, appRoot.compactNavigation ? 820 : 1080)
                     height: parent.height - 8
                     source: "../assets/lunacy_banner/genesis_cockpit_wordmark_full.png"
                     sourceClipRect: Qt.rect(0, 28, 945, 317)
-                    fillMode: Image.PreserveAspectFit
+                    fillMode: Image.Stretch
                     mipmap: true
                     smooth: true
                     visible: !privacyMode
@@ -503,7 +530,7 @@ ApplicationWindow {
                         width: parent.width
                         height: 34
                         radius: 17
-                        color: "#171b20"
+                        color: "#161616"
                         border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                         Text {
                             anchors.centerIn: parent
@@ -530,7 +557,7 @@ ApplicationWindow {
             spacing: 8
 
             Panel {
-                Layout.preferredWidth: 250
+                Layout.preferredWidth: 205
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent
@@ -589,12 +616,12 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "⌂  Create"; active: true; onClicked: appRoot.pageIndex = 0 }
-                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
-                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
-                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
-                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "⌂  Create"; active: true; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Compare"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "History"; enabled: false }
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -602,7 +629,7 @@ ApplicationWindow {
                             spacing: 8
 
                             Panel {
-                                Layout.preferredWidth: 350
+                                Layout.preferredWidth: 280
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -619,7 +646,7 @@ ApplicationWindow {
                                         Layout.preferredHeight: 160
                                         Layout.minimumHeight: 140
                                         radius: 10
-                                        color: "#0d0f11"
+                                        color: "#0d0d0d"
                                         border.color: appRoot.generationSource.toString().length > 0 ? appRoot.gold : appRoot.line
                                         border.width: appRoot.generationSource.toString().length > 0 ? 1.5 : 1
                                         Image { anchors.fill: parent; anchors.margins: 7; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
@@ -636,7 +663,7 @@ ApplicationWindow {
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        GButton { Layout.fillWidth: true; text: "Load Source Image"; active: appRoot.generationSource.toString().length === 0; onClicked: appRoot.chooseSource() }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Load Source Image"; active: appRoot.generationSource.toString().length === 0; onClicked: appRoot.chooseSource() }
                                         GButton { Layout.preferredWidth: 82; text: "Clear"; enabled: appRoot.generationSource.toString().length > 0; onClicked: appRoot.generationSource = "" }
                                     }
                                     RowLayout {
@@ -650,7 +677,7 @@ ApplicationWindow {
                                         placeholderText: "Search 70 Grok + curated presets…"
                                         color: appRoot.textMain
                                         onTextChanged: appRoot.presetSearch = text
-                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#191919"; border.color: appRoot.line; radius: 8 }
                                     }
                                     GridView {
                                         id: quickPresetGrid
@@ -667,7 +694,7 @@ ApplicationWindow {
                                             width: quickPresetGrid.cellWidth - 7
                                             height: quickPresetGrid.cellHeight - 7
                                             radius: 9
-                                            color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? "#26384a" : "#0a1118"
+                                            color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? "#30291c" : "#121212"
                                             border.color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? appRoot.gold : appRoot.line
                                             Column {
                                                 anchors.fill: parent
@@ -691,49 +718,12 @@ ApplicationWindow {
                                     anchors.fill: parent
                                     anchors.margins: 10
                                     spacing: 8
-                                    SectionLabel { text: "RESULT" }
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 160
-                                        Layout.minimumHeight: 140
-                                        radius: 10
-                                        color: "#0d0f11"
-                                        border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
-                                        border.width: genesisBridge.previewUrl.length > 0 ? 1.5 : 1
-                                        Image {
-                                            anchors.fill: parent
-                                            anchors.margins: 7
-                                            source: genesisBridge.previewUrl
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            mipmap: true
-                                            visible: !privacyMode && genesisBridge.previewUrl.length > 0
-                                        }
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: privacyMode ? "PRIVATE" : "GENERATED RESULT"
-                                            color: appRoot.textDim
-                                            font.pixelSize: 13
-                                            visible: privacyMode || genesisBridge.previewUrl.length === 0
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            enabled: genesisBridge.previewUrl.length > 0 && !privacyMode
-                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                            onClicked: genesisBridge.openPreview()
-                                        }
-                                        Row {
-                                            anchors.right: parent.right
-                                            anchors.bottom: parent.bottom
-                                            anchors.margins: 7
-                                            spacing: 6
-                                            GButton { text: "Open Result"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
-                                            GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
-                                        }
-                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 58
+                                        Layout.preferredHeight: 68
+                                        Layout.minimumHeight: 68
+                                        Layout.maximumHeight: 68
+                                        objectName: "generationStageStrip"
                                         spacing: 6
                                         Repeater {
                                             model: [
@@ -761,13 +751,14 @@ ApplicationWindow {
                                     SectionLabel { text: "PROMPT" }
                                     TextArea {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 105
+                                        Layout.fillHeight: true
+                                        Layout.minimumHeight: 120
                                         text: appRoot.generationPrompt
                                         placeholderText: "Preset or pose fills this automatically — edit anything you want."
                                         color: appRoot.textMain
                                         wrapMode: TextEdit.Wrap
                                         onTextChanged: if (activeFocus) appRoot.generationPrompt = text
-                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#191919"; border.color: appRoot.line; radius: 8 }
                                     }
                                     TextField {
                                         Layout.fillWidth: true
@@ -775,7 +766,7 @@ ApplicationWindow {
                                         placeholderText: "Negative prompt (optional)"
                                         color: appRoot.textMain
                                         onTextChanged: if (activeFocus) appRoot.generationNegativePrompt = text
-                                        background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
+                                        background: Rectangle { color: "#191919"; border.color: appRoot.line; radius: 8 }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -786,11 +777,15 @@ ApplicationWindow {
                             }
 
                             Panel {
-                                Layout.preferredWidth: 330
+                                Layout.preferredWidth: 320
+                                Layout.maximumWidth: 360
                                 Layout.fillHeight: true
+                                ScrollView {
+                                    anchors.fill: parent; anchors.margins: 10
+                                    contentWidth: availableWidth; clip: true
+                                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                                 ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 10
+                                    width: parent.width
                                     spacing: 8
                                     SectionLabel { text: "3 · MODEL / WORKFLOW" }
                                     ComboBox {
@@ -864,9 +859,9 @@ ApplicationWindow {
                                     SectionLabel { text: "QUALITY" }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        GButton { Layout.fillWidth: true; text: "Fast"; active: appRoot.generationWidth === 512; onClicked: { generationWidth = 512; generationHeight = 512 } }
-                                        GButton { Layout.fillWidth: true; text: "Balanced"; active: appRoot.generationWidth === 768; onClicked: { generationWidth = 768; generationHeight = 1152 } }
-                                        GButton { Layout.fillWidth: true; text: "Quality"; active: appRoot.generationWidth === 1024; onClicked: { generationWidth = 1024; generationHeight = 1024 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Fast"; active: appRoot.generationWidth === 512; onClicked: { generationWidth = 512; generationHeight = 512 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Balanced"; active: appRoot.generationWidth === 768; onClicked: { generationWidth = 768; generationHeight = 1152 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Quality"; active: appRoot.generationWidth === 1024; onClicked: { generationWidth = 1024; generationHeight = 1024 } }
                                     }
                                     SectionLabel { text: "PIPELINE" }
                                     CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
@@ -874,7 +869,7 @@ ApplicationWindow {
                                     CheckBox { text: "Final upscale"; checked: appRoot.useUpscale; enabled: genesisBridge.upscaleAvailable; onToggled: appRoot.useUpscale = checked }
                                     Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
                                     Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 11; wrapMode: Text.Wrap }
-                                    Item { Layout.fillHeight: true }
+
                                     GButton {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 58
@@ -887,9 +882,52 @@ ApplicationWindow {
                                         onClicked: appRoot.generateCurrent()
                                     }
                                     Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    SectionLabel { text: "RESULT" }
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 170
+                                        objectName: "generationResultPreview"
+                                        Layout.minimumHeight: 140
+                                        Layout.maximumHeight: 210
+                                        radius: 10
+                                        color: "#0d0d0d"
+                                        border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
+                                        border.width: genesisBridge.previewUrl.length > 0 ? 1.5 : 1
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 7
+                                            source: genesisBridge.previewUrl
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
+                                            visible: !privacyMode && genesisBridge.previewUrl.length > 0
+                                        }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: privacyMode ? "PRIVATE" : "GENERATED RESULT"
+                                            color: appRoot.textDim
+                                            font.pixelSize: 13
+                                            visible: privacyMode || genesisBridge.previewUrl.length === 0
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: genesisBridge.previewUrl.length > 0 && !privacyMode
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: genesisBridge.openPreview()
+                                        }
+                                        Row {
+                                            anchors.right: parent.right
+                                            anchors.bottom: parent.bottom
+                                            anchors.margins: 7
+                                            spacing: 6
+                                            GButton { text: "Open Result"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
+                                            GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
+                                        }
+                                    }
                                     Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 9; elide: Text.ElideMiddle }
-                                    GButton { Layout.fillWidth: true; text: "Choose Output Folder"; onClicked: genesisBridge.chooseOutputFolder() }
-                                    GButton { Layout.fillWidth: true; text: "Send Result to Edit"; enabled: genesisBridge.previewUrl.length > 0; onClicked: { appRoot.editSource = genesisBridge.previewUrl; appRoot.pageIndex = 8 } }
+                                    GButton { Layout.preferredWidth: implicitWidth; text: "Choose Output Folder"; onClicked: genesisBridge.chooseOutputFolder() }
+                                    GButton { Layout.preferredWidth: implicitWidth; text: "Send Result to Edit"; enabled: genesisBridge.previewUrl.length > 0; onClicked: { appRoot.editSource = genesisBridge.previewUrl; appRoot.pageIndex = 8 } }
+                                }
                                 }
                             }
                         }
@@ -903,17 +941,17 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
-                            GButton { Layout.fillWidth: true; text: "Pose Library"; active: true; onClicked: appRoot.pageIndex = 1 }
-                            GButton { Layout.fillWidth: true; text: "Workflow"; active: false; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
-                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
-                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Library"; active: true; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Workflow"; active: false; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Compare"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "History"; enabled: false }
                         }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 } }
+                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#191919"; border.color: appRoot.line; radius: 8 } }
                             Repeater {
                                 model: ["All", "Standing", "Sitting", "Lying", "Kneeling", "All Fours"]
                                 GButton { text: modelData; active: appRoot.poseCategory === modelData; onClicked: appRoot.poseCategory = modelData }
@@ -938,25 +976,34 @@ ApplicationWindow {
                                         Layout.preferredHeight: 130
                                         Layout.minimumHeight: 115
                                         radius: 8
-                                        color: "#0d0f11"
+                                        color: "#0d0d0d"
                                         border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: appRoot.generationSource.toString().length > 0 && !privacyMode }
                                         Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
                                     }
                                     SectionLabel { text: "SELECTED POSE" }
-                                    Rectangle {
+                                    RowLayout {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 160
                                         Layout.minimumHeight: 140
-                                        radius: 8
-                                        color: "#0d0f11"
-                                        border.color: appRoot.gold
-                                        Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
+                                        spacing: 6
+                                        Rectangle {
+                                            Layout.fillWidth: true; Layout.fillHeight: true
+                                            radius: 8; color: "#0d0d0d"; border.color: appRoot.gold
+                                            Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseThumbnail; fillMode: Image.PreserveAspectFit; asynchronous: true }
+                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "PREVIEW"; color: appRoot.brightGold; font.pixelSize: 8; font.bold: true }
+                                        }
+                                        Rectangle {
+                                            Layout.fillWidth: true; Layout.fillHeight: true
+                                            radius: 8; color: "#0d0d0d"; border.color: appRoot.line
+                                            Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
+                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "SKELETON"; color: appRoot.textDim; font.pixelSize: 8; font.bold: true }
+                                        }
                                     }
                                     Text { Layout.fillWidth: true; text: appRoot.selectedPoseName; color: appRoot.brightGold; font.pixelSize: 13; font.bold: true; wrapMode: Text.Wrap }
                                     Text { Layout.fillWidth: true; text: appRoot.selectedPoseCategory; color: appRoot.textDim; font.pixelSize: 11 }
                                     Item { Layout.fillHeight: true }
-                                    GButton { Layout.fillWidth: true; text: "Use Pose in Create"; active: true; onClicked: { if (appRoot.selectedPosePrompt.length) appRoot.generationPrompt = appRoot.selectedPosePrompt; appRoot.pageIndex = 0 } }
+                                    GButton { Layout.preferredWidth: implicitWidth; text: "Use Pose in Create"; active: true; onClicked: { if (appRoot.selectedPosePrompt.length) appRoot.generationPrompt = appRoot.selectedPosePrompt; appRoot.pageIndex = 0 } }
                                 }
                             }
                             GridView {
@@ -974,7 +1021,7 @@ ApplicationWindow {
                                     color: appRoot.panel
                                     border.color: appRoot.selectedPoseName === String(modelData.name || "") ? appRoot.gold : appRoot.line
                                     border.width: appRoot.selectedPoseName === String(modelData.name || "") ? 2 : 1
-                                    Image { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: caption.top; anchors.margins: 6; source: modelData.source; fillMode: Image.PreserveAspectFit; asynchronous: true }
+                                    Image { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: caption.top; anchors.margins: 6; source: modelData.thumbnail || modelData.source; fillMode: Image.PreserveAspectFit; asynchronous: true }
                                     Rectangle {
                                         id: caption
                                         anchors.left: parent.left
@@ -1004,12 +1051,12 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
-                            GButton { Layout.fillWidth: true; text: "Pose Library"; active: false; onClicked: appRoot.pageIndex = 1 }
-                            GButton { Layout.fillWidth: true; text: "Workflow"; active: true; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
-                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
-                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Library"; active: false; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Workflow"; active: true; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Compare"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "History"; enabled: false }
                         }
                         GridLayout {
                             Layout.fillWidth: true
@@ -1085,10 +1132,10 @@ ApplicationWindow {
                     ColumnLayout { anchors.fill: parent; spacing: 10
                         Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10
                             RowLayout { Layout.fillWidth:true; Text { Layout.fillWidth:true; text:"CAMERA HUB"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true } Text { text:"LOCAL CAMERAS"; color:appRoot.textDim; font.pixelSize:10; font.letterSpacing:1.2 } }
-                            Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0d0f11"; radius:10; border.color:appRoot.line
+                            Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0d0d0d"; radius:10; border.color:appRoot.line
                                 Column { anchors.centerIn:parent; spacing:8; Text { anchors.horizontalCenter:parent.horizontalCenter; text:"●"; color:appRoot.gold; font.pixelSize:28 } Text { anchors.horizontalCenter:parent.horizontalCenter; text:"Camera service and live grid"; color:appRoot.textDim; font.pixelSize:12 } }
                             }
-                            GButton { Layout.fillWidth:true; text:"Open Camera Hub"; active:true; onClicked:moduleBridge.triggerAction("camera hub") }
+                            GButton { Layout.preferredWidth: implicitWidth; text:"Open Camera Hub"; active:true; onClicked:moduleBridge.triggerAction("camera hub") }
                         } }
                     }
                 }
@@ -1105,7 +1152,7 @@ ApplicationWindow {
                                 {title:"Models & Storage", body:"Open your AI model/storage location.", action:"models and storage"},
                                 {title:"Backups & Recovery", body:"Open GENESIS recovery resources.", action:"backup recovery"}
                             ]
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:150; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:6; Text { text:modelData.title; color:appRoot.brightGold; font.pixelSize:16; font.bold:true } Text { Layout.fillWidth:true; text:modelData.body; color:appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap; maximumLineCount:2; elide:Text.ElideRight } Item { Layout.fillHeight:true } GButton { Layout.fillWidth:true; text:"Open"; onClicked:moduleBridge.triggerAction(modelData.action) } } } }
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:150; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:6; Text { text:modelData.title; color:appRoot.brightGold; font.pixelSize:16; font.bold:true } Text { Layout.fillWidth:true; text:modelData.body; color:appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap; maximumLineCount:2; elide:Text.ElideRight } Item { Layout.fillHeight:true } GButton { Layout.preferredWidth: implicitWidth; text:"Open"; onClicked:moduleBridge.triggerAction(modelData.action) } } } }
                         }
                     }
                 }
@@ -1113,8 +1160,8 @@ ApplicationWindow {
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing:10
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
-                            Panel { Layout.preferredWidth:340; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"SOURCE" } Rectangle { Layout.fillWidth:true; Layout.preferredHeight:150; Layout.minimumHeight:130; color:"#080d12"; radius:8; border.color:appRoot.editSource.toString().length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:6; source:appRoot.editSource; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:appRoot.editSource.toString().length===0; text:"NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:13 } } GButton { Layout.fillWidth:true; text:"Load Image"; onClicked:appRoot.chooseEditSource() } SectionLabel { text:"EDIT INSTRUCTIONS" } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.editPrompt; color:appRoot.textMain; placeholderText:"Describe the edit…"; onTextChanged:if(activeFocus) appRoot.editPrompt=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } GButton { Layout.fillWidth:true; text:"Run Image Edit"; active:true; enabled:appRoot.editSource.toString().length>0 && appRoot.editPrompt.trim().length>0 && !genesisBridge.busy; onClicked:genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength) } } }
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"RESULT" } Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; color:"#05080b"; radius:10; border.color:genesisBridge.previewUrl.length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:genesisBridge.previewUrl.length===0; text:"EDIT RESULT"; color:appRoot.textDim; font.pixelSize:16 } MouseArea { anchors.fill:parent; enabled:genesisBridge.previewUrl.length>0; cursorShape:Qt.PointingHandCursor; onClicked:genesisBridge.openPreview() } } RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Open Result"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() } GButton { Layout.fillWidth:true; text:"Output Folder"; onClicked:genesisBridge.openOutputFolder() } } } }
+                            Panel { Layout.preferredWidth:340; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"SOURCE" } Rectangle { Layout.fillWidth:true; Layout.preferredHeight:150; Layout.minimumHeight:130; color:"#0c0c0c"; radius:8; border.color:appRoot.editSource.toString().length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:6; source:appRoot.editSource; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:appRoot.editSource.toString().length===0; text:"NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:13 } } GButton { Layout.preferredWidth: implicitWidth; text:"Load Image"; onClicked:appRoot.chooseEditSource() } SectionLabel { text:"EDIT INSTRUCTIONS" } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.editPrompt; color:appRoot.textMain; placeholderText:"Describe the edit…"; onTextChanged:if(activeFocus) appRoot.editPrompt=text; background:Rectangle{color:"#0c0c0c"; border.color:appRoot.line; radius:8} } GButton { Layout.preferredWidth: implicitWidth; text:"Run Image Edit"; active:true; enabled:appRoot.editSource.toString().length>0 && appRoot.editPrompt.trim().length>0 && !genesisBridge.busy; onClicked:genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength) } } }
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"RESULT" } Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; color:"#05080b"; radius:10; border.color:genesisBridge.previewUrl.length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:genesisBridge.previewUrl.length===0; text:"EDIT RESULT"; color:appRoot.textDim; font.pixelSize:16 } MouseArea { anchors.fill:parent; enabled:genesisBridge.previewUrl.length>0; cursorShape:Qt.PointingHandCursor; onClicked:genesisBridge.openPreview() } } RowLayout { Layout.fillWidth:true; GButton { Layout.preferredWidth: implicitWidth; text:"Open Result"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() } GButton { Layout.preferredWidth: implicitWidth; text:"Output Folder"; onClicked:genesisBridge.openOutputFolder() } } } }
                         }
                     }
                 }
@@ -1124,16 +1171,45 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
-                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
-                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Pose Maker"; active: true; onClicked: appRoot.pageIndex = 9 }
-                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
-                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Maker"; active: true; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Compare"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "History"; enabled: false }
                         }
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
-                            Panel { Layout.preferredWidth:360; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"PRESETS" } TextField { Layout.fillWidth:true; placeholderText:"Search presets…"; color:appRoot.textMain; onTextChanged:appRoot.presetSearch=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:5; model:appRoot.filteredPresets(); delegate:GButton { width:ListView.view.width; text:modelData.label || modelData.name || "Preset"; active:appRoot.selectedPresetName===text; onClicked:appRoot.applyPreset(modelData) } } } }
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10; SectionLabel { text:"ACTIVE PRESET" } Text { Layout.fillWidth:true; text:appRoot.selectedPresetName; color:appRoot.brightGold; font.pixelSize:22; font.bold:true; wrapMode:Text.Wrap } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.generationPrompt; color:appRoot.textMain; wrapMode:TextEdit.Wrap; onTextChanged:if(activeFocus) appRoot.generationPrompt=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } GButton { Layout.fillWidth:true; text:"Use in Image Generation"; active:true; onClicked:appRoot.pageIndex=0 } } }
+                            Panel {
+                                Layout.preferredWidth: 380; Layout.fillHeight: true
+                                ColumnLayout { anchors.fill: parent; anchors.margins: 16; spacing: 10
+                                    SectionLabel { text: "POSE MAKER WORKBENCH" }
+                                    Text { Layout.fillWidth:true; text:"Custom pose/photo workflow"; color:appRoot.brightGold; font.pixelSize:20; font.bold:true; wrapMode:Text.Wrap }
+                                    Text { Layout.fillWidth:true; text:"Use Pose Maker when you want to upload a custom pose photo, extract pose geometry with DWPose, use prompt-only pose control, or run the dedicated Stage 1 → Stage 2 → Stage 3 pose pipeline."; color:appRoot.textMain; font.pixelSize:12; wrapMode:Text.Wrap }
+                                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:150; radius:10; color:"#0d0d0d"; border.color:appRoot.gold
+                                        Column { anchors.centerIn:parent; spacing:7
+                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"CUSTOM POSE"; color:appRoot.brightGold; font.pixelSize:16; font.bold:true }
+                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"PHOTO → GEOMETRY → 3-STAGE PIPELINE"; color:appRoot.textDim; font.pixelSize:9; font.letterSpacing:0.8 }
+                                        }
+                                    }
+                                    GButton { Layout.preferredWidth: implicitWidth; text:"Open Pose Maker Workbench"; active:true; onClicked:moduleBridge.triggerAction("pose maker") }
+                                    Text { Layout.fillWidth:true; text:moduleBridge.status; color:appRoot.textDim; font.pixelSize:10; wrapMode:Text.Wrap }
+                                    Item { Layout.fillHeight:true }
+                                }
+                            }
+                            Panel {
+                                Layout.fillWidth:true; Layout.fillHeight:true
+                                ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10
+                                    SectionLabel { text:"WHAT GOES WHERE" }
+                                    Text { Layout.fillWidth:true; text:"POSE LIBRARY"; color:appRoot.brightGold; font.pixelSize:16; font.bold:true }
+                                    Text { Layout.fillWidth:true; text:"Browse the curated pose thumbnail grid. Selecting a card keeps its visual preview separate from the OpenPose skeleton used by generation."; color:appRoot.textMain; font.pixelSize:12; wrapMode:Text.Wrap }
+                                    GButton { Layout.preferredWidth: implicitWidth; text:"Browse Pose Library"; onClicked:appRoot.pageIndex=1 }
+                                    Rectangle { Layout.fillWidth:true; height:1; color:appRoot.line }
+                                    Text { Layout.fillWidth:true; text:"POSE MAKER"; color:appRoot.brightGold; font.pixelSize:16; font.bold:true }
+                                    Text { Layout.fillWidth:true; text:"Create or extract a pose from your own reference image, tune pose strength/identity lock, then run the dedicated pose pipeline. It is no longer a duplicate preset browser."; color:appRoot.textMain; font.pixelSize:12; wrapMode:Text.Wrap }
+                                    Item { Layout.fillHeight:true }
+                                    Text { Layout.fillWidth:true; text:"Heavy image generation remains off until you explicitly run it; opening the workbench itself does not start a generation."; color:appRoot.textDim; font.pixelSize:10; wrapMode:Text.Wrap }
+                                }
+                            }
                         }
                     }
                 }
@@ -1151,38 +1227,38 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
-                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
-                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
-                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
-                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "Compare"; enabled: false }
+                            GButton { Layout.preferredWidth: implicitWidth; text: "History"; enabled: false }
                         }
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"TARGET IMAGE · WHERE THE FACE GOES" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.faceSwapTarget.toString().length ? appRoot.gold : appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0c0c0c"; radius:10; border.color:appRoot.faceSwapTarget.toString().length ? appRoot.gold : appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapTarget; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapTarget.toString().length > 0 && !privacyMode }
                                     Text { anchors.centerIn:parent; text:appRoot.faceSwapTarget.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO TARGET IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
                                 }
-                                RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Load Target Image"; onClicked:appRoot.chooseFaceSwapTarget() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapTarget.toString().length>0; onClicked:appRoot.faceSwapTarget="" } }
+                                RowLayout { Layout.fillWidth:true; GButton { Layout.preferredWidth: implicitWidth; text:"Load Target Image"; onClicked:appRoot.chooseFaceSwapTarget() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapTarget.toString().length>0; onClicked:appRoot.faceSwapTarget="" } }
                             } }
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"SOURCE IDENTITY · FACE TO USE" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.faceSwapSource.toString().length ? appRoot.gold : appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0c0c0c"; radius:10; border.color:appRoot.faceSwapSource.toString().length ? appRoot.gold : appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapSource; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapSource.toString().length > 0 && !privacyMode }
                                     Text { anchors.centerIn:parent; text:appRoot.faceSwapSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
                                 }
-                                RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Load Source Image"; onClicked:appRoot.chooseFaceSwapSource() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.faceSwapSource="" } }
+                                RowLayout { Layout.fillWidth:true; GButton { Layout.preferredWidth: implicitWidth; text:"Load Source Image"; onClicked:appRoot.chooseFaceSwapSource() } GButton { Layout.preferredWidth:80; text:"Clear"; enabled:appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.faceSwapSource="" } }
                             } }
                             Panel { Layout.preferredWidth:360; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"RESULT" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0c0c0c"; radius:10; border.color:appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit; visible:!privacyMode }
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }
-                                GButton { Layout.fillWidth:true; text:genesisBridge.busy ? "RUNNING…" : "RUN FACE SWAP"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
-                                GButton { Layout.fillWidth:true; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
+                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN FACE SWAP"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
+                                GButton { Layout.preferredWidth: implicitWidth; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
                             } }
                         }
                         Text { Layout.fillWidth:true; text:"Use images you own or have permission to use. Neutral portraits work best; extreme angles, occlusion, hands, hair, and mismatched lighting can still cause distortion. This isolated tool is for ordinary, non-explicit images."; color:appRoot.gold; font.pixelSize:11; wrapMode:Text.Wrap }
@@ -1191,5 +1267,6 @@ ApplicationWindow {
                 }
             }
         }
+    }
     }
 }

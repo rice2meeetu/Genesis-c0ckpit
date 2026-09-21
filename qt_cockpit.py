@@ -33,6 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 UI_ROOT = PROJECT_ROOT / "genesis" / "qt_ui"
 ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
+POSE_THUMB_CACHE = Path.home() / "GENESIS-Photo-Studio" / "cache" / "thumbnails"
 WORKFLOW_ROOT = Path.home() / "AI" / "ComfyUI" / "user" / "default" / "workflows"
 GENERATION_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUX2_KLEIN_9B_KV_OFFICIAL_T2I.json"
 REGULAR_9B_WORKFLOWS = (
@@ -328,6 +329,21 @@ def build_create_prompt(
     return prompt
 
 
+def _pose_thumbnail_for(source: Path) -> Path:
+    """Prefer the Photo Studio visual preview while preserving skeleton input separately."""
+    stem = source.stem
+    for suffix in ("_bone_structure", "_bone_strucure"):
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    for variant in ("depth", "lineart", "bone_structure"):
+        for ext in (".jpg", ".jpeg", ".png", ".webp"):
+            candidate = POSE_THUMB_CACHE / f"{stem}_{variant}{ext}"
+            if candidate.is_file():
+                return candidate
+    return source
+
+
 def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
     """Return a varied, existing subset of the local Pose Maker library."""
     roots = (
@@ -362,6 +378,7 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
             categories.setdefault(category, []).append({
                 **item,
                 "source": QUrl.fromLocalFile(str(source)).toString(),
+                "thumbnail": QUrl.fromLocalFile(str(_pose_thumbnail_for(source))).toString(),
                 "poseId": pose_id,
                 "prompt": record.prompt if record else "",
                 "negativePrompt": record.negative_prompt if record else "",
@@ -380,6 +397,7 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
                     "category": category.replace("NSFW_", "").replace("_", " ").title(),
                     "resolution": str(item.get("resolution", "")),
                     "source": str(item["source"]),
+                    "thumbnail": str(item.get("thumbnail", item["source"])),
                     "poseId": str(item.get("poseId", "")),
                     "prompt": str(item.get("prompt", "")),
                     "negativePrompt": str(item.get("negativePrompt", "")),
@@ -488,6 +506,40 @@ class ModuleBridge(QObject):
         except OSError as exc:
             self._set_status(f"{action} failed · {exc}")
 
+    def _pose_maker(self) -> None:
+        root = Path.home() / "AI" / "GENESIS_POSE_MAKER"
+        run_script = root / "run.sh"
+        url = "http://127.0.0.1:7861"
+
+        def worker() -> None:
+            if not integrations.endpoint_online(url, "/", timeout=0.8):
+                if not run_script.is_file():
+                    self._set_status("Pose Maker is not installed")
+                    return
+                try:
+                    subprocess.Popen(
+                        [str(run_script)],
+                        cwd=str(root),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                    )
+                except OSError as exc:
+                    self._set_status(f"Pose Maker failed · {exc}")
+                    return
+                for _ in range(60):
+                    if integrations.endpoint_online(url, "/", timeout=0.5):
+                        break
+                    time.sleep(0.5)
+                else:
+                    self._set_status("Pose Maker did not come online on port 7861")
+                    return
+            integrations.open_url(url)
+            self._set_status("Pose Maker workbench opened")
+
+        self._set_status("Starting Pose Maker workbench…")
+        threading.Thread(target=worker, daemon=True).start()
+
     def _service(self, url: str, health_path: str, service: str, label: str) -> None:
         def worker() -> None:
             online = integrations.endpoint_online(url, health_path)
@@ -528,7 +580,9 @@ class ModuleBridge(QObject):
         elif any(word in key for word in ("workflow", "json", "nodes", "preflight", "validate")):
             self._open(WORKFLOW_ROOT, "ComfyUI workflows")
         elif any(word in key for word in ("camera", "grid", "recordings", "hub")):
-            self._open(integrations.GO2RTC_URL, "Camera Hub")
+            self._service(integrations.GO2RTC_URL, "/api/streams", "go2rtc.service", "Camera Hub")
+        elif "pose maker" in key or "pose workbench" in key:
+            self._pose_maker()
         elif any(word in key for word in ("movie", "video library")):
             ok, detail = integrations.launch_jellyfin_desktop()
             self._set_status(detail if ok else f"Jellyfin failed · {detail}")

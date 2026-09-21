@@ -57,199 +57,19 @@ STACK_END_MARKER = "\n            }\n        }\n    }\n}"
 FACE_SWAP_STACK_MARKER = "\n                // GENESIS_FACE_SWAP_PAGE"
 
 AI_PAGE_QML = r'''
-
                 Item {
                     objectName: "assistantWorkspace"
-                    ColumnLayout {
+                    FeeFeeChat {
                         anchors.fill: parent
-                        spacing: 10
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text { Layout.fillWidth:true; text:"FEEFEE · AI ASSISTANT"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true }
-                            Text { text:assistantBridge.status; color:assistantBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize:11; elide:Text.ElideRight; Layout.maximumWidth:420 }
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            spacing: 10
-
-                            Panel {
-                                Layout.preferredWidth: 275
-                                Layout.fillHeight: true
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 14
-                                    spacing: 9
-                                    SectionLabel { text: "FEEFEE · YOUR AI COMPANION" }
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 190
-                                        radius: 12
-                                        color: "#090a0b"
-                                        border.color: appRoot.gold
-                                        border.width: 1
-                                        Image {
-                                            id: feefeeAvatar
-                                            objectName: "feefeeAvatar"
-                                            anchors.fill: parent
-                                            anchors.margins: 5
-                                            source: genesisAssetRoot + "../feefee-avatar-reference.jpg"
-                                            // Display the cat from the original uploaded viewer screenshot.
-                                            sourceClipRect: Qt.rect(164, 0, 514, 514)
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            Accessible.name: "FeeFee, wearing a straw hat and black robe"
-                                        }
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: feefeeAvatar.status === Image.Error
-                                            text: "FeeFee image unavailable"
-                                            color: appRoot.textDim
-                                        }
-                                    }
-                                    SectionLabel { text: "ASSISTANT MODE" }
-                                    GButton {
-                                        Layout.fillWidth: true
-                                        text: "CHAT · QWEN"
-                                        active: assistantBridge.mode === "CHAT"
-                                        onClicked: assistantBridge.setMode("CHAT")
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: "General private conversation · Qwen2.5-Coder-14B"
-                                        color: appRoot.textDim
-                                        font.pixelSize: 11
-                                        wrapMode: Text.Wrap
-                                    }
-                                    GButton {
-                                        Layout.fillWidth: true
-                                        text: "BUILD · QWEN CODER"
-                                        active: assistantBridge.mode === "BUILD"
-                                        onClicked: assistantBridge.setMode("BUILD")
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: "Coding, debugging and GENESIS engineering · Qwen3-Coder-30B-A3B"
-                                        color: appRoot.textDim
-                                        font.pixelSize: 11
-                                        wrapMode: Text.Wrap
-                                    }
-                                    GButton {
-                                        Layout.fillWidth: true
-                                        text: "STUDIO · QWEN"
-                                        active: assistantBridge.mode === "STUDIO"
-                                        onClicked: assistantBridge.setMode("STUDIO")
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: "Prompts, models, LoRAs, poses and ComfyUI workflow help"
-                                        color: appRoot.textDim
-                                        font.pixelSize: 11
-                                        wrapMode: Text.Wrap
-                                    }
-                                    Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
-                                    SectionLabel { text: "ACTIVE MODEL" }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: assistantBridge.activeModel
-                                        color: appRoot.brightGold
-                                        font.pixelSize: 15
-                                        font.bold: true
-                                        wrapMode: Text.Wrap
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: "Local only · prompts stay on this machine"
-                                        color: appRoot.success
-                                        font.pixelSize: 11
-                                        wrapMode: Text.Wrap
-                                    }
-                                    Item { Layout.fillHeight: true }
-                                    GButton { Layout.fillWidth: true; text: "Clear Chat"; onClicked: assistantBridge.clearChat() }
-                                }
-                            }
-
-                            Panel {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 14
-                                    spacing: 9
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        SectionLabel { text: "FEEFEE · CONVERSATION" }
-                                        Item { Layout.fillWidth: true }
-                                        Text {
-                                            text: assistantBridge.busy ? "● WORKING" : "● READY"
-                                            color: assistantBridge.busy ? appRoot.gold : appRoot.success
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                        }
-                                    }
-                                    ScrollView {
-                                        Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        clip: true
-                                        TextArea {
-                                            id: assistantTranscript
-                                            text: assistantBridge.transcript
-                                            readOnly: true
-                                            selectByMouse: true
-                                            color: appRoot.textMain
-                                            font.pixelSize: 13
-                                            wrapMode: TextEdit.Wrap
-                                            background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 9 }
-                                            onTextChanged: cursorPosition = length
-                                        }
-                                    }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 6
-                                        GButton { Layout.fillWidth:true; text:"Help with a prompt"; onClicked:assistantInput.text="Help me improve this image prompt: " }
-                                        GButton { Layout.fillWidth:true; text:"Find a LoRA"; onClicked:assistantInput.text="Help me find the best local LoRA for: " }
-                                        GButton { Layout.fillWidth:true; text:"Explain workflow"; onClicked:assistantInput.text="Explain this GENESIS workflow: " }
-                                        GButton { Layout.fillWidth:true; text:"Research models"; onClicked:assistantInput.text="Compare suitable models for: " }
-                                        GButton { Layout.fillWidth:true; text:"System info"; onClicked:assistantInput.text="Give me a concise GENESIS system status summary." }
-                                    }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-                                        TextArea {
-                                            id: assistantInput
-                                            Layout.fillWidth: true
-                                            Layout.preferredHeight: 82
-                                            placeholderText: assistantBridge.mode === "CHAT" ? "Ask FeeFee anything…" : (assistantBridge.mode === "BUILD" ? "What should we build or fix?" : "Ask about prompts, models, LoRAs or workflows…")
-                                            color: appRoot.textMain
-                                            wrapMode: TextEdit.Wrap
-                                            background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 9 }
-                                        }
-                                        GButton {
-                                            Layout.preferredWidth: 120
-                                            Layout.preferredHeight: 82
-                                            text: assistantBridge.busy ? "WORKING…" : "SEND"
-                                            active: !assistantBridge.busy && assistantInput.text.trim().length > 0
-                                            enabled: !assistantBridge.busy && assistantInput.text.trim().length > 0
-                                            onClicked: {
-                                                assistantBridge.sendMessage(assistantInput.text)
-                                                assistantInput.text = ""
-                                            }
-                                        }
-                                    }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text:"🐾  FeeFee"; color:appRoot.brightGold; font.pixelSize:12; font.bold:true }
-                                        Text { text:assistantBridge.busy ? "● Working" : "● Idle"; color:assistantBridge.busy ? appRoot.gold : appRoot.success; font.pixelSize:10 }
-                                        Item { Layout.fillWidth:true }
-                                        Text { text:"Small cat. Big ideas.  ♡"; color:appRoot.textDim; font.pixelSize:11; font.italic:true }
-                                    }
-                                }
-                            }
-                        }
+                        bridge: assistantBridge
+                        onCollapseRequested: { appRoot.pageIndex = appRoot.lastWorkspacePage; appRoot.feefeeOpen = true }
                     }
                 }
 '''
 
+
+
+FEEFEE_OVERLAY_QML = '\n    Item {\n        id: feefeeDock\n        parent: genesisScene\n        objectName: "feefeeDock"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 20; anchors.bottomMargin: 22\n        width: 76; height: 76; z: 100\n        visible: appRoot.pageIndex !== 11\n        Rectangle {\n            anchors.fill: parent; radius: 38\n            color: "#15130f"; border.color: "#c59b58"; border.width: 2\n            Image { anchors.fill: parent; anchors.margins: 7; source: "../assets/feefee-avatar-reference.jpg"; sourceClipRect: Qt.rect(164,0,514,514); fillMode: Image.PreserveAspectFit }\n        }\n        MouseArea {\n            anchors.fill: parent; cursorShape: Qt.PointingHandCursor\n            onClicked: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        }\n        Accessible.name: "Open FeeFee chat"\n        Keys.onReturnPressed: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        activeFocusOnTab: true\n        Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: -15; text: "FeeFee"; color: "#e3c68f"; font.pixelSize: 11 }\n    }\n    FeeFeeChat {\n        id: feefeeQuickChat\n        parent: genesisScene\n        objectName: "feefeeQuickChat"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 108; anchors.bottomMargin: 22\n        width: Math.min(460, appRoot.width - 140)\n        height: Math.min(590, appRoot.height - 130)\n        z: 101\n        compact: true; bridge: assistantBridge\n        visible: appRoot.feefeeOpen && appRoot.pageIndex !== 11\n        onExpandRequested: { appRoot.feefeeOpen = false; appRoot.pageIndex = 11 }\n        onCollapseRequested: appRoot.feefeeOpen = false\n    }\n'
 
 def compose_premium_qml(source: str) -> str:
     """Inject the dedicated GENESIS AI nav entry and page into the premium shell."""
@@ -264,7 +84,9 @@ def compose_premium_qml(source: str) -> str:
     if source.count(FACE_SWAP_STACK_MARKER) != 1:
         raise ValueError("Premium Linux QML Face Swap page boundary changed.")
     # Insert before the complete top-level page, never inside its layout.
-    return source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
+    source = source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
+    root_end = source.rfind("\n}")
+    return source[:root_end] + FEEFEE_OVERLAY_QML + source[root_end:]
 
 
 def main() -> int:
@@ -320,7 +142,7 @@ def main() -> int:
         def save_screenshot() -> None:
             # Capture our own scene graph. This also works when the distro has
             # Qt Quick QML plugins but no Python PyQt6.QtQuick bindings.
-            capture_item = window.findChild(QObject, "genesisMainWorkspace")
+            capture_item = window.findChild(QObject, "genesisScene")
             if capture_item is None:
                 app.exit(2)
                 return

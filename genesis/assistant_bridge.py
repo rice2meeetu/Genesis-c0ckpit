@@ -24,6 +24,8 @@ from genesis import integrations
 
 
 class AssistantBridge(QObject):
+    messagesChanged = pyqtSignal()
+    draftChanged = pyqtSignal()
     statusChanged = pyqtSignal()
     busyChanged = pyqtSignal()
     transcriptChanged = pyqtSignal()
@@ -39,6 +41,35 @@ class AssistantBridge(QObject):
         self._transcript = "FEEFEE · GENESIS AI\nYour private GENESIS assistant.\n"
         self._mode = "CHAT"
         self._history: list[dict[str, str]] = []
+        self._messages = []
+        self._draft = ""
+        self._inference_paused = os.environ.get("GENESIS_AI_PAUSED", "1") != "0"
+
+    @pyqtProperty("QVariantList", notify=messagesChanged)
+    def messages(self):
+        return self._messages
+
+    @pyqtProperty(str, notify=draftChanged)
+    def draft(self):
+        return self._draft
+
+    @pyqtProperty(bool, constant=True)
+    def inferencePaused(self):
+        return self._inference_paused
+
+    @pyqtSlot(str)
+    def setDraft(self, value):
+        if value != self._draft:
+            self._draft = value
+            self.draftChanged.emit()
+
+    @pyqtSlot()
+    def sendDraft(self):
+        if self._inference_paused or self._busy or not self._draft.strip():
+            return
+        message = self._draft
+        self.setDraft("")
+        self.sendMessage(message)
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
@@ -96,6 +127,8 @@ class AssistantBridge(QObject):
         self.busyChanged.emit()
 
     def _append(self, role: str, text: str) -> None:
+        self._messages.append({"role": role, "content": text.strip()})
+        self.messagesChanged.emit()
         label = "YOU" if role == "user" else "FEEFEE"
         self._transcript = self._transcript.rstrip() + f"\n\n{label}\n{text.strip()}\n"
         self.transcriptChanged.emit()
@@ -125,13 +158,20 @@ class AssistantBridge(QObject):
 
     @pyqtSlot()
     def clearChat(self) -> None:
+        if self._busy:
+            return
         self._history.clear()
+        self._messages.clear()
+        self.messagesChanged.emit()
         self._transcript = "FEEFEE · GENESIS AI\nYour private GENESIS assistant.\n"
         self.transcriptChanged.emit()
         self._set_status("Feefee · conversation cleared")
 
     @pyqtSlot(str)
     def sendMessage(self, text: str) -> None:
+        if self._inference_paused:
+            self._set_status("AI replies paused while the GPU issue is investigated")
+            return
         message = text.strip()
         if not message or self._busy:
             return
