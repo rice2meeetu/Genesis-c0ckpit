@@ -17,13 +17,18 @@ This checkpoint supersedes the older render-next instructions below.
   top-level page marker and fail-closed handling if that marker is absent.
   A new software-only runtime test verifies visibility of both page 11 and 12.
   Chat label now matches its Qwen backend rather than Rocinante.
-- No inference, generation, GPU benchmark, driver or ROCm changes in this session.
+- No driver, ROCm, firmware or kernel changes were made. The only new inference
+  was the single guarded Klein 4B mitigation baseline described below.
 - GPU HOLD is partially relaxed for the verified 4B baseline only. Current
   ComfyUI startup adds `--disable-mmap` alongside `--disable-pinned-memory`,
   `--disable-dynamic-vram` and disabled async offload. On 2026-09-21 one guarded
   Klein 4B 512x512 / 4-step / no-LoRA run completed cleanly with zero KFD/SVM,
   GPU-reset/page-fault and SATA CRC/reset events. Keep 9B, LoRA, multi-stage and
   stress workloads on hold until separately validated under the same safeguards.
+- The 4B model resides behind a symlink into the Windows `Ai` volume. GENESIS now
+  restores that volume on demand by label with a read-only `udisksctl` mount and
+  refuses an existing read-write mount, avoiding the broken-symlink failure seen
+  after reboot while preserving the NTFS volume as read-only.
 
 ## Verified regular Klein 9B single-LoRA render — 2026-09-20
 

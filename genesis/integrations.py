@@ -55,6 +55,8 @@ QWEN_MODEL = Path(
     "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf"
 )
 COMFYUI_ROOT = Path.home() / "AI" / "ComfyUI"
+AI_MODEL_VOLUME = Path("/dev/disk/by-label/Ai")
+AI_MODEL_MOUNT = Path("/run/media") / Path.home().name / "Ai"
 COMFYUI_PYTHON_CANDIDATES = (
     Path.home() / "miniforge3/envs/comfyui-reactor-rocm/bin/python",
     COMFYUI_ROOT / ".venv/bin/python",
@@ -142,6 +144,38 @@ def mount_is_writable(path: Path):
     except (OSError, subprocess.TimeoutExpired):
         pass
     return os.access(path, os.W_OK)
+
+
+def ensure_ai_model_volume_readonly(required_path: Path | None = None):
+    """Make the Windows `Ai` model volume available without mounting it writable."""
+    required = Path(required_path) if required_path is not None else AI_MODEL_MOUNT
+    if required.exists():
+        if AI_MODEL_MOUNT.exists() and mount_is_writable(AI_MODEL_MOUNT):
+            return False, "Ai model volume is mounted read-write; GENESIS requires it read-only."
+        return True, "Ai model volume is ready read-only."
+    if not AI_MODEL_VOLUME.exists():
+        return False, "Ai model volume is unavailable."
+    if shutil.which("udisksctl") is None:
+        return False, "udisksctl is unavailable; cannot mount the Ai model volume safely."
+    try:
+        device = AI_MODEL_VOLUME.resolve(strict=True)
+        result = subprocess.run(
+            ["udisksctl", "mount", "-b", str(device), "--options", "ro"],
+            capture_output=True,
+            text=True,
+            timeout=12,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return False, f"Ai model volume mount failed: {error}"
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown mount error"
+        return False, f"Ai model volume mount failed: {detail}"
+    if not AI_MODEL_MOUNT.exists() or mount_is_writable(AI_MODEL_MOUNT):
+        return False, "Ai model volume did not mount read-only."
+    if not required.exists():
+        return False, f"Ai volume mounted, but required model asset is unavailable: {required}"
+    return True, "Mounted Ai model volume read-only."
 
 
 def process_running(pattern: str):

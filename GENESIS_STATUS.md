@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 116 tests
+- Current automated suite passes: 119 tests
 
 ## Current Architecture
 
@@ -147,6 +147,11 @@ deliberate milestone files.
 - Image Studio no longer starts ComfyUI merely by opening the Create UI. Generate,
   Edit, Inpaint and Face Swap now acquire the guarded ComfyUI service on demand,
   so browsing the cockpit leaves the ROCm backend inactive.
+- Klein 4B generation also checks the Windows `Ai` model volume before starting
+  ComfyUI. If the model symlink is unavailable because the volume is not mounted,
+  GENESIS resolves `/dev/disk/by-label/Ai` and mounts it through `udisksctl` with
+  `--options ro`. Existing read-write mounts are refused rather than silently used.
+  The live helper currently reports the required 4B model volume ready read-only.
 - The premium Linux cockpit launcher now uses a runtime `QLockFile` singleton
   guard to prevent duplicate cockpit instances. A duplicate pair had been seen
   immediately before an unexpected ComfyUI start; the later duplicate was

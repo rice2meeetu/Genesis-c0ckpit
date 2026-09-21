@@ -963,6 +963,11 @@ class GenerationBridge(QObject):
         use_upscale: bool,
     ) -> None:
         try:
+            if model_name == FOUR_B_MODEL:
+                required_model = Path.home() / "AI/ComfyUI/models/diffusion_models" / FOUR_B_MODEL
+                ready, detail = integrations.ensure_ai_model_volume_readonly(required_model)
+                if not ready:
+                    raise workflow_lab.ComfyError(detail)
             client, stats = self._connect_comfyui()
             info = client.object_info()
             self._output_dir.mkdir(parents=True, exist_ok=True)

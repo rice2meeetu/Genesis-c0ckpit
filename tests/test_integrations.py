@@ -1,3 +1,5 @@
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -115,6 +117,58 @@ class IntegrationTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn(integrations.QWEN_SERVICE, detail)
         run.assert_not_called()
+
+    def test_ai_model_volume_accepts_existing_read_only_asset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mount = Path(tmp) / "Ai"
+            required = mount / "AI-Models/diffusion_models/model.safetensors"
+            required.parent.mkdir(parents=True)
+            required.touch()
+            with patch.object(integrations, "AI_MODEL_MOUNT", mount), patch(
+                "genesis.integrations.mount_is_writable", return_value=False
+            ), patch("genesis.integrations.subprocess.run") as run:
+                ok, detail = integrations.ensure_ai_model_volume_readonly(required)
+        self.assertTrue(ok)
+        self.assertIn("ready read-only", detail)
+        run.assert_not_called()
+
+    def test_ai_model_volume_mounts_by_label_read_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            device = root / "Ai-device"
+            device.touch()
+            mount = root / "Ai"
+            required = mount / "AI-Models/diffusion_models/model.safetensors"
+
+            def mounted(command, **kwargs):
+                required.parent.mkdir(parents=True, exist_ok=True)
+                required.touch()
+                return subprocess.CompletedProcess(command, 0, stdout="mounted", stderr="")
+
+            with patch.object(integrations, "AI_MODEL_VOLUME", device), patch.object(
+                integrations, "AI_MODEL_MOUNT", mount
+            ), patch("genesis.integrations.shutil.which", return_value="/usr/bin/udisksctl"), patch(
+                "genesis.integrations.mount_is_writable", return_value=False
+            ), patch("genesis.integrations.subprocess.run", side_effect=mounted) as run:
+                ok, detail = integrations.ensure_ai_model_volume_readonly(required)
+        self.assertTrue(ok)
+        self.assertIn("Mounted Ai model volume read-only", detail)
+        command = run.call_args.args[0]
+        self.assertEqual(command[:3], ["udisksctl", "mount", "-b"])
+        self.assertEqual(command[-2:], ["--options", "ro"])
+
+    def test_ai_model_volume_refuses_existing_read_write_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mount = Path(tmp) / "Ai"
+            required = mount / "model.safetensors"
+            mount.mkdir()
+            required.touch()
+            with patch.object(integrations, "AI_MODEL_MOUNT", mount), patch(
+                "genesis.integrations.mount_is_writable", return_value=True
+            ):
+                ok, detail = integrations.ensure_ai_model_volume_readonly(required)
+        self.assertFalse(ok)
+        self.assertIn("read-write", detail)
 
     def test_gpu_kernel_preflight_is_clean_without_svm_warning(self):
         with patch("genesis.integrations.subprocess.run") as run:
