@@ -125,6 +125,16 @@ deliberate milestone files.
 - A backend-idle ComfyUI startup with those flags completed cleanly and was
   stopped again: current-boot counts remain zero for `svm_range_restore_work`,
   `svm_range_deferred_list_work`, and `amdgpu_amdkfd_restore_userptr_worker`.
+- One controlled loaded-workload verification also passed with the current
+  `--disable-mmap` profile: Klein 4B baseline, 512x512, 4 steps, no LoRA,
+  prompt `e933e545-f011-43bf-9c53-80c97213c23a`. ComfyUI loaded the full
+  7392.01 MB Flux2 model and completed the prompt in 112.06 seconds; the guarded
+  client measured 140.94 seconds including backend startup. Output SHA-256 is
+  `f466479c485c285f24c2677c48d0e4e845ffcfacd674543e3e2859a26638e2fa`.
+  After completion ComfyUI stopped normally, and current-boot counts remained
+  zero for all three KFD/SVM warnings, GPU reset/ring timeout/page fault, and
+  SATA `BadCRC`/`ICRC`/hard-reset events. This validates one 4B baseline only;
+  it does not prove all 9B, LoRA or multi-stage workloads are safe.
 - GENESIS now has a boot-scoped GPU safety latch: GPU-service starts and every
   ComfyUI submit check the current kernel log for those KFD/SVM warning names.
   If any has appeared, further GPU work is refused with a reboot-required

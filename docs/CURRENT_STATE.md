@@ -18,11 +18,12 @@ This checkpoint supersedes the older render-next instructions below.
   A new software-only runtime test verifies visibility of both page 11 and 12.
   Chat label now matches its Qwen backend rather than Rocinante.
 - No inference, generation, GPU benchmark, driver or ROCm changes in this session.
-- GPU HOLD: GENESIS_STATUS.md records reproduced KFD SVM warnings during the
-  isolated Klein 4B test. Current ComfyUI startup adds `--disable-mmap` alongside
-  `--disable-pinned-memory`, `--disable-dynamic-vram` and disabled async offload;
-  this is a mitigation only, not yet a loaded-workload verification. Do not follow
-  historical render/benchmark next steps until GPU work is explicitly authorized.
+- GPU HOLD is partially relaxed for the verified 4B baseline only. Current
+  ComfyUI startup adds `--disable-mmap` alongside `--disable-pinned-memory`,
+  `--disable-dynamic-vram` and disabled async offload. On 2026-09-21 one guarded
+  Klein 4B 512x512 / 4-step / no-LoRA run completed cleanly with zero KFD/SVM,
+  GPU-reset/page-fault and SATA CRC/reset events. Keep 9B, LoRA, multi-stage and
+  stress workloads on hold until separately validated under the same safeguards.
 
 ## Verified regular Klein 9B single-LoRA render — 2026-09-20
 
