@@ -35,17 +35,16 @@ def test_source_image_is_a_real_preview_not_filename_only():
 def test_easy_presets_are_first_class_visual_controls():
     qml = source()
     assert 'text: "2 · EASY PRESETS"' in qml
-    assert 'model: ["All", "Full 70", "Curated 18"]' in qml
     assert "model: appRoot.filteredPresets()" in qml
     assert "appRoot.applyPreset(modelData)" in qml
-    assert 'text: "Browse Full Visual Pose Library"' in qml
+    assert 'text: "Pose Library"; onClicked: appRoot.pageIndex = 1' in qml
 
 
 def test_full_pose_browser_and_source_controls_are_available_together():
     qml = source()
     assert "model: appRoot.filteredPoses()" in qml
     assert "appRoot.applyPose(modelData)" in qml
-    assert 'titleText: "Pose Library"' in qml
+    assert 'text: "Pose Library"; active: true' in qml
     assert '"Load Source Image"' in qml
     assert 'text: "Use Pose in Create"' in qml
 

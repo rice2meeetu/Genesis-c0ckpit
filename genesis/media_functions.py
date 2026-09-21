@@ -126,14 +126,14 @@ def extract_media(
     if kind == "video":
         if not info["has_video"]:
             raise MediaFunctionError("Source has no video stream")
-        command = ["ffmpeg", "-y", *trim, "-i", str(source), "-an"]
+        command = ["ffmpeg", "-y", *trim, "-i", str(source)]
         if trim:
-            command += ["-c:v", "libx264", "-preset", "medium", "-crf", "18"]
+            command += ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-c:a", "aac", "-b:a", "192k"]
         else:
-            command += ["-c:v", "copy"]
+            command += ["-c", "copy"]
         command.append(str(target))
         _run(command)
-        return OperationResult(target, "ffmpeg", {"kind": "video", "audio_removed": True})
+        return OperationResult(target, "ffmpeg", {"kind": "video", "audio_preserved": bool(info["has_audio"])})
     raise ValueError("kind must be 'audio' or 'video'")
 
 

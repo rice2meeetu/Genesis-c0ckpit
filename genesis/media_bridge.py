@@ -149,12 +149,12 @@ class MediaBridge(QObject):
             return
         source_path = Path(source)
         target, _ = QFileDialog.getSaveFileName(
-            None, "Save video without audio",
-            str(source_path.with_name(source_path.stem + "_silent.mp4")), "MP4 (*.mp4)",
+            None, "Save extracted video",
+            str(source_path.with_name(source_path.stem + "_video.mp4")), "MP4 (*.mp4)",
         )
         if target:
             self._start(
-                "Extracting silent video",
+                "Extracting video",
                 lambda: extract_media(source_path, target, kind="video"),
             )
 

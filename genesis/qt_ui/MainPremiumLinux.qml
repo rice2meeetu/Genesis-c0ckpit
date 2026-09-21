@@ -10,7 +10,7 @@ ApplicationWindow {
     minimumWidth: 1120
     minimumHeight: 720
     title: "GENESIS c0ckpit · Linux"
-    color: "#141619"
+    color: "#0b0c0e"
     font.family: "Noto Sans"
 
     readonly property color gold: "#d2a34e"
@@ -18,11 +18,11 @@ ApplicationWindow {
     readonly property color blue: "#3aa7ff"
     readonly property color blueBright: "#75c5ff"
     readonly property color blueDeep: "#123a5a"
-    readonly property color bg: "#141619"
-    readonly property color panel: "#202328"
-    readonly property color raised: "#282c31"
-    readonly property color raised2: "#30353b"
-    readonly property color line: "#454b53"
+    readonly property color bg: "#0b0c0e"
+    readonly property color panel: "#121416"
+    readonly property color raised: "#191c1f"
+    readonly property color raised2: "#22262a"
+    readonly property color line: "#34393f"
     readonly property color textMain: "#eef3f6"
     readonly property color textDim: "#91a2b2"
     readonly property color success: "#62d27a"
@@ -32,31 +32,23 @@ ApplicationWindow {
     readonly property bool compactNavigation: height < 850
     property var navItems: [
         {icon:"▣", label:"Image Generation", page:0},
-        {icon:"♟", label:"Pose Library", page:1},
-        {icon:"◇", label:"Workflow Studio", page:2},
         {icon:"✦", label:"Media Tools", page:3},
         {icon:"▧", label:"Photo Library", page:4},
         {icon:"●", label:"Camera Hub", page:5},
-        {icon:"▷", label:"Entertainment", page:6},
         {icon:"⚙", label:"System Tools", page:7},
         {icon:"Ps", label:"Canvas / Edit", page:8},
-        {icon:"♜", label:"Pose Maker", page:9},
-        {icon:"☷", label:"Settings", page:10},
-        {icon:"↺", label:"Face Swap", page:12}
+        {icon:"☷", label:"Settings", page:10}
     ]
 
+    // Primary navigation shortcuts mirror the visible sidebar. Internal generation tabs
+    // intentionally have no global number shortcuts.
     Shortcut { sequence: "Alt+1"; onActivated: appRoot.pageIndex = 0 }
-    Shortcut { sequence: "Alt+2"; onActivated: appRoot.pageIndex = 1 }
-    Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 2 }
-    Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 3 }
-    Shortcut { sequence: "Alt+5"; onActivated: appRoot.pageIndex = 4 }
-    Shortcut { sequence: "Alt+6"; onActivated: appRoot.pageIndex = 5 }
-    Shortcut { sequence: "Alt+7"; onActivated: appRoot.pageIndex = 6 }
-    Shortcut { sequence: "Alt+8"; onActivated: appRoot.pageIndex = 7 }
-    Shortcut { sequence: "Alt+9"; onActivated: appRoot.pageIndex = 8 }
-    Shortcut { sequence: "Alt+0"; onActivated: appRoot.pageIndex = 9 }
+    Shortcut { sequence: "Alt+2"; onActivated: appRoot.pageIndex = 3 }
+    Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 4 }
+    Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 5 }
+    Shortcut { sequence: "Alt+5"; onActivated: appRoot.pageIndex = 7 }
+    Shortcut { sequence: "Alt+6"; onActivated: appRoot.pageIndex = 8 }
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
-    Shortcut { sequence: "Alt+A"; onActivated: if (appRoot.navItems.length > 11) appRoot.pageIndex = 11 }
 
     property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
     property int selectedGenerationIndex: 0
@@ -229,15 +221,15 @@ ApplicationWindow {
         id: button
         property bool active: false
         property bool premium: false
-        implicitHeight: 46
+        implicitHeight: 48
         activeFocusOnTab: true
         Accessible.name: text
         Accessible.role: Accessible.Button
         font.pixelSize: 14
-        font.weight: active || premium ? Font.DemiBold : Font.Medium
+        font.weight: active || premium ? Font.Bold : Font.DemiBold
         contentItem: Text {
             text: button.text
-            color: !button.enabled ? "#64717c" : (button.premium ? appRoot.brightGold : (button.active ? "#ffffff" : (button.hovered ? appRoot.blueBright : appRoot.textMain)))
+            color: !button.enabled ? "#6f6758" : (button.premium || button.active ? "#fff7d0" : (button.hovered ? "#fff1b0" : appRoot.textMain))
             font: button.font
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -245,31 +237,53 @@ ApplicationWindow {
             transform: Translate { y: button.down ? 2 : 0 }
         }
         background: Item {
+            // Deep lower lip gives the control its chunky machined 3D profile.
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: parent.height - 3
-                radius: 10
-                color: button.premium ? "#5b431c" : (button.active ? "#0b2940" : "#10151a")
-                border.color: "#080a0d"
+                radius: 13
+                color: !button.enabled ? "#29251f" : "#6f4510"
+                border.color: "#171009"
+                border.width: 1
             }
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
                 y: button.down ? 3 : 0
-                height: parent.height - 4
-                radius: 10
+                height: parent.height - 5
+                radius: 13
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: !button.enabled ? "#282b2f" : (button.premium ? "#3b3120" : (button.active ? "#1a5278" : (button.hovered ? "#343b42" : "#2b3036"))) }
-                    GradientStop { position: 1.0; color: !button.enabled ? "#202226" : (button.premium ? "#1f1b13" : (button.active ? "#12364f" : "#20252a")) }
+                    GradientStop { position: 0.00; color: !button.enabled ? "#4a463f" : (button.hovered ? "#fff09a" : "#e8c65c") }
+                    GradientStop { position: 0.16; color: !button.enabled ? "#3a3732" : "#b57a18" }
+                    GradientStop { position: 0.50; color: !button.enabled ? "#292825" : (button.premium || button.active ? "#6c4615" : "#49371f") }
+                    GradientStop { position: 0.84; color: !button.enabled ? "#242321" : "#8d5b12" }
+                    GradientStop { position: 1.00; color: !button.enabled ? "#35322d" : "#d7a932" }
                 }
-                border.color: button.premium ? appRoot.gold : (button.active ? appRoot.blueBright : (button.hovered ? appRoot.blue : appRoot.line))
-                border.width: button.active || button.hovered || button.premium ? 1.5 : 1
+                border.color: !button.enabled ? "#59534a" : (button.hovered ? "#fff1a0" : appRoot.gold)
+                border.width: button.hovered || button.active || button.premium ? 2 : 1.5
+                // Recessed centre panel, inspired by the rounded metallic reference.
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    radius: 9
+                    gradient: Gradient {
+                        orientation: Gradient.Vertical
+                        GradientStop { position: 0.0; color: !button.enabled ? "#32302c" : (button.premium || button.active ? "#8b5a16" : "#4a3a25") }
+                        GradientStop { position: 0.55; color: !button.enabled ? "#292825" : (button.premium || button.active ? "#5b3b13" : "#292823") }
+                        GradientStop { position: 1.0; color: !button.enabled ? "#262522" : "#201b13" }
+                    }
+                    border.color: !button.enabled ? "#45413b" : "#f2c84b"
+                    border.width: 1
+                }
+                // Fine top highlight sells the polished metal edge without neon/glass styling.
                 Rectangle {
                     anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-                    anchors.leftMargin: 9; anchors.rightMargin: 9
+                    anchors.leftMargin: 12; anchors.rightMargin: 12; anchors.topMargin: 2
                     height: 1
-                    color: button.premium ? "#99f3d28b" : (button.active || button.hovered ? "#aa75c5ff" : "#35ffffff")
+                    radius: 1
+                    color: button.enabled ? "#fff3ad" : "#625d54"
+                    opacity: button.down ? 0.35 : 0.9
                 }
             }
         }
@@ -325,15 +339,15 @@ ApplicationWindow {
         property string statusText: "LOCAL TOOL"
         Layout.fillWidth: true
         Layout.fillHeight: true
-        Layout.minimumHeight: 250
+        Layout.minimumHeight: 190
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 9
+            anchors.margins: 11
+            spacing: 7
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: mediaCard.iconText; color: appRoot.blueBright; font.pixelSize: 22; font.bold: true }
-                Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.family: "Noto Sans Display"; font.pixelSize: 18; font.bold: true; elide: Text.ElideRight }
+                Text { text: mediaCard.iconText; color: appRoot.gold; font.pixelSize: 18; font.bold: true }
+                Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.family: "Noto Sans Display"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
                 Rectangle {
                     radius: 10; height: 22; width: statusLabel.implicitWidth + 18
                     color: "#152b3b"; border.color: appRoot.blue
@@ -343,7 +357,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumHeight: 118
+                Layout.minimumHeight: 72
                 radius: 10
                 color: "#111418"
                 border.color: "#39424b"
@@ -357,7 +371,7 @@ ApplicationWindow {
                 Text { anchors.centerIn: parent; text: mediaCard.iconText; color: "#5575c5ff"; font.pixelSize: 58; font.bold: true }
                 Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10; text: "GENESIS · " + mediaCard.titleText.toUpperCase(); color: appRoot.textDim; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.8 }
             }
-            Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight }
+            Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
             GButton {
                 Layout.fillWidth: true
                 text: mediaBridge.busy ? "WORKING…" : "OPEN  " + mediaCard.titleText.toUpperCase()
@@ -401,9 +415,9 @@ ApplicationWindow {
         z: -10
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0; color: "#272b30" }
+            GradientStop { position: 0; color: "#17191c" }
             GradientStop { position: 0.40; color: appRoot.bg }
-            GradientStop { position: 1; color: "#111315" }
+            GradientStop { position: 1; color: "#08090a" }
         }
         Image {
             anchors.fill: parent
@@ -416,12 +430,12 @@ ApplicationWindow {
     ColumnLayout {
         objectName: "genesisMainWorkspace"
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 10
+        anchors.margins: 10
+        spacing: 8
 
         Panel {
             Layout.fillWidth: true
-            Layout.preferredHeight: appRoot.compactNavigation ? 112 : 150
+            Layout.preferredHeight: appRoot.compactNavigation ? 112 : 146
             clip: true
 
             Item {
@@ -459,7 +473,7 @@ ApplicationWindow {
                 Image {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(parent.width * 0.56, appRoot.compactNavigation ? 500 : 650)
+                    width: Math.min(parent.width * 0.66, appRoot.compactNavigation ? 590 : 760)
                     height: parent.height - 8
                     source: "../assets/lunacy_banner/genesis_cockpit_wordmark_full.png"
                     sourceClipRect: Qt.rect(0, 28, 945, 317)
@@ -513,7 +527,7 @@ ApplicationWindow {
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 10
+            spacing: 8
 
             Panel {
                 Layout.preferredWidth: 250
@@ -524,9 +538,9 @@ ApplicationWindow {
                     spacing: 5
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: appRoot.compactNavigation ? 96 : 220
+                        Layout.preferredHeight: appRoot.compactNavigation ? 82 : 160
                         radius: 14
-                        color: "#202328"
+                        color: appRoot.panel
                         border.color: appRoot.line
                         Image {
                             anchors.fill: parent
@@ -572,18 +586,28 @@ ApplicationWindow {
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 9
-                        PageHeader { titleText: "Image Generation"; subtitleText: "Load your source image, pick a visual preset or pose, then generate."; iconText: "▣" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "⌂  Create"; active: true; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
+                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
+                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: 10
+                            spacing: 8
 
                             Panel {
                                 Layout.preferredWidth: 350
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 12
+                                    anchors.margins: 10
                                     spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -593,17 +617,18 @@ ApplicationWindow {
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 245
+                                        Layout.preferredHeight: 160
+                                        Layout.minimumHeight: 140
                                         radius: 10
-                                        color: "#1f2227"
-                                        border.color: appRoot.gold
-                                        border.width: 2
+                                        color: "#0d0f11"
+                                        border.color: appRoot.generationSource.toString().length > 0 ? appRoot.gold : appRoot.line
+                                        border.width: appRoot.generationSource.toString().length > 0 ? 1.5 : 1
                                         Image { anchors.fill: parent; anchors.margins: 7; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
                                         Column {
                                             anchors.centerIn: parent
                                             visible: appRoot.generationSource.toString().length === 0
                                             spacing: 6
-                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: "+"; color: appRoot.gold; font.pixelSize: 46 }
+                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: "+"; color: appRoot.gold; font.pixelSize: 34 }
                                             Text { text: "DROP OR LOAD SOURCE IMAGE"; color: appRoot.textMain; font.pixelSize: 12; font.bold: true }
                                             Text { anchors.horizontalCenter: parent.horizontalCenter; text: "PNG · JPG · WEBP"; color: appRoot.textDim; font.pixelSize: 10 }
                                         }
@@ -628,22 +653,16 @@ ApplicationWindow {
                                         onTextChanged: appRoot.presetSearch = text
                                         background: Rectangle { color: "#1f2227"; border.color: appRoot.line; radius: 8 }
                                     }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 5
-                                        Repeater {
-                                            model: ["All", "Full 70", "Curated 18"]
-                                            GButton { Layout.fillWidth: true; text: modelData; active: appRoot.presetCategory === modelData; onClicked: appRoot.presetCategory = modelData }
-                                        }
-                                    }
                                     GridView {
                                         id: quickPresetGrid
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         Layout.minimumHeight: 190
                                         clip: true
-                                        cellWidth: Math.max(145, width / 2)
-                                        cellHeight: 86
+                                        // Always expose three preset columns. Floor division avoids the
+                                        // GridView rounding a nominal 3-column width back to two columns.
+                                        cellWidth: Math.floor(width / 3)
+                                        cellHeight: 68
                                         model: appRoot.filteredPresets()
                                         delegate: Rectangle {
                                             width: quickPresetGrid.cellWidth - 7
@@ -653,17 +672,16 @@ ApplicationWindow {
                                             border.color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? appRoot.gold : appRoot.line
                                             Column {
                                                 anchors.fill: parent
-                                                anchors.margins: 9
-                                                spacing: 4
-                                                Text { width: parent.width; text: modelData.label || modelData.name || "Preset"; color: appRoot.textMain; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
-                                                Text { width: parent.width; text: (modelData.collection || "Preset") + " · " + (modelData.category || "General"); color: appRoot.gold; font.pixelSize: 9; elide: Text.ElideRight }
-                                                Text { width: parent.width; text: modelData.prompt || ""; color: appRoot.textDim; font.pixelSize: 9; maximumLineCount: 2; elide: Text.ElideRight; wrapMode: Text.Wrap }
+                                                anchors.margins: 7
+                                                spacing: 2
+                                                Text { width: parent.width; text: modelData.label || modelData.name || "Preset"; color: appRoot.textMain; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
+                                                Text { width: parent.width; text: (modelData.collection || "Preset") + " · " + (modelData.category || "General"); color: appRoot.gold; font.pixelSize: 8; elide: Text.ElideRight }
+                                                Text { width: parent.width; text: modelData.prompt || ""; color: appRoot.textDim; font.pixelSize: 8; maximumLineCount: 1; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                                             }
                                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appRoot.applyPreset(modelData) }
                                         }
                                         ScrollBar.vertical: ScrollBar { }
                                     }
-                                    GButton { Layout.fillWidth: true; text: "Browse Full Visual Pose Library"; onClicked: appRoot.pageIndex = 1 }
                                 }
                             }
 
@@ -672,31 +690,52 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 12
+                                    anchors.margins: 10
                                     spacing: 8
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        SectionLabel { text: "RESULT" }
-                                        Item { Layout.fillWidth: true }
-                                        GButton { text: "Open / Full Size"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
-                                        GButton { text: "Show in Folder"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.showPreviewInFolder() }
-                                        GButton { text: "Open Output"; onClicked: genesisBridge.openOutputFolder() }
-                                    }
+                                    SectionLabel { text: "RESULT" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 300
-                                        Layout.minimumHeight: 240
-                                        color: "#171a1e"
+                                        Layout.preferredHeight: 160
+                                        Layout.minimumHeight: 140
                                         radius: 10
-                                        border.color: "#8fd2a34e"
-                                        border.width: 1.5
-                                        Image { anchors.fill: parent; anchors.margins: 8; source: genesisBridge.previewUrl; fillMode: Image.PreserveAspectFit; visible: !privacyMode }
-                                        Text { anchors.centerIn: parent; text: privacyMode ? "PRIVATE" : "GENERATED RESULT"; color: appRoot.textDim; font.pixelSize: 18; visible: privacyMode || genesisBridge.previewUrl.length === 0 }
+                                        color: "#0d0f11"
+                                        border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
+                                        border.width: genesisBridge.previewUrl.length > 0 ? 1.5 : 1
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 7
+                                            source: genesisBridge.previewUrl
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
+                                            visible: !privacyMode && genesisBridge.previewUrl.length > 0
+                                        }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: privacyMode ? "PRIVATE" : "GENERATED RESULT"
+                                            color: appRoot.textDim
+                                            font.pixelSize: 13
+                                            visible: privacyMode || genesisBridge.previewUrl.length === 0
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: genesisBridge.previewUrl.length > 0 && !privacyMode
+                                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: genesisBridge.openPreview()
+                                        }
+                                        Row {
+                                            anchors.right: parent.right
+                                            anchors.bottom: parent.bottom
+                                            anchors.margins: 7
+                                            spacing: 6
+                                            GButton { text: "Open Result"; enabled: genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.openPreview() }
+                                            GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
+                                        }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 92
-                                        spacing: 8
+                                        Layout.preferredHeight: 58
+                                        spacing: 6
                                         Repeater {
                                             model: [
                                                 {title:"STAGE 1", name:"Phr00t / Qwen", enabled:true},
@@ -706,16 +745,16 @@ ApplicationWindow {
                                             Rectangle {
                                                 Layout.fillWidth: true
                                                 Layout.fillHeight: true
-                                                radius: 9
-                                                color: modelData.enabled ? "#2b2922" : "#202328"
+                                                radius: 8
+                                                color: modelData.enabled ? "#2b2922" : appRoot.raised
                                                 border.color: modelData.enabled ? appRoot.gold : appRoot.line
                                                 border.width: modelData.enabled ? 2 : 1
                                                 Column {
                                                     anchors.centerIn: parent
-                                                    spacing: 3
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 12; font.bold: true }
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.name; color: appRoot.textMain; font.pixelSize: 11; font.bold: true }
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9 }
+                                                    spacing: 1
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 10; font.bold: true }
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.name; color: appRoot.textMain; font.pixelSize: 10; font.bold: true }
+                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 8 }
                                                 }
                                             }
                                         }
@@ -752,7 +791,7 @@ ApplicationWindow {
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 12
+                                    anchors.margins: 10
                                     spacing: 8
                                     SectionLabel { text: "3 · MODEL / WORKFLOW" }
                                     ComboBox {
@@ -862,7 +901,17 @@ ApplicationWindow {
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 9
-                        PageHeader { titleText: "Pose Library"; subtitleText: "Visual pose browser — source image stays loaded while you pick geometry."; iconText: "♟" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.fillWidth: true; text: "Pose Library"; active: true; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.fillWidth: true; text: "Workflow"; active: false; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
+                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
+                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
@@ -877,20 +926,21 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            spacing: 10
+                            spacing: 8
                             Panel {
                                 Layout.preferredWidth: 230
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 12
+                                    anchors.margins: 10
                                     spacing: 8
                                     SectionLabel { text: "SOURCE" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 170
+                                        Layout.preferredHeight: 130
+                                        Layout.minimumHeight: 115
                                         radius: 8
-                                        color: "#1f2227"
+                                        color: "#0d0f11"
                                         border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: appRoot.generationSource.toString().length > 0 && !privacyMode }
                                         Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
@@ -898,9 +948,10 @@ ApplicationWindow {
                                     SectionLabel { text: "SELECTED POSE" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 210
+                                        Layout.preferredHeight: 160
+                                        Layout.minimumHeight: 140
                                         radius: 8
-                                        color: "#1f2227"
+                                        color: "#0d0f11"
                                         border.color: appRoot.gold
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
                                     }
@@ -915,14 +966,14 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 clip: true
-                                cellWidth: Math.max(175, width / 4)
-                                cellHeight: 220
+                                cellWidth: Math.max(155, width / 4)
+                                cellHeight: 190
                                 model: appRoot.filteredPoses()
                                 delegate: Rectangle {
                                     width: poseGrid.cellWidth - 9
                                     height: poseGrid.cellHeight - 9
                                     radius: 10
-                                    color: "#0a1118"
+                                    color: appRoot.panel
                                     border.color: appRoot.selectedPoseName === String(modelData.name || "") ? appRoot.gold : appRoot.line
                                     border.width: appRoot.selectedPoseName === String(modelData.name || "") ? 2 : 1
                                     Image { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: caption.top; anchors.margins: 6; source: modelData.source; fillMode: Image.PreserveAspectFit; asynchronous: true }
@@ -951,8 +1002,18 @@ ApplicationWindow {
                 Item {
                     ColumnLayout {
                         anchors.fill: parent
-                        spacing: 10
-                        PageHeader { titleText: "Workflow Studio"; subtitleText: "Validated generation workflows without manual node wiring."; iconText: "◇" }
+                        spacing: 8
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.fillWidth: true; text: "Pose Library"; active: false; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.fillWidth: true; text: "Workflow"; active: true; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
+                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
+                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                        }
                         GridLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -979,8 +1040,14 @@ ApplicationWindow {
                 Item {
                     ColumnLayout {
                         anchors.fill: parent
-                        spacing: 10
-                        PageHeader { titleText: "Media Tools"; subtitleText: mediaBridge.status; iconText: "✦" }
+                        spacing: 8
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "Media Tools"; active: true; onClicked: appRoot.pageIndex = 3 }
+                            GButton { Layout.fillWidth: true; text: "Photo Library"; onClicked: appRoot.pageIndex = 4 }
+                            Text { Layout.preferredWidth: 260; text: mediaBridge.status; color: appRoot.textDim; elide: Text.ElideRight }
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             GButton { text: "Open saved result"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: Qt.openUrlExternally(mediaBridge.resultUrl) }
@@ -999,7 +1066,7 @@ ApplicationWindow {
                                     {title:"Enhance", body:"Restore detail and prepare images for finishing.", action:"enhance", icon:"✦", status:"AI TOOL"},
                                     {title:"Upscale", body:"Increase resolution with the local image stack.", action:"upscale", icon:"⇧", status:"GPU / LOCAL"},
                                     {title:"Extract MP3", body:"Extract an MP3 audio track from a video or audio file.", action:"extract audio", icon:"♫", status:"FFMPEG"},
-                                    {title:"Silent Video", body:"Create a video-only copy with its audio track removed.", action:"extract video", icon:"▷", status:"FFMPEG"},
+                                    {title:"Extract Video", body:"Save a video copy while keeping its original audio track.", action:"extract video", icon:"▷", status:"FFMPEG"},
                                     {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
                                     {title:"Canvas", body:"Prompt-based image editing. Layer and cutout tools are not yet implemented.", action:"canvas", icon:"Ps", status:"IN DEVELOPMENT"}
                                 ]
@@ -1013,7 +1080,12 @@ ApplicationWindow {
                 Item {
                     ColumnLayout {
                         anchors.fill: parent; spacing: 10
-                        PageHeader { titleText: "Photo Library"; subtitleText: "View, organise, find duplicates and group faces."; iconText: "▧" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "Media Tools"; onClicked: appRoot.pageIndex = 3 }
+                            GButton { Layout.fillWidth: true; text: "Photo Library"; active: true; onClicked: appRoot.pageIndex = 4 }
+                        }
                         GridLayout { Layout.fillWidth: true; Layout.fillHeight: true; columns: 3; rowSpacing: 10; columnSpacing: 10
                             Repeater { model: [
                                 {title:"Media Viewer", body:"Thumbnail library, large preview and image metadata.", action:"media viewer", icon:"▧", status:"BROWSE"},
@@ -1027,23 +1099,21 @@ ApplicationWindow {
 
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing: 10
-                        PageHeader { titleText: "Camera Hub"; subtitleText: "Local cameras and recordings in their own workspace."; iconText: "●" }
-                        Panel { Layout.fillWidth: true; Layout.fillHeight: true; ColumnLayout { anchors.centerIn: parent; spacing: 12; Text { text:"CAMERA HUB"; color: appRoot.brightGold; font.pixelSize: 38; font.bold: true } Text { text:"Open the local camera service and live grid."; color: appRoot.textDim; font.pixelSize: 14 } GButton { text:"Open Camera Hub"; active:true; Layout.preferredWidth:220; onClicked: moduleBridge.triggerAction("camera hub") } } }
+                        Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10
+                            RowLayout { Layout.fillWidth:true; Text { Layout.fillWidth:true; text:"CAMERA HUB"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true } Text { text:"LOCAL CAMERAS"; color:appRoot.textDim; font.pixelSize:10; font.letterSpacing:1.2 } }
+                            Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#0d0f11"; radius:10; border.color:appRoot.line
+                                Column { anchors.centerIn:parent; spacing:8; Text { anchors.horizontalCenter:parent.horizontalCenter; text:"●"; color:appRoot.gold; font.pixelSize:28 } Text { anchors.horizontalCenter:parent.horizontalCenter; text:"Camera service and live grid"; color:appRoot.textDim; font.pixelSize:12 } }
+                            }
+                            GButton { Layout.fillWidth:true; text:"Open Camera Hub"; active:true; onClicked:moduleBridge.triggerAction("camera hub") }
+                        } }
                     }
                 }
 
-                Item {
-                    ColumnLayout { anchors.fill: parent; spacing: 10
-                        PageHeader { titleText: "Entertainment"; subtitleText: "Local media and entertainment tools."; iconText: "▷" }
-                        RowLayout { Layout.fillWidth: true; Layout.fillHeight: true; spacing:10
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.centerIn: parent; spacing:12; Text { text:"JELLYFIN"; color:appRoot.brightGold; font.pixelSize:24; font.bold:true } GButton { text:"Open Jellyfin"; Layout.preferredWidth:200; onClicked:moduleBridge.triggerAction("movie library") } } }
-                        }
-                    }
-                }
+                // Page 6 intentionally retired; retained as an empty slot to preserve stable page indices.
+                Item { }
 
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing:10
-                        PageHeader { titleText:"System Tools"; subtitleText:"GPU, ComfyUI, storage and recovery."; iconText:"⚙" }
                         GridLayout { Layout.fillWidth:true; Layout.fillHeight:true; columns:2; rowSpacing:10; columnSpacing:10
                             Repeater { model:[
                                 {title:"ComfyUI", body:runtimeStatus.comfyOnline ? "Online and ready" : "Offline — start or inspect service", action:"comfyui"},
@@ -1051,24 +1121,33 @@ ApplicationWindow {
                                 {title:"Models & Storage", body:"Open your AI model/storage location.", action:"models and storage"},
                                 {title:"Backups & Recovery", body:"Open GENESIS recovery resources.", action:"backup recovery"}
                             ]
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:18; Text { text:modelData.title; color:appRoot.brightGold; font.pixelSize:19; font.bold:true } Text { Layout.fillWidth:true; text:modelData.body; color:appRoot.textDim; wrapMode:Text.Wrap } Item { Layout.fillHeight:true } GButton { Layout.fillWidth:true; text:"Open"; onClicked:moduleBridge.triggerAction(modelData.action) } } } }
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:150; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:6; Text { text:modelData.title; color:appRoot.brightGold; font.pixelSize:16; font.bold:true } Text { Layout.fillWidth:true; text:modelData.body; color:appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap; maximumLineCount:2; elide:Text.ElideRight } Item { Layout.fillHeight:true } GButton { Layout.fillWidth:true; text:"Open"; onClicked:moduleBridge.triggerAction(modelData.action) } } } }
                         }
                     }
                 }
 
                 Item {
                     ColumnLayout { anchors.fill: parent; spacing:10
-                        PageHeader { titleText:"Canvas / Edit"; subtitleText:"Send generated images here for local editing and finishing."; iconText:"Ps" }
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
-                            Panel { Layout.preferredWidth:340; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"SOURCE" } Rectangle { Layout.fillWidth:true; Layout.preferredHeight:260; color:"#080d12"; radius:8; border.color:appRoot.line; Image { anchors.fill:parent; anchors.margins:6; source:appRoot.editSource; fillMode:Image.PreserveAspectFit } } GButton { Layout.fillWidth:true; text:"Load Image"; onClicked:appRoot.chooseEditSource() } SectionLabel { text:"EDIT INSTRUCTIONS" } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.editPrompt; color:appRoot.textMain; placeholderText:"Describe the edit…"; onTextChanged:if(activeFocus) appRoot.editPrompt=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } GButton { Layout.fillWidth:true; text:"Run Image Edit"; active:true; enabled:appRoot.editSource.toString().length>0 && appRoot.editPrompt.trim().length>0 && !genesisBridge.busy; onClicked:genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength) } } }
-                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; Rectangle { anchors.fill:parent; anchors.margins:12; color:"#05080b"; radius:10; border.color:appRoot.line; Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:genesisBridge.previewUrl.length===0; text:"EDIT RESULT"; color:appRoot.textDim; font.pixelSize:18 } } }
+                            Panel { Layout.preferredWidth:340; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"SOURCE" } Rectangle { Layout.fillWidth:true; Layout.preferredHeight:150; Layout.minimumHeight:130; color:"#080d12"; radius:8; border.color:appRoot.editSource.toString().length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:6; source:appRoot.editSource; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:appRoot.editSource.toString().length===0; text:"NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:13 } } GButton { Layout.fillWidth:true; text:"Load Image"; onClicked:appRoot.chooseEditSource() } SectionLabel { text:"EDIT INSTRUCTIONS" } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.editPrompt; color:appRoot.textMain; placeholderText:"Describe the edit…"; onTextChanged:if(activeFocus) appRoot.editPrompt=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } GButton { Layout.fillWidth:true; text:"Run Image Edit"; active:true; enabled:appRoot.editSource.toString().length>0 && appRoot.editPrompt.trim().length>0 && !genesisBridge.busy; onClicked:genesisBridge.queueEdit(appRoot.editSource.toString(), appRoot.editPrompt, appRoot.editStrength) } } }
+                            Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"RESULT" } Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; color:"#05080b"; radius:10; border.color:genesisBridge.previewUrl.length ? appRoot.gold : appRoot.line; Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit } Text { anchors.centerIn:parent; visible:genesisBridge.previewUrl.length===0; text:"EDIT RESULT"; color:appRoot.textDim; font.pixelSize:16 } MouseArea { anchors.fill:parent; enabled:genesisBridge.previewUrl.length>0; cursorShape:Qt.PointingHandCursor; onClicked:genesisBridge.openPreview() } } RowLayout { Layout.fillWidth:true; GButton { Layout.fillWidth:true; text:"Open Result"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() } GButton { Layout.fillWidth:true; text:"Output Folder"; onClicked:genesisBridge.openOutputFolder() } } } }
                         }
                     }
                 }
 
                 Item {
                     ColumnLayout { anchors.fill:parent; spacing:10
-                        PageHeader { titleText:"Pose Maker"; subtitleText:"Build a prompt from the preset packs, then send it to Create."; iconText:"♜" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
+                            GButton { Layout.fillWidth: true; text: "Pose Maker"; active: true; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
+                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                        }
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
                             Panel { Layout.preferredWidth:360; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:12; spacing:8; SectionLabel { text:"PRESETS" } TextField { Layout.fillWidth:true; placeholderText:"Search presets…"; color:appRoot.textMain; onTextChanged:appRoot.presetSearch=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:5; model:appRoot.filteredPresets(); delegate:GButton { width:ListView.view.width; text:modelData.label || modelData.name || "Preset"; active:appRoot.selectedPresetName===text; onClicked:appRoot.applyPreset(modelData) } } } }
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10; SectionLabel { text:"ACTIVE PRESET" } Text { Layout.fillWidth:true; text:appRoot.selectedPresetName; color:appRoot.brightGold; font.pixelSize:22; font.bold:true; wrapMode:Text.Wrap } TextArea { Layout.fillWidth:true; Layout.fillHeight:true; text:appRoot.generationPrompt; color:appRoot.textMain; wrapMode:TextEdit.Wrap; onTextChanged:if(activeFocus) appRoot.generationPrompt=text; background:Rectangle{color:"#080d12"; border.color:appRoot.line; radius:8} } GButton { Layout.fillWidth:true; text:"Use in Image Generation"; active:true; onClicked:appRoot.pageIndex=0 } } }
@@ -1078,18 +1157,27 @@ ApplicationWindow {
 
                 Item {
                     ColumnLayout { anchors.fill:parent; spacing:10
-                        PageHeader { titleText:"Settings"; subtitleText:"Local services and GENESIS workspace settings."; iconText:"☷" }
-                        Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:20; spacing:12; Text { text:"GENESIS LINUX"; color:appRoot.brightGold; font.pixelSize:24; font.bold:true } Text { text:"Backend status: " + moduleBridge.status; color:appRoot.textDim; font.pixelSize:13; wrapMode:Text.Wrap; Layout.fillWidth:true } RowLayout { GButton { text:"Refresh Health"; onClicked:moduleBridge.triggerAction("refresh") } GButton { text:"Open Settings Folder"; onClicked:moduleBridge.triggerAction("settings") } } Item { Layout.fillHeight:true } Text { text:"The source image, selected preset/pose and prompt are preserved while you move between Create and Pose Library."; color:appRoot.textDim; font.pixelSize:12; wrapMode:Text.Wrap; Layout.fillWidth:true } } }
+                        Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10; RowLayout { Layout.fillWidth:true; Text { Layout.fillWidth:true; text:"GENESIS LINUX"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true } Text { text:moduleBridge.status; color:appRoot.textDim; font.pixelSize:11; elide:Text.ElideRight; Layout.maximumWidth:360 } } RowLayout { GButton { text:"Refresh Health"; onClicked:moduleBridge.triggerAction("refresh") } GButton { text:"Open Settings Folder"; onClicked:moduleBridge.triggerAction("settings") } } Item { Layout.fillHeight:true } Text { text:"Workspace state is preserved while moving between Create, Pose Library and the generation tools."; color:appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap; Layout.fillWidth:true } } }
                     }
                 }
 
                 Item {
                     ColumnLayout { anchors.fill:parent; spacing:10
-                        PageHeader { titleText:"Face Swap"; subtitleText:"Load a target image and a source identity image, then run the isolated ReActor route."; iconText:"↺" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
+                            GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
+                            GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
+                            GButton { Layout.fillWidth: true; text: "Face Swap"; active: true; onClicked: appRoot.pageIndex = 12 }
+                            GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
+                            GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
+                            GButton { Layout.fillWidth: true; text: "History"; enabled: false }
+                        }
                         RowLayout { Layout.fillWidth:true; Layout.fillHeight:true; spacing:10
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"TARGET IMAGE · WHERE THE FACE GOES" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.faceSwapTarget.toString().length ? appRoot.gold : appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.faceSwapTarget.toString().length ? appRoot.gold : appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapTarget; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapTarget.toString().length > 0 && !privacyMode }
                                     Text { anchors.centerIn:parent; text:appRoot.faceSwapTarget.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO TARGET IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
                                 }
@@ -1097,7 +1185,7 @@ ApplicationWindow {
                             } }
                             Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"SOURCE IDENTITY · FACE TO USE" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.faceSwapSource.toString().length ? appRoot.gold : appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.faceSwapSource.toString().length ? appRoot.gold : appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:appRoot.faceSwapSource; fillMode:Image.PreserveAspectFit; visible:appRoot.faceSwapSource.toString().length > 0 && !privacyMode }
                                     Text { anchors.centerIn:parent; text:appRoot.faceSwapSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE IMAGE"; color:appRoot.textDim; font.pixelSize:16 }
                                 }
@@ -1105,7 +1193,7 @@ ApplicationWindow {
                             } }
                             Panel { Layout.preferredWidth:360; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:14; spacing:10
                                 SectionLabel { text:"RESULT" }
-                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:260; color:"#080d12"; radius:10; border.color:appRoot.line
+                                Rectangle { Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:180; color:"#080d12"; radius:10; border.color:appRoot.line
                                     Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit; visible:!privacyMode }
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }

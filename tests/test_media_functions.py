@@ -53,7 +53,7 @@ def test_group_faces_clusters_similar_embeddings():
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
                     reason="FFmpeg tools unavailable")
-def test_extract_audio_and_silent_video(tmp_path):
+def test_extract_audio_and_video_with_audio(tmp_path):
     source = tmp_path / "source.mp4"
     subprocess.run([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
@@ -64,11 +64,11 @@ def test_extract_audio_and_silent_video(tmp_path):
     ], check=True)
 
     audio = extract_media(source, tmp_path / "audio.mp3", kind="audio")
-    video = extract_media(source, tmp_path / "silent.mp4", kind="video")
+    video = extract_media(source, tmp_path / "video.mp4", kind="video")
     audio_info = probe_media(audio.output)
     video_info = probe_media(video.output)
     assert audio_info["has_audio"] and not audio_info["has_video"]
-    assert video_info["has_video"] and not video_info["has_audio"]
+    assert video_info["has_video"] and video_info["has_audio"]
 
 
 @pytest.mark.parametrize("operation", ["extract_media", "remove_background", "upscale_enhance"])
