@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 71 tests
+- Current automated suite passes: 107 tests
 
 ## Current Architecture
 
@@ -116,9 +116,26 @@ deliberate milestone files.
   ROCm 7.2 Noble repository is not supplying the active runtime packages.
 - All heavy GPU services were stopped after the test and remain disabled/inactive.
   No further SVM/KFD warnings appeared while idle.
-- Keep the existing mutual-exclusion and 8-second transition guard. Do not run
-  Klein 9B, full LoRA benchmark suites, GPU stress tests, or overlapping ROCm
-  workloads until the kernel/KFD SVM issue has a verified mitigation.
+- Live ComfyUI now uses `--disable-async-offload --disable-pinned-memory`
+  `--disable-dynamic-vram`, a 10-second KFD/SVM settle delay, and 30-second
+  restart backoff. The same 10-second transition guard is committed for the
+  other ROCm services. Heavy GPU services remain disabled/inactive by default.
+- A backend-idle ComfyUI startup with those flags completed cleanly and was
+  stopped again: current-boot counts remain zero for `svm_range_restore_work`,
+  `svm_range_deferred_list_work`, and `amdgpu_amdkfd_restore_userptr_worker`.
+- Do not run Klein 9B, full LoRA benchmark suites, GPU stress tests, or
+  overlapping ROCm workloads until a controlled loaded-workload retest is
+  explicitly approved after the kernel/KFD SVM mitigation review.
+- The 06:20-06:25 incident window also contained one real SATA link event on
+  the Kingston SA400 root SSD (`BadCRC`/`ICRC`, two failed queued reads, one
+  ata5 hard reset). Cached SMART at 12:50 AWST reports healthy overall status,
+  zero failing attributes, zero bad sectors, and `UDMA_CRC_Error_Count = 1`;
+  this fits a one-off SATA data-link/cable/connector error better than proven
+  NAND/media failure. No repeat SATA error has occurred on the current boot.
+- The manual Klein 4B LoRA benchmark had bypassed the normal compatibility
+  layer and directly tried blocked `FLUX2_KLEIN_UNLOCKED_V1.safetensors`.
+  GPU LoRA benchmarks now call `is_compatible()` and static tests ensure every
+  benchmark LoRA is approved for its selected model.
 - Do not change ROCm, AMDGPU, firmware, or kernel merely to experiment. Current
   evidence points toward the kernel AMDGPU/KFD SVM/userptr path under ROCm
   memory activity; it does not establish hardware failure or a definitive root
