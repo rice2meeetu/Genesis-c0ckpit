@@ -1,0 +1,19 @@
+[Unit]
+Conflicts=genesis-comfyui.service genesis-llama.service genesis-assistant.service genesis-qwen.service genesis-builder.service
+Description=GENESIS F5-TTS voice server
+ConditionPathExists=%h/.local/share/genesis-voice/voice_server.py
+ConditionPathExists=%h/.local/share/genesis-voice/models/f5-tts-onnx/F5_Transformer.onnx
+
+[Service]
+Type=simple
+Environment=ROCBLAS_USE_HIPBLASLT=0
+Environment=GENESIS_TTS_DEVICE=rocm
+WorkingDirectory=%h/.local/share/genesis-voice
+ExecStart=%h/.local/share/genesis-voice/.venv312-test/bin/python %h/.local/share/genesis-voice/voice_server.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:%h/.local/state/genesis/voice-server.log
+StandardError=append:%h/.local/state/genesis/voice-server.log
+
+[Install]
+WantedBy=default.target
