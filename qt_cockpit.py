@@ -1025,13 +1025,22 @@ class GenerationBridge(QObject):
         selected = compatible_selection(FOUR_B_MODEL, loras)
         if len(selected) > 1:
             raise workflow_lab.ComfyError("Klein 4B remains isolated to one experimental LoRA.")
-        lora = selected[0] if selected else "klein4b-deepthroat-22epoc-k3nk.safetensors"
-        selected_strength = strengths[loras.index(lora)] if selected else 0.0
-        prompt["4"]["inputs"].update({
-            "lora_name": lora,
-            "strength_model": selected_strength,
-            "strength_clip": 0.0,
-        })
+        if selected:
+            lora = selected[0]
+            selected_strength = strengths[loras.index(lora)]
+            prompt["4"]["inputs"].update({
+                "lora_name": lora,
+                "strength_model": selected_strength,
+                "strength_clip": 0.0,
+            })
+        else:
+            # The source workflow historically contains a LoRA loader.  When
+            # no runtime-approved adapter exists, bypass it completely rather
+            # than leaving a hidden/default LoRA in the graph.
+            prompt["8"]["inputs"]["model"] = ["1", 0]
+            prompt["5"]["inputs"]["clip"] = ["2", 0]
+            prompt["6"]["inputs"]["clip"] = ["2", 0]
+            prompt.pop("4", None)
         prompt["5"]["inputs"]["text"] = prompt_text
         prompt["7"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["9"]["inputs"].update({"steps": 4, "cfg": 1.0})

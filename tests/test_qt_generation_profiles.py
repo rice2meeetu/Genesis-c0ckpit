@@ -150,6 +150,47 @@ class QtGenerationProfileTests(unittest.TestCase):
         connect.assert_not_called()
         self.assertIn("Ai model volume unavailable", bridge.status)
 
+    def test_klein4b_source_route_removes_hidden_lora_when_none_is_allowed(self):
+        from qt_cockpit import GenerationBridge
+
+        bridge = GenerationBridge()
+        client = Mock()
+        client.upload_image.return_value = {"subfolder": "", "name": "source.png"}
+        prompt = {
+            "1": {"inputs": {}},
+            "2": {"inputs": {}},
+            "4": {"inputs": {
+                "model": ["1", 0],
+                "clip": ["2", 0],
+                "lora_name": "legacy-default.safetensors",
+                "strength_model": 0.8,
+                "strength_clip": 0.75,
+            }},
+            "5": {"inputs": {"clip": ["4", 1], "text": ""}},
+            "6": {"inputs": {"clip": ["4", 1], "text": ""}},
+            "7": {"inputs": {"width": 768, "height": 768, "batch_size": 1}},
+            "8": {"inputs": {"model": ["4", 0]}},
+            "9": {"inputs": {"steps": 8, "cfg": 1.0}},
+            "11": {"inputs": {"image": ""}},
+        }
+        with patch("qt_cockpit.workflow_lab.workflow_to_prompt", return_value=prompt), \
+             patch("qt_cockpit.workflow_lab.validate_prompt", return_value={
+                 "valid": True, "missing_nodes": [], "missing_inputs": []
+             }), patch.object(
+                 bridge, "_submit_and_save", return_value=Path("/tmp/out.png")
+             ) as submit:
+            bridge._run_4b_source(
+                client, {}, Path("/tmp/source.png"), "neutral portrait",
+                ["None", "None", "None"], [0.0, 0.0, 0.0],
+                512, 512, "stamp",
+            )
+
+        sent = submit.call_args.args[1]
+        self.assertNotIn("4", sent)
+        self.assertEqual(sent["8"]["inputs"]["model"], ["1", 0])
+        self.assertEqual(sent["5"]["inputs"]["clip"], ["2", 0])
+        self.assertEqual(sent["6"]["inputs"]["clip"], ["2", 0])
+
     def test_on_demand_comfy_connector_starts_guarded_backend(self):
         from qt_cockpit import GenerationBridge
         client = Mock()

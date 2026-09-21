@@ -199,3 +199,43 @@ deliberate milestone files.
   evidence points toward the kernel AMDGPU/KFD SVM/userptr path under ROCm
   memory activity; it does not establish hardware failure or a definitive root
   cause.
+
+## Diagnostic handover checkpoint — 2026-09-21
+
+- Current boot is on Ubuntu 26.04.1 with kernel `7.0.0-31-generic`. Read-only
+  verification found zero current-boot occurrences of the three KFD/SVM warning
+  names, zero SATA error signatures, and zero panic/OOM/GPU-reset/ring-timeout
+  signatures. This is an idle/light-workload result, not approval for stress.
+- The complete static suite passes: `122 passed, 1 deprecation warning` in
+  3.14 seconds. The warning is only `face_recognition_models` importing the
+  deprecated `pkg_resources` API.
+- All heavy GENESIS GPU services remain disabled. Only the lightweight control
+  bridge and remote-control service are running. Do not enable ComfyUI, Ollama,
+  llama, Qwen, voice, Builder, or overlapping GPU services casually.
+- Klein 4B routing now removes the source workflow's hidden LoRA loader whenever
+  no runtime-approved LoRA is selected, reconnecting model and CLIP inputs
+  directly. A regression test covers this exact safety behavior.
+- The Kingston SA400 root filesystem is 91% used with about 14 GB available.
+  This boot has no repeated ATA error. Earlier SMART evidence remains as recorded
+  above; a new direct SMART read requires sudo. The user plans to buy a new SSD
+  after payday. Do not erase, repartition, clone over, or retire any current
+  drive before the new installation and migration are independently verified.
+- The preferred new-system target is a clean Ubuntu 24.04.4 LTS installation
+  using an AMD-supported kernel (6.17 HWE is listed), followed by a clean,
+  officially supported ROCm/PyTorch environment. Keep the present Ubuntu
+  installation bootable as the rollback source. AMD's Radeon ROCm matrix lists
+  the RX 9060 XT/gfx1200 on Ubuntu 24.04.4 and 22.04.5; Ubuntu 26.04/kernel 7.0
+  is outside that currently validated combination.
+- A RunPod account is available for later heavy model experiments. Prefer remote
+  Klein 9B, LoRA-suite, or stress work there until the replacement-SSD migration
+  and local supported-stack validation are complete. Do not request, expose, or
+  repurpose credentials during the handover.
+- After migration, validate in this order: static tests; idle kernel baseline;
+  guarded Klein 4B no-LoRA generation; shutdown and kernel-log review; then at
+  most one explicitly approved adapter. Klein 9B and multi-stage loads remain
+  deferred until these gates pass.
+- Separate media-player finding: the troublesome Jellyfin MPV Shim installation
+  was v2.10. MPV Shim v3.0.0 adds a full in-MPV Jellyfin library browser,
+  improved `input.conf` handling and tested Wayland support. Test native MPV
+  mouse bindings first, then one clean v3 installation; do not reinstall
+  competing Desktop/Flatpak/pipx variants simultaneously.
