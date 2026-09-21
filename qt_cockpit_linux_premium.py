@@ -62,10 +62,10 @@ AI_PAGE_QML = r'''
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 10
-                        PageHeader {
-                            titleText: "GENESIS AI"
-                            subtitleText: "Private local assistant — chat, build and studio modes on your own GPU."
-                            iconText: "AI"
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text { Layout.fillWidth:true; text:"FEEFEE · AI ASSISTANT"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true }
+                            Text { text:assistantBridge.status; color:assistantBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize:11; elide:Text.ElideRight; Layout.maximumWidth:420 }
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -79,6 +79,22 @@ AI_PAGE_QML = r'''
                                     anchors.fill: parent
                                     anchors.margins: 14
                                     spacing: 9
+                                    SectionLabel { text: "FEEFEE · YOUR AI COMPANION" }
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 190
+                                        radius: 12
+                                        color: "#090a0b"
+                                        border.color: appRoot.gold
+                                        border.width: 1
+                                        Column {
+                                            anchors.centerIn: parent
+                                            spacing: 7
+                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"🐾"; color:appRoot.brightGold; font.pixelSize:44 }
+                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"FEEFEE"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true; font.letterSpacing:1.2 }
+                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"Always here · Ready to help"; color:appRoot.textDim; font.pixelSize:10 }
+                                        }
+                                    }
                                     SectionLabel { text: "ASSISTANT MODE" }
                                     GButton {
                                         Layout.fillWidth: true
@@ -150,7 +166,7 @@ AI_PAGE_QML = r'''
                                     spacing: 9
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        SectionLabel { text: "CONVERSATION" }
+                                        SectionLabel { text: "FEEFEE · CONVERSATION" }
                                         Item { Layout.fillWidth: true }
                                         Text {
                                             text: assistantBridge.busy ? "● WORKING" : "● READY"
@@ -175,12 +191,14 @@ AI_PAGE_QML = r'''
                                             onTextChanged: cursorPosition = length
                                         }
                                     }
-                                    Text {
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        text: assistantBridge.status
-                                        color: assistantBridge.busy ? appRoot.gold : appRoot.textDim
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
+                                        spacing: 6
+                                        GButton { Layout.fillWidth:true; text:"Help with a prompt"; onClicked:assistantInput.text="Help me improve this image prompt: " }
+                                        GButton { Layout.fillWidth:true; text:"Find a LoRA"; onClicked:assistantInput.text="Help me find the best local LoRA for: " }
+                                        GButton { Layout.fillWidth:true; text:"Explain workflow"; onClicked:assistantInput.text="Explain this GENESIS workflow: " }
+                                        GButton { Layout.fillWidth:true; text:"Research models"; onClicked:assistantInput.text="Compare suitable models for: " }
+                                        GButton { Layout.fillWidth:true; text:"System info"; onClicked:assistantInput.text="Give me a concise GENESIS system status summary." }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -189,7 +207,7 @@ AI_PAGE_QML = r'''
                                             id: assistantInput
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 82
-                                            placeholderText: assistantBridge.mode === "CHAT" ? "Talk to GENESIS…" : (assistantBridge.mode === "BUILD" ? "What should we build or fix?" : "Ask about prompts, models, LoRAs or workflows…")
+                                            placeholderText: assistantBridge.mode === "CHAT" ? "Ask FeeFee anything…" : (assistantBridge.mode === "BUILD" ? "What should we build or fix?" : "Ask about prompts, models, LoRAs or workflows…")
                                             color: appRoot.textMain
                                             wrapMode: TextEdit.Wrap
                                             background: Rectangle { color: "#080d12"; border.color: appRoot.line; radius: 9 }
@@ -206,6 +224,13 @@ AI_PAGE_QML = r'''
                                             }
                                         }
                                     }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text:"🐾  FeeFee"; color:appRoot.brightGold; font.pixelSize:12; font.bold:true }
+                                        Text { text:assistantBridge.busy ? "● Working" : "● Online · Ready to help"; color:assistantBridge.busy ? appRoot.gold : appRoot.success; font.pixelSize:10 }
+                                        Item { Layout.fillWidth:true }
+                                        Text { text:"Small cat. Big ideas.  ♡"; color:appRoot.textDim; font.pixelSize:11; font.italic:true }
+                                    }
                                 }
                             }
                         }
@@ -220,7 +245,7 @@ def compose_premium_qml(source: str) -> str:
         raise ValueError("Premium Linux QML settings nav marker changed.")
     source = source.replace(
         AI_NAV_MARKER,
-        '        {icon:"✦", label:"GENESIS AI", page:11},\n' + AI_NAV_MARKER,
+        '        {icon:"🐾", label:"AI Assistant", page:11},\n' + AI_NAV_MARKER,
         1,
     )
     face_swap_start = source.find(FACE_SWAP_STACK_MARKER)

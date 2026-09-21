@@ -10,7 +10,7 @@ ApplicationWindow {
     minimumWidth: 1120
     minimumHeight: 720
     title: "GENESIS c0ckpit · Linux"
-    color: "#0b0c0e"
+    color: "#070809"
     font.family: "Noto Sans"
 
     readonly property color gold: "#d2a34e"
@@ -18,10 +18,10 @@ ApplicationWindow {
     readonly property color blue: "#3aa7ff"
     readonly property color blueBright: "#75c5ff"
     readonly property color blueDeep: "#123a5a"
-    readonly property color bg: "#0b0c0e"
-    readonly property color panel: "#121416"
-    readonly property color raised: "#191c1f"
-    readonly property color raised2: "#22262a"
+    readonly property color bg: "#070809"
+    readonly property color panel: "#0e1012"
+    readonly property color raised: "#151719"
+    readonly property color raised2: "#1c1f22"
     readonly property color line: "#34393f"
     readonly property color textMain: "#eef3f6"
     readonly property color textDim: "#91a2b2"
@@ -33,10 +33,8 @@ ApplicationWindow {
     property var navItems: [
         {icon:"▣", label:"Image Generation", page:0},
         {icon:"✦", label:"Media Tools", page:3},
-        {icon:"▧", label:"Photo Library", page:4},
         {icon:"●", label:"Camera Hub", page:5},
         {icon:"⚙", label:"System Tools", page:7},
-        {icon:"Ps", label:"Canvas / Edit", page:8},
         {icon:"☷", label:"Settings", page:10}
     ]
 
@@ -44,10 +42,8 @@ ApplicationWindow {
     // intentionally have no global number shortcuts.
     Shortcut { sequence: "Alt+1"; onActivated: appRoot.pageIndex = 0 }
     Shortcut { sequence: "Alt+2"; onActivated: appRoot.pageIndex = 3 }
-    Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 4 }
-    Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 5 }
-    Shortcut { sequence: "Alt+5"; onActivated: appRoot.pageIndex = 7 }
-    Shortcut { sequence: "Alt+6"; onActivated: appRoot.pageIndex = 8 }
+    Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 5 }
+    Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 7 }
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
 
     property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
@@ -386,6 +382,10 @@ ApplicationWindow {
                         mediaBridge.chooseAndExtractAudio()
                     else if (mediaCard.actionKey === "extract video")
                         mediaBridge.chooseAndExtractVideo()
+                    else if (mediaCard.actionKey === "face swap")
+                        appRoot.pageIndex = 12
+                    else if (mediaCard.actionKey === "canvas")
+                        appRoot.pageIndex = 8
                     else
                         moduleBridge.triggerAction(mediaCard.actionKey)
                 }
@@ -415,9 +415,9 @@ ApplicationWindow {
         z: -10
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0; color: "#17191c" }
+            GradientStop { position: 0; color: "#101214" }
             GradientStop { position: 0.40; color: appRoot.bg }
-            GradientStop { position: 1; color: "#08090a" }
+            GradientStop { position: 1; color: "#050607" }
         }
         Image {
             anchors.fill: parent
@@ -592,7 +592,6 @@ ApplicationWindow {
                             GButton { Layout.fillWidth: true; text: "⌂  Create"; active: true; onClicked: appRoot.pageIndex = 0 }
                             GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
                             GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
                             GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
                             GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
                             GButton { Layout.fillWidth: true; text: "History"; enabled: false }
@@ -907,7 +906,6 @@ ApplicationWindow {
                             GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
                             GButton { Layout.fillWidth: true; text: "Pose Library"; active: true; onClicked: appRoot.pageIndex = 1 }
                             GButton { Layout.fillWidth: true; text: "Workflow"; active: false; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
                             GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
                             GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
                             GButton { Layout.fillWidth: true; text: "History"; enabled: false }
@@ -1009,7 +1007,6 @@ ApplicationWindow {
                             GButton { Layout.fillWidth: true; text: "‹  Create"; active: false; onClicked: appRoot.pageIndex = 0 }
                             GButton { Layout.fillWidth: true; text: "Pose Library"; active: false; onClicked: appRoot.pageIndex = 1 }
                             GButton { Layout.fillWidth: true; text: "Workflow"; active: true; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
                             GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
                             GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
                             GButton { Layout.fillWidth: true; text: "History"; enabled: false }
@@ -1044,9 +1041,8 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            GButton { Layout.fillWidth: true; text: "Media Tools"; active: true; onClicked: appRoot.pageIndex = 3 }
-                            GButton { Layout.fillWidth: true; text: "Photo Library"; onClicked: appRoot.pageIndex = 4 }
-                            Text { Layout.preferredWidth: 260; text: mediaBridge.status; color: appRoot.textDim; elide: Text.ElideRight }
+                            Text { Layout.fillWidth:true; text:"MEDIA TOOLS"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true }
+                            Text { Layout.preferredWidth:260; text:mediaBridge.status; color:appRoot.textDim; elide:Text.ElideRight }
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -1068,6 +1064,9 @@ ApplicationWindow {
                                     {title:"Extract MP3", body:"Extract an MP3 audio track from a video or audio file.", action:"extract audio", icon:"♫", status:"FFMPEG"},
                                     {title:"Extract Video", body:"Save a video copy while keeping its original audio track.", action:"extract video", icon:"▷", status:"FFMPEG"},
                                     {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
+                                    {title:"Duplicate Finder", body:"Review exact and near duplicates before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
+                                    {title:"Face Organiser", body:"Group and organise photos by people.", action:"face organiser", icon:"◎", status:"PEOPLE"},
+                                    {title:"Face Swap", body:"Swap a source identity onto a target image using the dedicated local workflow.", action:"face swap", icon:"◎", status:"LOCAL"},
                                     {title:"Canvas", body:"Prompt-based image editing. Layer and cutout tools are not yet implemented.", action:"canvas", icon:"Ps", status:"IN DEVELOPMENT"}
                                 ]
                                 MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
@@ -1077,24 +1076,9 @@ ApplicationWindow {
                     }
                 }
 
+                // Page 4 retained for compatibility with older saved navigation state.
                 Item {
-                    ColumnLayout {
-                        anchors.fill: parent; spacing: 10
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 6
-                            GButton { Layout.fillWidth: true; text: "Media Tools"; onClicked: appRoot.pageIndex = 3 }
-                            GButton { Layout.fillWidth: true; text: "Photo Library"; active: true; onClicked: appRoot.pageIndex = 4 }
-                        }
-                        GridLayout { Layout.fillWidth: true; Layout.fillHeight: true; columns: 3; rowSpacing: 10; columnSpacing: 10
-                            Repeater { model: [
-                                {title:"Media Viewer", body:"Thumbnail library, large preview and image metadata.", action:"media viewer", icon:"▧", status:"BROWSE"},
-                                {title:"Duplicate Finder", body:"Review exact and near duplicates side-by-side before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
-                                {title:"Face Organiser", body:"People workspace for face grouping and photo organisation.", action:"face organiser", icon:"◎", status:"PEOPLE"}
-                            ]
-                            MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status } }
-                        }
-                    }
+                    Component.onCompleted: if (appRoot.pageIndex === 4) appRoot.pageIndex = 3
                 }
 
                 Item {
@@ -1143,7 +1127,6 @@ ApplicationWindow {
                             GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
                             GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
                             GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Face Swap"; onClicked: appRoot.pageIndex = 12 }
                             GButton { Layout.fillWidth: true; text: "Pose Maker"; active: true; onClicked: appRoot.pageIndex = 9 }
                             GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
                             GButton { Layout.fillWidth: true; text: "History"; enabled: false }
@@ -1169,7 +1152,6 @@ ApplicationWindow {
                             GButton { Layout.fillWidth: true; text: "‹  Create"; onClicked: appRoot.pageIndex = 0 }
                             GButton { Layout.fillWidth: true; text: "Pose Library"; onClicked: appRoot.pageIndex = 1 }
                             GButton { Layout.fillWidth: true; text: "Workflow"; onClicked: appRoot.pageIndex = 2 }
-                            GButton { Layout.fillWidth: true; text: "Face Swap"; active: true; onClicked: appRoot.pageIndex = 12 }
                             GButton { Layout.fillWidth: true; text: "Pose Maker"; onClicked: appRoot.pageIndex = 9 }
                             GButton { Layout.fillWidth: true; text: "Compare"; enabled: false }
                             GButton { Layout.fillWidth: true; text: "History"; enabled: false }

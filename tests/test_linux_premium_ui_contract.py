@@ -65,7 +65,7 @@ def test_linux_launcher_loads_full_pose_index_premium_qml_and_ai():
     assert 'UI_ROOT / "MainPremiumLinux.qml"' in launcher
     assert '"settings": 10' in launcher
     assert '"ai": 11' in launcher
-    assert 'label:"GENESIS AI", page:11' in launcher
+    assert 'label:"AI Assistant", page:11' in launcher
     assert "AssistantBridge" in launcher
     assert "CHAT · ROCINANTE" in launcher
     assert "BUILD · QWEN CODER" in launcher

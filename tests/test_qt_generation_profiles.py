@@ -144,7 +144,8 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertEqual(counts, {2})
         root = Path(__file__).resolve().parents[1]
         qml = (root / "genesis/qt_ui/MainPremiumLinux.qml").read_text(encoding="utf-8")
-        self.assertIn('text: "Face Swap"; active: true; onClicked: appRoot.pageIndex = 12', qml)
+        self.assertIn('{title:"Face Swap"', qml)
+        self.assertIn('mediaCard.actionKey === "face swap"', qml)
         self.assertIn("faceSwapTarget", qml)
         self.assertIn("faceSwapSource", qml)
         self.assertIn("genesisBridge.queueFaceSwap", qml)
