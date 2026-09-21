@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 119 tests
+- Current automated suite passes: 120 tests
 
 ## Current Architecture
 
@@ -151,7 +151,9 @@ deliberate milestone files.
   ComfyUI. If the model symlink is unavailable because the volume is not mounted,
   GENESIS resolves `/dev/disk/by-label/Ai` and mounts it through `udisksctl` with
   `--options ro`. Existing read-write mounts are refused rather than silently used.
-  The live helper currently reports the required 4B model volume ready read-only.
+  This was live-verified by unmounting `/dev/sdc3`, observing the 4B symlink become
+  unavailable, then calling the GENESIS helper; it remounted `Ai` read-only and the
+  7.3 GB model resolved again without starting ComfyUI or producing GPU/SATA errors.
 - The premium Linux cockpit launcher now uses a runtime `QLockFile` singleton
   guard to prevent duplicate cockpit instances. A duplicate pair had been seen
   immediately before an unexpected ComfyUI start; the later duplicate was

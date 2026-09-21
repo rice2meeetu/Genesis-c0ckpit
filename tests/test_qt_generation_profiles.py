@@ -134,6 +134,22 @@ class QtGenerationProfileTests(unittest.TestCase):
                 ["one.safetensors", "one.safetensors"], [0.5, 0.7],
             )
 
+    def test_klein4b_generation_checks_model_volume_before_comfy_start(self):
+        from qt_cockpit import GenerationBridge, FOUR_B_MODEL
+        bridge = GenerationBridge()
+        with patch(
+            "qt_cockpit.integrations.ensure_ai_model_volume_readonly",
+            return_value=(False, "Ai model volume unavailable"),
+        ) as storage, patch.object(bridge, "_connect_comfyui") as connect:
+            bridge._run_generate(
+                "neutral studio portrait", "", 512, 512, FOUR_B_MODEL,
+                "None", "None", "None", 0.0, 0.0, 0.0,
+                None, None, False, False, False,
+            )
+        storage.assert_called_once()
+        connect.assert_not_called()
+        self.assertIn("Ai model volume unavailable", bridge.status)
+
     def test_on_demand_comfy_connector_starts_guarded_backend(self):
         from qt_cockpit import GenerationBridge
         client = Mock()
