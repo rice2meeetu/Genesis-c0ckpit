@@ -163,10 +163,15 @@ deliberate milestone files.
   explicitly approved after the kernel/KFD SVM mitigation review.
 - The 06:20-06:25 incident window also contained one real SATA link event on
   the Kingston SA400 root SSD (`BadCRC`/`ICRC`, two failed queued reads, one
-  ata5 hard reset). Cached SMART at 12:50 AWST reports healthy overall status,
-  zero failing attributes, zero bad sectors, and `UDMA_CRC_Error_Count = 1`;
-  this fits a one-off SATA data-link/cable/connector error better than proven
-  NAND/media failure. No repeat SATA error has occurred on the current boot.
+  ata5 hard reset). Cached SMART at 12:50 AWST reported healthy overall status,
+  zero failing attributes, zero bad sectors, and `UDMA_CRC_Error_Count = 1`.
+  A post-load SMART refresh at about 13:40 AWST still reports zero failing
+  attributes and zero bad sectors, and the CRC raw count remains exactly 1 after
+  the 7.3 GB model read plus an unmount/remount cycle. Historical raw values of
+  `reported-uncorrect = 3` and `reallocated-event-count = 3` are present but are
+  not currently marked failing. No repeat SATA error has occurred on this boot;
+  the observed incident still fits a link/cable/connector event better than a
+  newly demonstrated media failure.
 - The manual Klein 4B LoRA benchmark had bypassed the normal compatibility
   layer and directly tried blocked `FLUX2_KLEIN_UNLOCKED_V1.safetensors`.
   GPU LoRA benchmarks now call `is_compatible()` and static tests ensure every
