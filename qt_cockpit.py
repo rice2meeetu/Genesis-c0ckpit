@@ -1021,6 +1021,9 @@ class GenerationBridge(QObject):
         return self._submit_and_save(client, prompt, stamp, "Klein4B")
 
     def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
+        safe, detail = integrations.gpu_kernel_preflight()
+        if not safe:
+            raise workflow_lab.ComfyError(detail)
         problems = unavailable_local_assets(prompt, MODEL_ROOTS)
         if problems:
             raise workflow_lab.ComfyError("Local asset check failed: " + " ".join(problems))

@@ -54,7 +54,7 @@ Completed:
   queue and RX 9060 XT GPU acceleration available
 - All ten Qt Cockpit pages launched successfully on the host display; automated
   Wayland/XWayland screenshots remain black and are not treated as a visual pass
-- Current automated suite passes: 107 tests
+- Current automated suite passes: 109 tests
 
 ## Current Architecture
 
@@ -123,6 +123,10 @@ deliberate milestone files.
 - A backend-idle ComfyUI startup with those flags completed cleanly and was
   stopped again: current-boot counts remain zero for `svm_range_restore_work`,
   `svm_range_deferred_list_work`, and `amdgpu_amdkfd_restore_userptr_worker`.
+- GENESIS now has a boot-scoped GPU safety latch: GPU-service starts and every
+  ComfyUI submit check the current kernel log for those KFD/SVM warning names.
+  If any has appeared, further GPU work is refused with a reboot-required
+  safety message instead of continuing repeated jobs in the same boot.
 - Do not run Klein 9B, full LoRA benchmark suites, GPU stress tests, or
   overlapping ROCm workloads until a controlled loaded-workload retest is
   explicitly approved after the kernel/KFD SVM mitigation review.

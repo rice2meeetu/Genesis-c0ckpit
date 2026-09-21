@@ -116,6 +116,24 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn(integrations.QWEN_SERVICE, detail)
         run.assert_not_called()
 
+    def test_gpu_kernel_preflight_is_clean_without_svm_warning(self):
+        with patch("genesis.integrations.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "normal kernel output"
+            self.assertEqual(
+                integrations.gpu_kernel_preflight(),
+                (True, "GPU kernel preflight clean."),
+            )
+
+    def test_gpu_kernel_preflight_latches_after_svm_warning(self):
+        with patch("genesis.integrations.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "workqueue: svm_range_restore_work [amdgpu] hogged CPU"
+            ok, detail = integrations.gpu_kernel_preflight()
+        self.assertFalse(ok)
+        self.assertIn("reboot required", detail)
+        self.assertIn("svm_range_restore_work", detail)
+
 
 if __name__ == "__main__":
     unittest.main()

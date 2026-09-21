@@ -181,7 +181,12 @@ def service_state(name: str):
 
 
 GPU_SERVICES = {LLAMA_SERVICE, QWEN_SERVICE, ASSISTANT_SERVICE, COMFYUI_SERVICE, BUILDER_SERVICE}
-GPU_TRANSITION_COOLDOWN_SECONDS = 8
+GPU_TRANSITION_COOLDOWN_SECONDS = 10
+GPU_SVM_WARNING_PATTERNS = (
+    "svm_range_restore_work",
+    "svm_range_deferred_list_work",
+    "amdgpu_amdkfd_restore_userptr_worker",
+)
 
 
 def _gpu_services_active(exclude=None):
@@ -199,6 +204,26 @@ def _wait_for_gpu_services_idle(exclude=None, timeout=15):
     return False, _gpu_services_active(exclude)
 
 
+def gpu_kernel_preflight():
+    """Latch GPU work off after an AMD KFD/SVM warning appears this boot."""
+    try:
+        result = subprocess.run(
+            ["journalctl", "-k", "-b", "--no-pager"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return True, "Kernel GPU warning check unavailable."
+    if result.returncode != 0:
+        return True, "Kernel GPU warning check unavailable."
+    hits = [pattern for pattern in GPU_SVM_WARNING_PATTERNS if pattern in result.stdout]
+    if hits:
+        return False, "GPU safety latch: reboot required after KFD/SVM warning: " + ", ".join(hits)
+    return True, "GPU kernel preflight clean."
+
+
 def start_user_service(name: str, already_online=False):
     if already_online:
         return True, "Already running — no duplicate started."
@@ -206,6 +231,9 @@ def start_user_service(name: str, already_online=False):
         active = _gpu_services_active({name})
         if active:
             return False, "GPU busy: stop " + ", ".join(sorted(active)) + " before switching workloads."
+        safe, detail = gpu_kernel_preflight()
+        if not safe:
+            return False, detail
         idle, active = _wait_for_gpu_services_idle({name})
         if not idle:
             return False, "GPU transition blocked; still active: " + ", ".join(sorted(active))
