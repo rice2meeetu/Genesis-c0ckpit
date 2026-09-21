@@ -421,7 +421,7 @@ def start_comfyui() -> str:
     cmd = (
         f'source "{CONDA_SH}" && '
         f'conda activate "{COMFY_ENV}" && '
-        'exec python main.py --disable-pinned-memory --async-offload 1 --reserve-vram 1 --vram-headroom 1 --preview-method none'
+        'exec python main.py --lowvram --force-fp16 --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --listen 127.0.0.1 --port 8188'
     )
 
     log_fh = open(COMFY_MANAGED_LOG, "a", buffering=1)
@@ -3383,9 +3383,9 @@ with gr.Blocks(title="GENESIS Pose Maker — V14") as demo:
             pose_library_next_btn = gr.Button("NEXT ▶", elem_classes="sec-btn")
 
     with gr.Row():
-        use_stage2 = gr.Checkbox(True, label="Enable Stage 2 — selected model refinement")
-        use_stage3 = gr.Checkbox(True, label="Enable Stage 3 — ReActor")
-        memory_safe_restart = gr.Checkbox(True, label="Memory-safe restart between stages")
+        use_stage2 = gr.Checkbox(False, label="Enable Stage 2 — selected model refinement (manual in SVM-safe mode)")
+        use_stage3 = gr.Checkbox(False, label="Enable Stage 3 — ReActor (manual in SVM-safe mode)")
+        memory_safe_restart = gr.Checkbox(False, label="Restart ComfyUI between stages — disabled for KFD/SVM stability", interactive=False)
         on_demand_backend = gr.Checkbox(True, label="On-demand ComfyUI — stop backend when idle")
 
     with gr.Accordion("STAGE 1 CONFIG — Phr00t / Qwen Pose", open=True, elem_classes="config-accordion"):

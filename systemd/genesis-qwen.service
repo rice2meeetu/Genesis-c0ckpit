@@ -6,9 +6,11 @@ ConditionPathExists=/mnt/AI-Storage/GENESIS-LLM/Qwen3-Coder-30B-A3B-Instruct-UD-
 
 [Service]
 Type=simple
+# KFD/SVM safety: allow mappings from the previous ROCm workload to settle.
+ExecStartPre=/bin/sleep 10
 ExecStart=/mnt/AI-Storage/llama.cpp/build-rocm/bin/llama-server --model /mnt/AI-Storage/GENESIS-LLM/Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL.gguf --alias genesis-qwen --host 127.0.0.1 --port 8082 --ctx-size 8192 --n-gpu-layers 99
 Restart=on-failure
-RestartSec=5
+RestartSec=30
 StandardOutput=append:%h/.local/state/genesis/qwen-assistant.log
 StandardError=append:%h/.local/state/genesis/qwen-assistant.log
 

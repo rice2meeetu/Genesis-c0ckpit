@@ -45,12 +45,9 @@ KREA2_LORAS = {
     "snofs_krea_v1_3D.safetensors",
 }
 
-# Krea-native adapters with published community evidence of successful Klein 9B
-# use. Keep distinct from native compatibility until a local fixed-seed render passes.
-KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS = {
-    "lenovo_krea2_2.safetensors",
-    "snofs_krea_v1_3D.safetensors",
-}
+# Cross-family adapters remain blocked on Klein 9B until a local fixed-seed
+# validation passes without model-shape errors or KFD/SVM warnings.
+KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS: set[str] = set()
 
 # These names must stay blocked even if their filename looks like a known
 # family.  Move a file into a verified set only after metadata/source evidence
@@ -155,8 +152,6 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     family = model_family(model)
     if family == "flux2_klein_9b_kv":
         return base in KLEIN_9B_KV_VERIFIED_LORAS
-    if family == "flux2_klein_9b_base" and base in KLEIN_9B_COMMUNITY_CROSS_FAMILY_LORAS:
-        return True
     return lora_family(lora) == family
 
 
@@ -174,7 +169,7 @@ def compatibility_note(model: str | None) -> str:
     family = model_family(model)
     return {
         "flux2_klein_4b": "Klein 4B · only verified 4B LoRAs",
-        "flux2_klein_9b_base": "Klein 9B Base · verified 9B + community cross-family LoRAs (local validation pending)",
+        "flux2_klein_9b_base": "Klein 9B Base · native verified 9B LoRAs only",
         "flux2_klein_9b_kv": "Klein 9B-KV · LoRAs disabled until KV render verification",
         "krea2": "Krea 2 · only Krea 2 LoRAs",
         "aisha_9b": "Aisha 9B · use only adapters verified specifically with Aisha",

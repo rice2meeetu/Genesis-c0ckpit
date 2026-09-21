@@ -41,11 +41,11 @@ class ModelCompatibilityTests(unittest.TestCase):
     def test_known_sdxl_checkpoint_accepts_sdxl_adapter(self):
         self.assertTrue(is_compatible("juggernautXL_ragnarokBy.safetensors", "add-detail-xl.safetensors"))
 
-    def test_local_krea2_loras_keep_native_family_but_are_community_allowed_on_klein9b(self):
+    def test_local_krea2_loras_are_blocked_on_klein9b_until_local_validation(self):
         model = "flux-2-klein-base-9b-Q4_K_M.gguf"
         for name in ("snofs_krea_v1_3D.safetensors", "lenovo_krea2_2.safetensors"):
             self.assertEqual(lora_family(name), "krea2")
-            self.assertTrue(is_compatible(model, name))
+            self.assertFalse(is_compatible(model, name))
 
     def test_only_metadata_verified_regular_9b_loras_are_enabled(self):
         model = "flux-2-klein-base-9b-Q4_K_M.gguf"
@@ -77,11 +77,11 @@ class ModelCompatibilityTests(unittest.TestCase):
     def test_explicit_unverified_names_stay_blocked_even_if_filename_matches(self):
         self.assertFalse(is_compatible("flux-2-klein-base-9b-Q4_K_M.gguf", "FLUX2_KLEIN_UNLOCKED_V1.safetensors"))
 
-    def test_community_krea_loras_are_exposed_for_regular_klein9b_only(self):
+    def test_cross_family_krea_loras_are_blocked_for_both_klein9b_routes(self):
         regular = "flux-2-klein-base-9b-Q4_K_M.gguf"
         kv = "flux-2-klein-9b-kv-fp8.safetensors"
         for name in ("snofs_krea_v1_3D.safetensors", "lenovo_krea2_2.safetensors"):
-            self.assertTrue(is_compatible(regular, name))
+            self.assertFalse(is_compatible(regular, name))
             self.assertFalse(is_compatible(kv, name))
 
 

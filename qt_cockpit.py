@@ -856,7 +856,7 @@ class GenerationBridge(QObject):
             return
         try:
             selected_loras = compatible_selection(model_name, [lora_one, lora_two, lora_three])
-            max_loras = 3 if model_name == REGULAR_9B_MODEL else (1 if model_name == FOUR_B_MODEL else 0)
+            max_loras = 1 if model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL} else 0
             if len(selected_loras) > max_loras:
                 raise ValueError(f"{model_name} allows {max_loras} LoRA slot(s).")
             if any(value < 0.0 or value > 1.0 for value in (lora_one_strength, lora_two_strength, lora_three_strength)):

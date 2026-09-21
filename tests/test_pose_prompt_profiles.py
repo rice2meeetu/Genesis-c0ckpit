@@ -39,10 +39,10 @@ class PosePromptProfileTests(unittest.TestCase):
         self.assertEqual(mode, "paired")
         self.assertEqual(negative, record.negative_prompt)
 
-    def test_community_cross_family_recommendations_are_available_for_klein9b(self):
+    def test_klein9b_recommendations_are_native_only_during_svm_investigation(self):
         names = [x["name"] for x in self.prompt_map.filtered_lora_recommendations("flux-2-klein-base-9b-Q4_K_M.gguf")]
-        self.assertIn("snofs_krea_v1_3D.safetensors", names)
-        self.assertIn("lenovo_krea2_2.safetensors", names)
+        self.assertNotIn("snofs_krea_v1_3D.safetensors", names)
+        self.assertNotIn("lenovo_krea2_2.safetensors", names)
         self.assertIn("Klein_Anatomy_Revamped.safetensors", names)
         self.assertIn("Flux Klein - NSFW v2.safetensors", names)
         self.assertNotIn("FLUX2_KLEIN_UNLOCKED_V1.safetensors", names)
