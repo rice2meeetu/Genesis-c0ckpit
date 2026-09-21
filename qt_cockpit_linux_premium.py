@@ -87,12 +87,23 @@ AI_PAGE_QML = r'''
                                         color: "#090a0b"
                                         border.color: appRoot.gold
                                         border.width: 1
-                                        Column {
+                                        Image {
+                                            id: feefeeAvatar
+                                            objectName: "feefeeAvatar"
+                                            anchors.fill: parent
+                                            anchors.margins: 5
+                                            source: genesisAssetRoot + "../feefee-avatar-reference.jpg"
+                                            // Display the cat from the original uploaded viewer screenshot.
+                                            sourceClipRect: Qt.rect(164, 0, 514, 514)
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            Accessible.name: "FeeFee, wearing a straw hat and black robe"
+                                        }
+                                        Text {
                                             anchors.centerIn: parent
-                                            spacing: 7
-                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"🐾"; color:appRoot.brightGold; font.pixelSize:44 }
-                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"FEEFEE"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true; font.letterSpacing:1.2 }
-                                            Text { anchors.horizontalCenter:parent.horizontalCenter; text:"Always here · Ready to help"; color:appRoot.textDim; font.pixelSize:10 }
+                                            visible: feefeeAvatar.status === Image.Error
+                                            text: "FeeFee image unavailable"
+                                            color: appRoot.textDim
                                         }
                                     }
                                     SectionLabel { text: "ASSISTANT MODE" }
@@ -227,7 +238,7 @@ AI_PAGE_QML = r'''
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text:"🐾  FeeFee"; color:appRoot.brightGold; font.pixelSize:12; font.bold:true }
-                                        Text { text:assistantBridge.busy ? "● Working" : "● Online · Ready to help"; color:assistantBridge.busy ? appRoot.gold : appRoot.success; font.pixelSize:10 }
+                                        Text { text:assistantBridge.busy ? "● Working" : "● Idle"; color:assistantBridge.busy ? appRoot.gold : appRoot.success; font.pixelSize:10 }
                                         Item { Layout.fillWidth:true }
                                         Text { text:"Small cat. Big ideas.  ♡"; color:appRoot.textDim; font.pixelSize:11; font.italic:true }
                                     }
