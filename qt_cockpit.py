@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import struct
 import subprocess
 import sys
@@ -27,6 +28,7 @@ from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import adapt_prompt, compatible_selection
 from genesis import integrations, workflow_lab
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character
+from genesis.media_bridge import MediaBridge
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -48,9 +50,25 @@ QWEN_MODEL = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
 FOUR_B_MODEL = "flux-2-klein-4b.safetensors"
 TEXT_ENCODER_4B = "qwen_3_4b_fp4_flux2.safetensors"
 TEXT_ENCODER_9B = "qwen_3_8b_fp8mixed.safetensors"
-SUPPORTED_CREATE_MODELS = {FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL}
+
+# MARTY RunPod models verified from the live ComfyUI catalog.
+REMOTE_PHR00T_MODEL = "Qwen-Rapid-NSFW-v23_Q8_0.gguf"
+REMOTE_PHR00T_CLIP = "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+REMOTE_PHR00T_VAE = "qwen_image_vae.safetensors"
+REMOTE_KLEIN_9B_MODEL = "flux-2-klein-9b.safetensors"
+REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"
+REMOTE_9B_CLIP = "qwen_3_8b_fp8mixed.safetensors"
+REMOTE_9B_VAE = "flux2-vae.safetensors"
+REMOTE_SOURCE_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}
+
+SUPPORTED_CREATE_MODELS = {
+    FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL,
+    *REMOTE_SOURCE_MODELS,
+}
 OUTPUT_DIR = Path.home() / "GENESIS-Exports"
 REFERENCE_WORKFLOW_ROOT = PROJECT_ROOT / "genesis" / "reference" / "pose_workflows"
+REMOTE_PHR00T_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "PHR00T_QWEN_RAPID_V23.json"
+REMOTE_KLEIN9B_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "KLEIN9B_REMOTE.json"
 STAGE_1_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_1_PHR00T_POSE.json"
 STAGE_2_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_2_LUSTIFY_REFINE.json"
 STAGE_3_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_3_REACTOR_ROCM.json"
@@ -207,8 +225,104 @@ def load_grok_preset_items() -> list[dict]:
                 })
     return out
 
+def _remote_choice_values(info: dict, node_types: tuple[str, ...], input_name: str) -> list[str]:
+    values: set[str] = set()
+    for node_type in node_types:
+        spec = (info.get(node_type, {}).get("input", {}).get("required", {}) or {}).get(input_name)
+        if isinstance(spec, (list, tuple)) and spec and isinstance(spec[0], (list, tuple)):
+            values.update(str(value) for value in spec[0] if value)
+    return sorted(values, key=str.casefold)
+
+
+def build_remote_generation_profiles(info: dict) -> list[dict]:
+    """Build GENESIS model rows from a live remote ComfyUI /object_info catalog."""
+    checkpoints = _remote_choice_values(info, ("CheckpointLoaderSimple",), "ckpt_name")
+    diffusion = _remote_choice_values(info, ("UNETLoader", "UnetLoaderGGUF"), "unet_name")
+    loras = _remote_choice_values(
+        info, ("LoraLoader", "LoraLoaderModelOnly", "LoraLoaderBypass"), "lora_name"
+    )
+    models = list(dict.fromkeys([*checkpoints, *diffusion]))
+    labels = {
+        REMOTE_PHR00T_MODEL: "RunPod · Phr00t v23",
+        REMOTE_KLEIN_9B_MODEL: "RunPod · FLUX.2 Klein 9B",
+        REMOTE_AISHA_9B_MODEL: "RunPod · Aisha 9B v9.7",
+        QWEN_MODEL: "RunPod · Phr00t / QwenRapid AIO",
+        FOUR_B_MODEL: "RunPod · FLUX.2 Klein 4B",
+        REGULAR_9B_MODEL: "RunPod · FLUX.2 Klein 9B Base",
+        KV_9B_MODEL: "RunPod · FLUX.2 Klein 9B-KV FP8",
+    }
+    defaults = {
+        REMOTE_PHR00T_MODEL: {
+            "defaultWidth": 2264, "defaultHeight": 1360, "defaultSteps": 4,
+            "defaultCfg": 1.2, "defaultDenoise": 1.0,
+            "defaultSampler": "euler_ancestral", "defaultScheduler": "beta",
+        },
+        REMOTE_KLEIN_9B_MODEL: {
+            "defaultWidth": 1920, "defaultHeight": 1520, "defaultSteps": 5,
+            "defaultCfg": 1.0, "defaultDenoise": 1.0,
+            "defaultSampler": "euler", "defaultScheduler": "beta",
+        },
+        REMOTE_AISHA_9B_MODEL: {
+            "defaultWidth": 1920, "defaultHeight": 1520, "defaultSteps": 5,
+            "defaultCfg": 1.0, "defaultDenoise": 1.0,
+            "defaultSampler": "euler", "defaultScheduler": "beta",
+        },
+    }
+    rows: list[dict] = []
+    for model_name in models:
+        compatible = compatible_loras(model_name, loras)
+        runnable = model_name in SUPPORTED_CREATE_MODELS
+        row = {
+            "label": labels.get(model_name, "RunPod · " + model_name),
+            "model": model_name,
+            "note": (compatibility_note(model_name) if runnable else "Remote model detected · workflow mapping pending"),
+            "loras": ["None", *compatible],
+            "triggers": {},
+            "ready": True,
+            "runnable": runnable,
+            "sourceRequired": model_name in REMOTE_SOURCE_MODELS or model_name == QWEN_MODEL,
+            "maxLoras": 1 if model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL} else 0,
+            "experimentalLoras": model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL},
+            "remote": True,
+        }
+        row.update(defaults.get(model_name, {}))
+        rows.append(row)
+    priority = {
+        REMOTE_PHR00T_MODEL: 0, REMOTE_KLEIN_9B_MODEL: 1, REMOTE_AISHA_9B_MODEL: 2,
+        QWEN_MODEL: 3, FOUR_B_MODEL: 4, REGULAR_9B_MODEL: 5, KV_9B_MODEL: 6,
+    }
+    rows.sort(key=lambda item: (priority.get(item["model"], 99), item["label"].casefold()))
+    return rows
+
+
 def load_generation_profiles() -> list[dict]:
-    """Read installed model/LoRA names without loading any model tensors."""
+    """Read the active backend catalog without blocking the Qt startup thread."""
+    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
+    if remote_url:
+        cache_path = Path.home() / ".cache" / "genesis" / "runpod-object-info.json"
+        try:
+            if cache_path.is_file():
+                remote_info = json.loads(cache_path.read_text(encoding="utf-8"))
+                rows = build_remote_generation_profiles(remote_info)
+                if rows:
+                    return rows
+        except (OSError, json.JSONDecodeError, ValueError):
+            pass
+
+        # Never block the UI on a remote /object_info call.  Keep the three
+        # validated RunPod engines available even if the last catalog cache is absent.
+        remote_info = {
+            "UnetLoaderGGUF": {
+                "input": {"required": {"unet_name": [[REMOTE_PHR00T_MODEL], {}]}}
+            },
+            "UNETLoader": {
+                "input": {"required": {"unet_name": [[REMOTE_KLEIN_9B_MODEL], {}]}}
+            },
+            "CheckpointLoaderSimple": {
+                "input": {"required": {"ckpt_name": [[REMOTE_AISHA_9B_MODEL], {}]}}
+            },
+        }
+        return build_remote_generation_profiles(remote_info)
     loras: set[str] = set()
     triggers: dict[str, list[str]] = {}
     for root in MODEL_ROOTS:
@@ -278,8 +392,11 @@ def build_create_prompt(
     lora_strengths: list[float] | None = None,
 ) -> dict:
     """Build one of the two live-validated Create graphs selected in QML."""
-    width = max(256, min(1536, int(width)))
-    height = max(256, min(1536, int(height)))
+    # Keep the RX 9060 local path conservative, but let the remote A100
+    # honor the full resolution range exposed by the premium UI.
+    max_dimension = 4096 if os.environ.get("GENESIS_COMFY_URL") else 1536
+    width = max(256, min(max_dimension, int(width)))
+    height = max(256, min(max_dimension, int(height)))
     loras = loras or []
 
     if model_name == REGULAR_9B_MODEL:
@@ -409,7 +526,18 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
 
 
 def load_runtime_status() -> dict:
-    """Read live local service/GPU state without starting or stopping anything."""
+    """Return a fast startup-safe backend status without starting any GPU service."""
+    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
+    if remote_url:
+        online = integrations.endpoint_online(remote_url, "/system_stats", timeout=0.25)
+        return {
+            "comfyOnline": online,
+            "gpuName": "RunPod / Remote ComfyUI" if online else "RunPod offline",
+            "vramUsedGiB": 0,
+            "vramTotalGiB": 0,
+            "ready": online,
+            "remote": True,
+        }
     try:
         stats = workflow_lab.system_stats()
         metrics = workflow_lab.gpu_metrics(stats)
@@ -420,6 +548,7 @@ def load_runtime_status() -> dict:
             "vramUsedGiB": round(metrics["vram_used"] / gib, 1),
             "vramTotalGiB": round(metrics["vram_total"] / gib, 1),
             "ready": workflow_lab.gpu_acceleration_available(stats),
+            "remote": False,
         }
     except Exception:
         return {
@@ -428,6 +557,7 @@ def load_runtime_status() -> dict:
             "vramUsedGiB": 0,
             "vramTotalGiB": 0,
             "ready": False,
+            "remote": False,
         }
 
 
@@ -611,6 +741,7 @@ class GenerationBridge(QObject):
 
     statusChanged = pyqtSignal()
     busyChanged = pyqtSignal()
+    progressChanged = pyqtSignal()
     previewChanged = pyqtSignal()
     charactersChanged = pyqtSignal()
 
@@ -618,6 +749,7 @@ class GenerationBridge(QObject):
         super().__init__(parent)
         self._status = "Ready"
         self._busy = False
+        self._progress = -1.0
         self._preview = ""
         self._settings = QSettings("GENESIS", "c0ckpit")
         configured_output = str(self._settings.value("generation/output_dir", str(OUTPUT_DIR)))
@@ -630,6 +762,10 @@ class GenerationBridge(QObject):
     @pyqtProperty(bool, notify=busyChanged)
     def busy(self) -> bool:
         return self._busy
+
+    @pyqtProperty(float, notify=progressChanged)
+    def progress(self) -> float:
+        return self._progress
 
     @pyqtProperty(str, notify=previewChanged)
     def previewUrl(self) -> str:
@@ -655,25 +791,34 @@ class GenerationBridge(QObject):
         self._busy = value
         self.busyChanged.emit()
 
+    def _set_progress(self, value: float) -> None:
+        self._progress = max(-1.0, min(1.0, float(value)))
+        self.progressChanged.emit()
+
     def _set_preview(self, value: str) -> None:
         self._preview = value
         self.previewChanged.emit()
 
     def _connect_comfyui(self):
-        safe, detail = integrations.gpu_kernel_preflight()
-        if not safe:
-            raise workflow_lab.ComfyError(detail)
-        online = integrations.endpoint_online(
-            integrations.COMFYUI_URL, "/system_stats", timeout=0.8
-        )
-        ok, detail = integrations.start_user_service(
-            integrations.COMFYUI_SERVICE, already_online=online
-        )
-        if not ok:
-            raise workflow_lab.ComfyError(detail)
-        client = workflow_lab.ComfyClient(workflow_lab.COMFY_URL)
-        deadline = time.monotonic() + 30
+        comfy_url = os.environ.get("GENESIS_COMFY_URL", workflow_lab.COMFY_URL).rstrip("/")
+        remote_backend = comfy_url != workflow_lab.COMFY_URL.rstrip("/")
+        if not remote_backend:
+            safe, detail = integrations.gpu_kernel_preflight()
+            if not safe:
+                raise workflow_lab.ComfyError(detail)
+            online = integrations.endpoint_online(
+                integrations.COMFYUI_URL, "/system_stats", timeout=0.8
+            )
+            ok, detail = integrations.start_user_service(
+                integrations.COMFYUI_SERVICE, already_online=online
+            )
+            if not ok:
+                raise workflow_lab.ComfyError(detail)
+        client = workflow_lab.ComfyClient(comfy_url, timeout=8 if remote_backend else 20)
+        deadline = time.monotonic() + (8 if remote_backend else 30)
         last_error = "backend not ready"
+        if remote_backend:
+            self._set_status("Connecting to RunPod ComfyUI…")
         while time.monotonic() < deadline:
             try:
                 stats = client.system_stats()
@@ -683,6 +828,10 @@ class GenerationBridge(QObject):
             except Exception as exc:
                 last_error = str(exc)
             time.sleep(0.5)
+        if remote_backend:
+            raise workflow_lab.ComfyError(
+                "RunPod ComfyUI is offline or the tunnel is unavailable: " + last_error
+            )
         raise workflow_lab.ComfyError(f"ComfyUI did not become GPU-ready: {last_error}")
 
     @pyqtProperty("QVariantList", notify=charactersChanged)
@@ -765,6 +914,70 @@ class GenerationBridge(QObject):
         finally:
             self._set_busy(False)
 
+    @pyqtSlot(str, str)
+    def queueFaceFusion(self, target_url: str, source_url: str) -> None:
+        """Run the installed FaceFusion headlessly with the existing tuned config."""
+        if self._busy:
+            return
+        target = Path(QUrl(target_url).toLocalFile()) if target_url else Path()
+        source = Path(QUrl(source_url).toLocalFile()) if source_url else Path()
+        if not target.is_file() or not source.is_file():
+            self._set_status("Choose both a target image and a source image.")
+            return
+
+        ff_root = integrations.FACEFUSION_ROOT
+        ff_python = Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
+        ff_entry = ff_root / "facefusion.py"
+        ff_config = ff_root / "facefusion.ini"
+        if not ff_python.is_file() or not ff_entry.is_file() or not ff_config.is_file():
+            self._set_status("FaceFusion install is unavailable.")
+            return
+
+        self._set_busy(True)
+        self._set_status("Preparing FaceFusion · HyperSwap ROCm…")
+        threading.Thread(
+            target=self._run_facefusion,
+            args=(target, source, ff_python, ff_entry, ff_config),
+            daemon=True,
+        ).start()
+
+    def _run_facefusion(
+        self, target: Path, source: Path, ff_python: Path, ff_entry: Path, ff_config: Path
+    ) -> None:
+        try:
+            self._output_dir.mkdir(parents=True, exist_ok=True)
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            suffix = target.suffix.lower() if target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"} else ".png"
+            output = self._output_dir / f"GENESIS-FaceFusion-{stamp}{suffix}"
+            command = [
+                str(ff_python), str(ff_entry), "headless-run",
+                "--config-path", str(ff_config),
+                "--source-paths", str(source),
+                "--target-path", str(target),
+                "--output-path", str(output),
+                "--workflow-mode", "image-to-image",
+            ]
+            completed = subprocess.run(
+                command,
+                cwd=str(integrations.FACEFUSION_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=1800,
+                check=False,
+            )
+            if completed.returncode != 0 or not output.is_file():
+                tail = "\n".join((completed.stdout or "").splitlines()[-8:])
+                raise RuntimeError(tail or f"FaceFusion exited with code {completed.returncode}")
+            self._set_preview(QUrl.fromLocalFile(str(output)).toString())
+            self._set_status(f"FaceFusion complete · {output.name}")
+        except subprocess.TimeoutExpired:
+            self._set_status("FaceFusion timed out.")
+        except Exception as exc:
+            self._set_status(f"FaceFusion failed · {exc}")
+        finally:
+            self._set_busy(False)
+
     @pyqtProperty(str, notify=statusChanged)
     def outputFolder(self) -> str:
         return str(self._output_dir)
@@ -822,6 +1035,30 @@ class GenerationBridge(QObject):
             source_url, pose_url, use_stage_two, use_stage_three, use_upscale,
         )
 
+    @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool, int, float, int, float, str, str)
+    def queueGenerateAdvanced(
+        self, prompt_text, negative_prompt, width, height, model_name,
+        lora_one, lora_two, source_url, pose_url,
+        use_stage_two, use_stage_three, use_upscale,
+        steps, cfg, seed, denoise, sampler, scheduler,
+    ) -> None:
+        self._next_generation_controls = {
+            "steps": max(1, int(steps)),
+            "cfg": max(0.0, float(cfg)),
+            "seed": int(seed),
+            "denoise": max(0.0, min(1.0, float(denoise))),
+            "sampler": str(sampler),
+            "scheduler": str(scheduler),
+            "width": int(width),
+            "height": int(height),
+        }
+        strength = 0.5 if model_name == FOUR_B_MODEL else 0.65
+        self.queueGenerate(
+            prompt_text, negative_prompt, width, height, model_name,
+            lora_one, lora_two, "None", strength, strength, strength,
+            source_url, pose_url, use_stage_two, use_stage_three, use_upscale,
+        )
+
     @pyqtSlot(str, str, int, int, str, str, str, str, float, float, float, str, str, bool, bool, bool)
     def queueGenerate(
         self,
@@ -856,13 +1093,12 @@ class GenerationBridge(QObject):
         if source_url and (source is None or not source.is_file()):
             self._set_status("The selected source image is unavailable.")
             return
-        if model_name == QWEN_MODEL and source is None:
-            self._set_status("Phr00t/Qwen requires a source image.")
+        if model_name in ({QWEN_MODEL} | REMOTE_SOURCE_MODELS) and source is None:
+            self._set_status("This RunPod workflow requires a source image.")
             return
-        if source is not None and model_name not in {QWEN_MODEL, FOUR_B_MODEL}:
+        if source is not None and model_name not in ({QWEN_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS):
             self._set_status(
-                "That engine has no validated source-image graph. Choose 4B or Phr00t/Qwen, "
-                "or clear the source for text-to-image."
+                "That engine has no validated source-image graph. Choose 4B/Phr00t or a RunPod reference model."
             )
             return
         if use_stage_three and source is None:
@@ -873,7 +1109,7 @@ class GenerationBridge(QObject):
             return
         try:
             selected_loras = compatible_selection(model_name, [lora_one, lora_two, lora_three])
-            max_loras = 1 if model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL} else 0
+            max_loras = 1 if model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL} else 0
             if len(selected_loras) > max_loras:
                 raise ValueError(f"{model_name} allows {max_loras} LoRA slot(s).")
             if any(value < 0.0 or value > 1.0 for value in (lora_one_strength, lora_two_strength, lora_three_strength)):
@@ -881,8 +1117,34 @@ class GenerationBridge(QObject):
         except ValueError as exc:
             self._set_status(str(exc))
             return
+        if model_name == REMOTE_PHR00T_MODEL:
+            fallback_controls = {
+                "steps": 4, "cfg": 1.2, "seed": -1, "denoise": 1.0,
+                "sampler": "euler_ancestral", "scheduler": "beta",
+                "width": int(width), "height": int(height),
+            }
+        elif model_name in {REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}:
+            fallback_controls = {
+                "steps": 5, "cfg": 1.0, "seed": -1, "denoise": 1.0,
+                "sampler": "euler", "scheduler": "beta",
+                "width": int(width), "height": int(height),
+            }
+        else:
+            fallback_controls = {
+                "steps": 6 if model_name == QWEN_MODEL else 4,
+                "cfg": 1.0, "seed": -1, "denoise": 1.0,
+                "sampler": "er_sde" if model_name == QWEN_MODEL else "euler",
+                "scheduler": "beta" if model_name == QWEN_MODEL else "normal",
+                "width": int(width), "height": int(height),
+            }
+        generation_controls = getattr(self, "_next_generation_controls", None) or fallback_controls
+        self._next_generation_controls = None
+        self._set_progress(-1.0)
         self._set_busy(True)
         engine = {
+            REMOTE_PHR00T_MODEL: "RunPod Phr00t v23",
+            REMOTE_KLEIN_9B_MODEL: "RunPod Klein 9B",
+            REMOTE_AISHA_9B_MODEL: "RunPod Aisha 9B",
             REGULAR_9B_MODEL: "Klein 9B Base",
             KV_9B_MODEL: "Klein 9B-KV",
             QWEN_MODEL: "Phr00t/Qwen",
@@ -895,7 +1157,7 @@ class GenerationBridge(QObject):
                   lora_two, lora_three, float(lora_one_strength), float(lora_two_strength),
                   float(lora_three_strength), source, pose,
                   bool(use_stage_two), bool(use_stage_three),
-                  bool(use_upscale)),
+                  bool(use_upscale), generation_controls),
             daemon=True,
         ).start()
 
@@ -955,6 +1217,7 @@ class GenerationBridge(QObject):
         use_stage_two: bool,
         use_stage_three: bool,
         use_upscale: bool,
+        generation_controls: dict | None = None,
     ) -> None:
         try:
             if model_name == FOUR_B_MODEL:
@@ -963,7 +1226,14 @@ class GenerationBridge(QObject):
                 if not ready:
                     raise workflow_lab.ComfyError(detail)
             client, stats = self._connect_comfyui()
-            info = client.object_info()
+            if os.environ.get("GENESIS_COMFY_URL"):
+                cache_path = Path.home() / ".cache" / "genesis" / "runpod-object-info.json"
+                try:
+                    info = json.loads(cache_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    info = client.object_info()
+            else:
+                info = client.object_info()
             self._output_dir.mkdir(parents=True, exist_ok=True)
             stamp = time.strftime("%Y%m%d-%H%M%S")
             if source is not None and model_name == FOUR_B_MODEL:
@@ -972,11 +1242,26 @@ class GenerationBridge(QObject):
                     [lora_one, lora_two, lora_three],
                     [lora_one_strength, lora_two_strength, lora_three_strength], width, height, stamp,
                 )
+            elif source is not None and model_name == REMOTE_PHR00T_MODEL:
+                current = self._run_reference_stage(
+                    client, info, REMOTE_PHR00T_WORKFLOW, source,
+                    adapt_prompt(prompt_text, REMOTE_PHR00T_MODEL, source_image=True),
+                    stamp, "Phr00t", secondary_image=pose,
+                    controls=generation_controls,
+                )
+            elif source is not None and model_name in {REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}:
+                current = self._run_reference_stage(
+                    client, info, REMOTE_KLEIN9B_WORKFLOW, source,
+                    adapt_prompt(prompt_text, model_name, source_image=True),
+                    stamp, "Aisha9B" if model_name == REMOTE_AISHA_9B_MODEL else "Klein9B",
+                    controls=generation_controls, model_override=model_name,
+                )
             elif source is not None:
                 current = self._run_reference_stage(
                     client, info, STAGE_1_WORKFLOW, source,
                     adapt_prompt(prompt_text, QWEN_MODEL, source_image=True),
                     stamp, "Stage1", secondary_image=pose,
+                    controls=generation_controls,
                 )
             else:
                 prompt = build_create_prompt(
@@ -1005,8 +1290,10 @@ class GenerationBridge(QObject):
                     client, info, UPSCALE_WORKFLOW, current, "", stamp, "Upscale"
                 )
             self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._set_progress(1.0)
             self._set_status(f"Complete · {current.name}")
         except Exception as exc:
+            self._set_progress(-1.0)
             self._set_status(f"Generation failed · {exc}")
         finally:
             self._set_busy(False)
@@ -1049,21 +1336,35 @@ class GenerationBridge(QObject):
         return self._submit_and_save(client, prompt, stamp, "Klein4B")
 
     def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
-        safe, detail = integrations.gpu_kernel_preflight()
-        if not safe:
-            raise workflow_lab.ComfyError(detail)
-        problems = unavailable_local_assets(prompt, MODEL_ROOTS)
-        if problems:
-            raise workflow_lab.ComfyError("Local asset check failed: " + " ".join(problems))
+        # Local GPU/asset checks are deliberately skipped for a remote RunPod backend.
+        if not os.environ.get("GENESIS_COMFY_URL"):
+            safe, detail = integrations.gpu_kernel_preflight()
+            if not safe:
+                raise workflow_lab.ComfyError(detail)
+            problems = unavailable_local_assets(prompt, MODEL_ROOTS)
+            if problems:
+                raise workflow_lab.ComfyError("Local asset check failed: " + " ".join(problems))
+        self._set_progress(0.05)
         prompt_id = client.submit(prompt)
         self._set_status(f"{stage} queued {prompt_id[:8]}…")
+
+        def update_progress(value: dict) -> None:
+            state = str(value.get("status", "working"))
+            if state == "pending":
+                self._set_progress(0.12)
+            elif state == "running":
+                self._set_progress(0.55)
+            elif state == "completed":
+                self._set_progress(0.95)
+            self._set_status(
+                f"{stage} {state} · {int(value.get('elapsed', 0))}s"
+            )
+
         result = client.wait(
             prompt_id,
             timeout=1800,
-            progress=lambda value: self._set_status(
-                f"{stage} {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
-            ),
-            abort_check=integrations.gpu_kernel_abort_reason,
+            progress=update_progress,
+            abort_check=(None if os.environ.get("GENESIS_COMFY_URL") else integrations.gpu_kernel_abort_reason),
         )
         if result.status != "completed":
             raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
@@ -1082,6 +1383,7 @@ class GenerationBridge(QObject):
     def _run_reference_stage(
         self, client, info: dict, workflow: Path, input_image: Path,
         prompt_text: str, stamp: str, stage: str, secondary_image: Path | None = None,
+        controls: dict | None = None, model_override: str | None = None,
     ) -> Path:
         if not workflow.is_file():
             raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
@@ -1090,6 +1392,21 @@ class GenerationBridge(QObject):
             (str(node_id) for node_id, node in prompt.items() if node.get("class_type") == "LoadImage"),
             key=lambda value: int(value) if value.isdigit() else value,
         )
+        # Phr00t exposes image2 on the conditioning node but the saved graph only
+        # contains the main LoadImage. Inject a transient LoadImage for GENESIS pose
+        # selection while leaving MARTY's original workflow JSON untouched.
+        if secondary_image is not None and workflow == REMOTE_PHR00T_WORKFLOW:
+            uploaded_pose = client.upload_image(secondary_image)
+            pose_name = "/".join(
+                value for value in (uploaded_pose.get("subfolder"), uploaded_pose.get("name")) if value
+            )
+            pose_node = "__genesis_pose__"
+            prompt[pose_node] = {"class_type": "LoadImage", "inputs": {"image": pose_name}}
+            if "5" not in prompt:
+                raise workflow_lab.ComfyError("Phr00t conditioning node 5 is unavailable.")
+            prompt["5"].setdefault("inputs", {})["image2"] = [pose_node, 0]
+            secondary_image = None
+
         images = [input_image] + ([secondary_image] if secondary_image is not None else [])
         if len(load_nodes) < len(images):
             raise workflow_lab.ComfyError(f"{stage} workflow has too few image inputs.")
@@ -1098,11 +1415,45 @@ class GenerationBridge(QObject):
             prompt[node_id]["inputs"]["image"] = "/".join(
                 value for value in (uploaded.get("subfolder"), uploaded.get("name")) if value
             )
+        workflow_controls = workflow_lab.discover_workflow_controls(prompt)
+        if model_override:
+            target = workflow_controls.get("model")
+            if target:
+                prompt[str(target[0])]["inputs"][target[1]] = model_override
         if prompt_text:
-            controls = workflow_lab.discover_workflow_controls(prompt)
-            target = controls.get("positive")
+            target = workflow_controls.get("positive")
             if target:
                 prompt[str(target[0])]["inputs"][target[1]] = prompt_text
+        if controls:
+            for name in ("width", "height", "steps", "cfg", "denoise", "sampler", "scheduler"):
+                target = workflow_controls.get(name)
+                if target and name in controls:
+                    prompt[str(target[0])]["inputs"][target[1]] = controls[name]
+
+            # The supplied Klein/Aisha graph has separate scheduler and latent
+            # dimension nodes. Keep them synchronized when GENESIS overrides size.
+            if workflow == REMOTE_KLEIN9B_WORKFLOW:
+                for node in prompt.values():
+                    inputs = node.setdefault("inputs", {})
+                    kind = node.get("class_type")
+                    if kind == "EmptyFlux2LatentImage":
+                        inputs["width"] = int(controls.get("width", inputs.get("width", 1920)))
+                        inputs["height"] = int(controls.get("height", inputs.get("height", 1520)))
+                    elif kind == "Flux2Scheduler":
+                        inputs["steps"] = int(controls.get("steps", inputs.get("steps", 5)))
+                        inputs["width"] = int(controls.get("width", inputs.get("width", 1920)))
+                        inputs["height"] = int(controls.get("height", inputs.get("height", 1520)))
+                    elif kind == "CFGGuider":
+                        inputs["cfg"] = float(controls.get("cfg", inputs.get("cfg", 1.0)))
+                    elif kind == "KSamplerSelect":
+                        inputs["sampler_name"] = str(controls.get("sampler", inputs.get("sampler_name", "euler")))
+
+            target = workflow_controls.get("seed")
+            if target and "seed" in controls:
+                seed = int(controls["seed"])
+                if seed < 0:
+                    seed = int(time.time_ns() & 0x7FFFFFFFFFFFFFFF)
+                prompt[str(target[0])]["inputs"][target[1]] = seed
         validation = workflow_lab.validate_prompt(prompt, info)
         if not validation["valid"]:
             missing = validation["missing_nodes"] + validation["missing_inputs"]
@@ -1205,7 +1556,7 @@ class GenerationBridge(QObject):
                 progress=lambda value: self._set_status(
                     f"Image edit {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
                 ),
-                abort_check=integrations.gpu_kernel_abort_reason,
+                abort_check=(None if os.environ.get("GENESIS_COMFY_URL") else integrations.gpu_kernel_abort_reason),
             )
             if result.status != "completed":
                 raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")
@@ -1259,9 +1610,11 @@ def main() -> int:
     generation_bridge = GenerationBridge(app)
     layout_bridge = LayoutSettingsBridge(app)
     module_bridge = ModuleBridge(app)
+    media_bridge = MediaBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
+    context.setContextProperty("mediaBridge", media_bridge)
     engine.load(QUrl.fromLocalFile(str(UI_ROOT / "MainPremiumLinux.qml")))
     if not engine.rootObjects():
         return 1

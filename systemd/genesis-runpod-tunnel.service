@@ -1,0 +1,15 @@
+[Unit]
+Description=GENESIS RunPod ComfyUI SSH tunnel
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=%h/.config/genesis/runpod-tunnel.env
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/genesis/runpod-tunnel.env
+ExecStart=/usr/bin/ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=accept-new -L 18188:127.0.0.1:8188 ${RUNPOD_SSH_USER}@${RUNPOD_SSH_HOST} -p ${RUNPOD_SSH_PORT} -i %h/.ssh/id_ed25519
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

@@ -63,6 +63,7 @@ COMFYUI_PYTHON_CANDIDATES = (
     COMFYUI_ROOT / "venv/bin/python",
 )
 FACEFUSION_ROOT_CANDIDATES = (
+    Path.home() / "facefusion",
     Path.home() / "AI" / "facefusion",
     Path.home() / "AI" / "FaceFusion",
 )

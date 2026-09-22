@@ -56,7 +56,7 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert 'text: "Stage 2 · refine"' in qml
     assert 'text: "Stage 3 · identity lock"' in qml
     assert 'text: "Final upscale"' in qml
-    assert "genesisBridge.queueGenerate(" in qml
+    assert "genesisBridge.queueGenerateAdvanced(" in qml
 
 
 def test_linux_launcher_loads_full_pose_index_premium_qml_and_ai():
@@ -125,7 +125,8 @@ def test_image_studio_launcher_keeps_gpu_backend_off_until_work_is_requested():
     assert "systemctl --user start genesis-comfyui.service" not in launcher
     assert "_connect_comfyui" in backend
     assert "integrations.start_user_service" in backend
-    assert "abort_check=integrations.gpu_kernel_abort_reason" in backend
+    assert "integrations.gpu_kernel_abort_reason" in backend
+    assert "GENESIS_COMFY_URL" in backend
 
 
 def test_premium_launcher_is_single_instance_guarded():

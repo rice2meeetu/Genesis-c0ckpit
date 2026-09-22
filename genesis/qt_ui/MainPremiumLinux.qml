@@ -75,6 +75,12 @@ ApplicationWindow {
     property string generationNegativePrompt: ""
     property int generationWidth: 768
     property int generationHeight: 1152
+    property int generationSteps: 6
+    property real generationCfg: 1.0
+    property int generationSeed: -1
+    property real generationDenoise: 1.0
+    property string generationSampler: "er_sde"
+    property string generationScheduler: "beta"
     property bool useStageTwo: false
     property bool useStageThree: false
     property bool useUpscale: false
@@ -130,6 +136,16 @@ ApplicationWindow {
         selectedLoraStrength = 0.65
         selectedLoraTwoStrength = 0.65
         selectedLoraThreeStrength = 0.65
+
+        var profile = selectedGenerationProfile
+        if (!profile) return
+        if (profile.defaultWidth !== undefined) generationWidth = profile.defaultWidth
+        if (profile.defaultHeight !== undefined) generationHeight = profile.defaultHeight
+        if (profile.defaultSteps !== undefined) generationSteps = profile.defaultSteps
+        if (profile.defaultCfg !== undefined) generationCfg = profile.defaultCfg
+        if (profile.defaultDenoise !== undefined) generationDenoise = profile.defaultDenoise
+        if (profile.defaultSampler !== undefined) generationSampler = profile.defaultSampler
+        if (profile.defaultScheduler !== undefined) generationScheduler = profile.defaultScheduler
     }
 
     function applyPreset(row) {
@@ -185,7 +201,7 @@ ApplicationWindow {
 
     function generateCurrent() {
         var prompt = generationPrompt.trim().length ? generationPrompt : selectedPosePrompt
-        genesisBridge.queueGenerate(
+        genesisBridge.queueGenerateAdvanced(
             prompt,
             generationNegativePrompt,
             generationWidth,
@@ -193,15 +209,17 @@ ApplicationWindow {
             selectedGenerationProfile.model,
             selectedLora,
             selectedLoraTwo,
-            selectedLoraThree,
-            selectedLoraStrength,
-            selectedLoraTwoStrength,
-            selectedLoraThreeStrength,
             generationSource.toString(),
             selectedPoseSource.toString(),
             useStageTwo,
             useStageThree,
-            useUpscale
+            useUpscale,
+            generationSteps,
+            generationCfg,
+            generationSeed,
+            generationDenoise,
+            generationSampler,
+            generationScheduler
         )
     }
 
@@ -537,7 +555,9 @@ ApplicationWindow {
                         border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                         Text {
                             anchors.centerIn: parent
-                            text: runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE"
+                            text: runtimeStatus.remote
+                                ? (runtimeStatus.comfyOnline ? "●  RUNPOD ONLINE" : "○  RUNPOD OFFLINE")
+                                : (runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE")
                             color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                             font.pixelSize: 11
                             font.bold: true
@@ -780,13 +800,18 @@ ApplicationWindow {
                             }
 
                             Panel {
-                                Layout.preferredWidth: 320
-                                Layout.maximumWidth: 360
+                                Layout.preferredWidth: 390
+                                Layout.minimumWidth: 360
+                                Layout.maximumWidth: 430
                                 Layout.fillHeight: true
                                 ScrollView {
-                                    anchors.fill: parent; anchors.margins: 10
-                                    contentWidth: availableWidth; clip: true
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    contentWidth: availableWidth
+                                    clip: true
+                                    rightPadding: 14
                                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
                                 ColumnLayout {
                                     width: parent.width
                                     spacing: 8
@@ -865,6 +890,30 @@ ApplicationWindow {
                                         GButton { Layout.preferredWidth: implicitWidth; text: "Fast"; active: appRoot.generationWidth === 512; onClicked: { generationWidth = 512; generationHeight = 512 } }
                                         GButton { Layout.preferredWidth: implicitWidth; text: "Balanced"; active: appRoot.generationWidth === 768; onClicked: { generationWidth = 768; generationHeight = 1152 } }
                                         GButton { Layout.preferredWidth: implicitWidth; text: "Quality"; active: appRoot.generationWidth === 1024; onClicked: { generationWidth = 1024; generationHeight = 1024 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "2K"; visible: !!appRoot.selectedGenerationProfile.remote; active: appRoot.generationWidth === 2048; onClicked: { generationWidth = 2048; generationHeight = 2048 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "4K"; visible: !!appRoot.selectedGenerationProfile.remote; active: appRoot.generationWidth === 4096; onClicked: { generationWidth = 4096; generationHeight = 4096 } }
+                                    }
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: 2
+                                        columnSpacing: 8
+                                        rowSpacing: 5
+                                        Text { text: "Width"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationWidth; editable: true; onValueModified: appRoot.generationWidth = value }
+                                        Text { text: "Height"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationHeight; editable: true; onValueModified: appRoot.generationHeight = value }
+                                        Text { text: "Steps"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 1; to: 100; value: appRoot.generationSteps; editable: true; onValueModified: appRoot.generationSteps = value }
+                                        Text { text: "CFG"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
+                                        Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        ComboBox { Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
+                                        Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        ComboBox { Layout.fillWidth: true; model: ["beta", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
                                     }
                                     SectionLabel { text: "PIPELINE" }
                                     CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
@@ -884,14 +933,23 @@ ApplicationWindow {
                                             && (!appRoot.selectedGenerationProfile.sourceRequired || appRoot.generationSource.toString().length > 0)
                                         onClicked: appRoot.generateCurrent()
                                     }
+                                    ProgressBar {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 12
+                                        from: 0
+                                        to: 1
+                                        value: genesisBridge.progress < 0 ? 0 : genesisBridge.progress
+                                        indeterminate: genesisBridge.busy && genesisBridge.progress < 0
+                                        visible: genesisBridge.busy || genesisBridge.progress >= 0 || genesisBridge.previewUrl.length > 0
+                                    }
                                     Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
                                     SectionLabel { text: "RESULT" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 170
+                                        Layout.preferredHeight: 190
                                         objectName: "generationResultPreview"
-                                        Layout.minimumHeight: 140
-                                        Layout.maximumHeight: 210
+                                        Layout.minimumHeight: 170
+                                        Layout.maximumHeight: 220
                                         radius: 10
                                         color: "#0d0d0d"
                                         border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
@@ -1275,7 +1333,8 @@ ApplicationWindow {
                                     Image { anchors.fill:parent; anchors.margins:8; source:genesisBridge.previewUrl; fillMode:Image.PreserveAspectFit; visible:!privacyMode }
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }
-                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN FACE SWAP"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
+                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN REACTOR"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
+                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN FACEFUSION"; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
                                 GButton { Layout.preferredWidth: implicitWidth; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
                             } }
                         }

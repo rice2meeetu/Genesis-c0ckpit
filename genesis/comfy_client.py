@@ -87,20 +87,20 @@ class ComfyClient:
             raise ComfyError("ComfyUI returned invalid JSON") from exc
 
     def system_stats(self) -> dict:
-        value = self._request("/system_stats", timeout=5)
+        value = self._request("/system_stats", timeout=max(5.0, self.timeout))
         return value if isinstance(value, dict) else {}
 
     def object_info(self) -> dict:
-        value = self._request("/object_info", timeout=30)
+        value = self._request("/object_info", timeout=max(30.0, self.timeout))
         return value if isinstance(value, dict) else {}
 
     def queue(self) -> dict:
-        value = self._request("/queue", timeout=5)
+        value = self._request("/queue", timeout=max(5.0, self.timeout))
         return value if isinstance(value, dict) else {}
 
     def history(self, prompt_id: str | None = None, max_items: int = 100) -> dict:
         path = f"/history/{urllib.parse.quote(prompt_id)}" if prompt_id else f"/history?max_items={max_items}"
-        value = self._request(path, timeout=10)
+        value = self._request(path, timeout=max(10.0, self.timeout))
         return value if isinstance(value, dict) else {}
 
     def submit(self, prompt: dict, *, extra_data: dict | None = None) -> str:
@@ -203,6 +203,7 @@ class ComfyClient:
         abort_check: Callable[[], str | None] | None = None,
     ) -> PromptResult:
         started = time.monotonic()
+        missing_since: float | None = None
         while True:
             elapsed = time.monotonic() - started
             reason = abort_check() if abort_check else None
@@ -234,8 +235,18 @@ class ComfyClient:
             state = prompt_queue_state(queue, prompt_id)
             if progress:
                 progress({"status": state, "elapsed": elapsed, "prompt_id": prompt_id})
-            if state == "missing" and elapsed > max(5.0, poll_interval * 3):
-                return PromptResult(prompt_id, "missing", elapsed=elapsed, error="Prompt left queue without history")
+            if state == "missing":
+                if missing_since is None:
+                    missing_since = time.monotonic()
+                elif time.monotonic() - missing_since > 30.0:
+                    return PromptResult(
+                        prompt_id,
+                        "missing",
+                        elapsed=elapsed,
+                        error="Prompt left queue without history after 30s grace period",
+                    )
+            else:
+                missing_since = None
             time.sleep(poll_interval)
 
 
