@@ -158,17 +158,41 @@ def remove_background(path: str | Path, output: str | Path) -> OperationResult:
     return OperationResult(target, "rembg-rocm", {"model": "u2net"})
 
 
+def _source_alpha(source: Path, size: tuple[int, int]) -> Image.Image | None:
+    """Return a resized source alpha channel so GPU upscaling preserves cutouts."""
+    with Image.open(source) as opened:
+        image = ImageOps.exif_transpose(opened)
+        if image.mode not in {"RGBA", "LA"} and "transparency" not in image.info:
+            return None
+        return image.convert("RGBA").getchannel("A").resize(size, Image.Resampling.LANCZOS)
+
+
+def _attach_source_alpha(source: Path, target: Path) -> None:
+    with Image.open(target) as opened:
+        image = ImageOps.exif_transpose(opened).convert("RGB")
+    alpha = _source_alpha(source, image.size)
+    if alpha is not None:
+        image.putalpha(alpha)
+        image.save(target, format="PNG")
+
+
 def _enhance_pillow(source: Path, target: Path, scale: float) -> OperationResult:
     with Image.open(source) as opened:
-        image = ImageOps.exif_transpose(opened).convert("RGB")
+        original = ImageOps.exif_transpose(opened)
+        has_alpha = original.mode in {"RGBA", "LA"} or "transparency" in original.info
+        image = original.convert("RGBA" if has_alpha else "RGB")
         if scale != 1:
             size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
             image = image.resize(size, Image.Resampling.LANCZOS)
-        image = ImageEnhance.Contrast(image).enhance(1.04)
-        image = ImageEnhance.Sharpness(image).enhance(1.18)
-        image = image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=80, threshold=3))
-        image.save(target)
-    return OperationResult(target, "pillow", {"scale": scale, "mode": "enhance"})
+        rgb = ImageEnhance.Contrast(image.convert("RGB")).enhance(1.04)
+        rgb = ImageEnhance.Sharpness(rgb).enhance(1.18)
+        rgb = rgb.filter(ImageFilter.UnsharpMask(radius=1.2, percent=80, threshold=3))
+        if has_alpha:
+            rgb.putalpha(image.getchannel("A"))
+            rgb.save(target, format="PNG")
+        else:
+            rgb.save(target)
+    return OperationResult(target, "pillow", {"scale": scale, "mode": "enhance", "alpha_preserved": has_alpha})
 
 
 def upscale_enhance(
@@ -177,6 +201,7 @@ def upscale_enhance(
     *,
     scale: float = 2.0,
     prefer_ai: bool = True,
+    require_ai: bool = False,
 ) -> OperationResult:
     """Upscale/enhance an image, preferring 4x-UltraSharp through ComfyUI."""
     source = _require_file(path)
@@ -209,10 +234,76 @@ def upscale_enhance(
                 with Image.open(target) as generated:
                     resized = ImageOps.exif_transpose(generated).convert("RGB").resize(requested_size, Image.Resampling.LANCZOS)
                     resized.save(target)
-            return OperationResult(target, "comfyui-4x-ultrasharp", {"native_scale": 4.0, "output_scale": scale})
-        except (ComfyError, OSError, TimeoutError):
-            pass
+            _attach_source_alpha(source, target)
+            return OperationResult(
+                target,
+                "comfyui-4x-ultrasharp",
+                {"native_scale": 4.0, "output_scale": scale, "alpha_preserved": True},
+            )
+        except (ComfyError, OSError, TimeoutError) as exc:
+            if require_ai:
+                raise MediaFunctionError(f"GPU upscaler unavailable: {exc}") from exc
+    if require_ai:
+        if not UPSCALE_MODEL.is_file():
+            raise MediaFunctionError(f"GPU upscale model missing: {UPSCALE_MODEL}")
+        raise MediaFunctionError("GPU upscaler is required but unavailable")
     return _enhance_pillow(source, target, scale)
+
+
+def _available_target(folder: Path, stem: str, suffix: str = ".png") -> Path:
+    candidate = folder / f"{stem}{suffix}"
+    index = 2
+    while candidate.exists():
+        candidate = folder / f"{stem}_{index}{suffix}"
+        index += 1
+    return candidate
+
+
+def batch_remove_background(paths: Iterable[str | Path], output_dir: str | Path) -> OperationResult:
+    """GPU-remove backgrounds sequentially while preserving every source file."""
+    folder = Path(output_dir).expanduser().resolve()
+    folder.mkdir(parents=True, exist_ok=True)
+    completed, failures = [], []
+    for value in paths:
+        try:
+            source = _require_file(value)
+            target = _available_target(folder, f"{source.stem}_cutout")
+            result = remove_background(source, target)
+            completed.append(str(result.output))
+        except Exception as exc:
+            failures.append({"source": str(value), "error": str(exc)})
+    if not completed:
+        detail = failures[0]["error"] if failures else "No images were selected"
+        raise MediaFunctionError(f"Batch background removal produced no files: {detail}")
+    return OperationResult(
+        Path(completed[-1]), "rembg-rocm-batch",
+        {"completed": completed, "failures": failures, "count": len(completed)},
+    )
+
+
+def batch_upscale(
+    paths: Iterable[str | Path], output_dir: str | Path, *, scale: float = 4.0,
+) -> OperationResult:
+    """Run strict GPU quality upscaling sequentially and preserve transparent cutouts."""
+    folder = Path(output_dir).expanduser().resolve()
+    folder.mkdir(parents=True, exist_ok=True)
+    completed, failures = [], []
+    for value in paths:
+        try:
+            source = _require_file(value)
+            target = _available_target(folder, f"{source.stem}_{scale:g}x")
+            result = upscale_enhance(source, target, scale=scale, prefer_ai=True, require_ai=True)
+            completed.append(str(result.output))
+        except Exception as exc:
+            failures.append({"source": str(value), "error": str(exc)})
+    if not completed:
+        detail = failures[0]["error"] if failures else "No images were selected"
+        raise MediaFunctionError(f"Batch GPU upscale produced no files: {detail}")
+    return OperationResult(
+        Path(completed[-1]), "comfyui-4x-ultrasharp-batch",
+        {"completed": completed, "failures": failures, "count": len(completed), "scale": scale},
+    )
+
 
 def scan_media(folder: str | Path, *, recursive: bool = True) -> list[dict]:
     """Return lightweight metadata for media files without changing the library."""

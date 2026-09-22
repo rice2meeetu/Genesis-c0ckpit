@@ -80,3 +80,61 @@ def test_operations_preserve_original(tmp_path, operation):
     with pytest.raises(media_functions.MediaFunctionError, match="original"):
         getattr(media_functions, operation)(source, source)
     assert source.read_bytes() == before
+
+
+def test_fallback_enhance_preserves_transparency(tmp_path):
+    source = tmp_path / "cutout.png"
+    image = Image.new("RGBA", (12, 8), (255, 0, 0, 0))
+    for x in range(3, 9):
+        for y in range(2, 7):
+            image.putpixel((x, y), (255, 0, 0, 255))
+    image.save(source)
+
+    output = tmp_path / "cutout-2x.png"
+    result = upscale_enhance(source, output, scale=2, prefer_ai=False)
+
+    assert result.details["alpha_preserved"] is True
+    with Image.open(output) as enhanced:
+        assert enhanced.mode == "RGBA"
+        assert enhanced.size == (24, 16)
+        assert enhanced.getchannel("A").getextrema() == (0, 255)
+
+
+def test_require_ai_refuses_silent_cpu_fallback(tmp_path, monkeypatch):
+    from genesis import media_functions
+
+    source = tmp_path / "source.png"
+    _make_image(source)
+    monkeypatch.setattr(media_functions, "UPSCALE_MODEL", tmp_path / "missing-model.pth")
+
+    with pytest.raises(media_functions.MediaFunctionError, match="GPU upscale model missing"):
+        media_functions.upscale_enhance(
+            source, tmp_path / "strict.png", scale=4, prefer_ai=True, require_ai=True
+        )
+
+
+def test_batch_background_removal_preserves_sources_and_uses_unique_outputs(tmp_path, monkeypatch):
+    from genesis import media_functions
+
+    first = tmp_path / "one.png"
+    second = tmp_path / "two.png"
+    _make_image(first)
+    _make_image(second)
+    before = {first: first.read_bytes(), second: second.read_bytes()}
+    output_dir = tmp_path / "batch"
+    output_dir.mkdir()
+    (output_dir / "one_cutout.png").write_bytes(b"existing")
+
+    def fake_remove(source, target):
+        target = Path(target)
+        target.write_bytes(Path(source).read_bytes())
+        return media_functions.OperationResult(target, "fake-rembg", {})
+
+    monkeypatch.setattr(media_functions, "remove_background", fake_remove)
+    result = media_functions.batch_remove_background([first, second], output_dir)
+
+    completed = [Path(value).name for value in result.details["completed"]]
+    assert completed == ["one_cutout_2.png", "two_cutout.png"]
+    assert result.details["count"] == 2
+    assert first.read_bytes() == before[first]
+    assert second.read_bytes() == before[second]
