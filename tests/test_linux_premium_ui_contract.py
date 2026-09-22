@@ -134,3 +134,13 @@ def test_premium_launcher_is_single_instance_guarded():
     assert "QLockFile" in launcher
     assert "genesis-cockpit-premium.lock" in launcher
     assert "tryLock(0)" in launcher
+
+
+def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
+    qml = source()
+    for legacy_blue in ("#17324a", "#242a30", "#152b3b", "#39424b", "#24292f", "#5575c5ff"):
+        assert legacy_blue not in qml
+    assert 'Layout.preferredWidth: 260' in qml
+    assert 'Layout.preferredWidth: 360' in qml
+    assert 'objectName: "generationResultPreview"' in qml
+    assert 'Layout.preferredHeight: 168' in qml

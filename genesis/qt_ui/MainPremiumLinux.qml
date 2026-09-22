@@ -250,8 +250,8 @@ ApplicationWindow {
         property bool active: false
         property bool premium: false
         implicitHeight: 36
-        implicitWidth: Math.max(86, contentItem.implicitWidth + 28)
-        Layout.maximumWidth: 190
+        implicitWidth: Math.max(78, contentItem.implicitWidth + 22)
+        Layout.maximumWidth: 170
         activeFocusOnTab: true
         Accessible.name: text
         Accessible.role: Accessible.Button
@@ -338,8 +338,8 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 8
-            color: nav.active ? "#17324a" : (nav.hovered ? "#242a30" : "transparent")
-            border.color: nav.active ? appRoot.blue : "transparent"
+            color: nav.active ? "#302719" : (nav.hovered ? "#1c1a17" : "transparent")
+            border.color: nav.active ? appRoot.gold : "transparent"
             border.width: 1
             Rectangle {
                 visible: nav.active
@@ -347,7 +347,7 @@ ApplicationWindow {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: 3
-                color: appRoot.blue
+                color: appRoot.gold
                 radius: 2
             }
         }
@@ -380,8 +380,8 @@ ApplicationWindow {
                 Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.family: "Noto Sans Display"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
                 Rectangle {
                     radius: 10; height: 22; width: statusLabel.implicitWidth + 18
-                    color: "#152b3b"; border.color: appRoot.blue
-                    Text { id: statusLabel; anchors.centerIn: parent; text: mediaCard.statusText; color: appRoot.blueBright; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
+                    color: "#241c11"; border.color: appRoot.gold
+                    Text { id: statusLabel; anchors.centerIn: parent; text: mediaCard.statusText; color: appRoot.brightGold; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
                 }
             }
             Rectangle {
@@ -389,16 +389,16 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 Layout.minimumHeight: 72
                 radius: 10
-                color: "#111418"
-                border.color: "#39424b"
+                color: "#11100e"
+                border.color: "#40372a"
                 border.width: 1
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: "#24292f" }
-                    GradientStop { position: 1.0; color: "#111418" }
+                    GradientStop { position: 0.0; color: "#211d17" }
+                    GradientStop { position: 1.0; color: "#11100e" }
                 }
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 2; color: appRoot.blue; opacity: 0.7 }
-                Text { anchors.centerIn: parent; text: mediaCard.iconText; color: "#5575c5ff"; font.pixelSize: 58; font.bold: true }
+                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 2; color: appRoot.gold; opacity: 0.7 }
+                Text { anchors.centerIn: parent; text: mediaCard.iconText; color: "#55f3d28b"; font.pixelSize: 58; font.bold: true }
                 Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10; text: "GENESIS · " + mediaCard.titleText.toUpperCase(); color: appRoot.textDim; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.8 }
             }
             Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
@@ -652,7 +652,7 @@ ApplicationWindow {
                             spacing: 8
 
                             Panel {
-                                Layout.preferredWidth: 280
+                                Layout.preferredWidth: 260
                                 Layout.fillHeight: true
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -666,8 +666,8 @@ ApplicationWindow {
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 160
-                                        Layout.minimumHeight: 140
+                                        Layout.preferredHeight: 150
+                                        Layout.minimumHeight: 132
                                         radius: 10
                                         color: "#0d0d0d"
                                         border.color: appRoot.generationSource.toString().length > 0 ? appRoot.gold : appRoot.line
@@ -743,9 +743,9 @@ ApplicationWindow {
                                     spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 68
-                                        Layout.minimumHeight: 68
-                                        Layout.maximumHeight: 68
+                                        Layout.preferredHeight: 60
+                                        Layout.minimumHeight: 60
+                                        Layout.maximumHeight: 60
                                         objectName: "generationStageStrip"
                                         spacing: 6
                                         Repeater {
@@ -800,9 +800,9 @@ ApplicationWindow {
                             }
 
                             Panel {
-                                Layout.preferredWidth: 390
-                                Layout.minimumWidth: 360
-                                Layout.maximumWidth: 430
+                                Layout.preferredWidth: 360
+                                Layout.minimumWidth: 340
+                                Layout.maximumWidth: 400
                                 Layout.fillHeight: true
                                 ScrollView {
                                     anchors.fill: parent
@@ -946,10 +946,10 @@ ApplicationWindow {
                                     SectionLabel { text: "RESULT" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 190
+                                        Layout.preferredHeight: 168
                                         objectName: "generationResultPreview"
-                                        Layout.minimumHeight: 170
-                                        Layout.maximumHeight: 220
+                                        Layout.minimumHeight: 150
+                                        Layout.maximumHeight: 190
                                         radius: 10
                                         color: "#0d0d0d"
                                         border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
