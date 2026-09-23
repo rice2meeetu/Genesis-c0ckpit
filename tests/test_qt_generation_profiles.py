@@ -2,7 +2,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from qt_cockpit import build_generation_profiles, insert_model_only_loras
+from qt_cockpit import (
+    REMOTE_KLEIN_9B_MODEL,
+    build_generation_profiles,
+    build_remote_generation_profiles,
+    insert_model_only_loras,
+)
 
 
 class QtGenerationProfileTests(unittest.TestCase):
@@ -63,6 +68,21 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertEqual(
             profiles[0]["triggers"]["flux2klein_body_version_a.safetensors"],
             ["woman"],
+        )
+
+    def test_remote_klein_profile_exposes_known_lora_trigger_metadata(self):
+        info = {
+            "UNETLoader": {
+                "input": {"required": {"unet_name": [[REMOTE_KLEIN_9B_MODEL], {}]}}
+            },
+            "LoraLoader": {
+                "input": {"required": {"lora_name": [["refcontrol_v2_poses.safetensors"], {}]}}
+            },
+        }
+        profile = build_remote_generation_profiles(info)[0]
+        self.assertEqual(
+            profile["triggers"]["refcontrol_v2_poses.safetensors"],
+            ["apply pose from image 1 with reference from image 2"],
         )
 
     def test_unvalidated_inventory_model_is_visible_but_not_runnable(self):

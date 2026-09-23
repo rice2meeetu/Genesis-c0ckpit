@@ -22,7 +22,7 @@ from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtWidgets import QApplication, QFileDialog
 
-from genesis.model_compatibility import compatibility_note, compatible_loras
+from genesis.model_compatibility import compatibility_note, compatible_loras, lora_trigger
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.asset_inventory import unavailable_local_assets
 from genesis.pose_prompt_profiles import PosePromptMap
@@ -278,7 +278,10 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "model": model_name,
             "note": (compatibility_note(model_name) if runnable else "Remote model detected · workflow mapping pending"),
             "loras": ["None", *compatible],
-            "triggers": {},
+            "triggers": {
+                name: ([lora_trigger(name)] if lora_trigger(name) else [])
+                for name in compatible
+            },
             "ready": True,
             "runnable": runnable,
             "sourceRequired": model_name in REMOTE_SOURCE_MODELS or model_name == QWEN_MODEL,

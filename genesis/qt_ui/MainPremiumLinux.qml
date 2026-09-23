@@ -114,6 +114,21 @@ ApplicationWindow {
     property string editPrompt: ""
     property real editStrength: 0.40
 
+    function selectedLoraTriggerText() {
+        var profile = selectedGenerationProfile
+        var triggerMap = profile && profile.triggers ? profile.triggers : ({})
+        var selected = [selectedLora, selectedLoraTwo, selectedLoraThree]
+        var output = []
+        for (var i = 0; i < selected.length; ++i) {
+            var name = selected[i]
+            if (!name || name === "None") continue
+            var words = triggerMap[name]
+            if (words && words.length)
+                output.push(name + ": " + words.join(", "))
+        }
+        return output.join("  ·  ")
+    }
+
     function chooseSource() {
         var chosen = genesisBridge.chooseSourceImage()
         if (chosen.length) generationSource = chosen
@@ -980,6 +995,14 @@ ApplicationWindow {
                                         text: (appRoot.selectedGenerationProfile.experimentalLoras ? "EXPERIMENTAL · " : "")
                                             + "LoRAs run in picker order with independent strengths."
                                         color: appRoot.selectedGenerationProfile.experimentalLoras ? appRoot.gold : appRoot.textDim
+                                        font.pixelSize: 10
+                                        wrapMode: Text.Wrap
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: appRoot.selectedLoraTriggerText().length > 0
+                                        text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()
+                                        color: appRoot.brightGold
                                         font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }

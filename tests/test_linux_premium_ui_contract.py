@@ -53,6 +53,7 @@ def test_generation_keeps_model_lora_and_stage_controls():
     qml = source()
     assert 'text: "3 · MODEL / WORKFLOW"' in qml
     assert 'text: "COMPATIBLE LORA"' in qml
+    assert 'text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()' in qml
     assert 'text: "Stage 2 · refine"' in qml
     assert 'text: "Stage 3 · identity lock"' in qml
     assert 'text: "Final upscale"' in qml
