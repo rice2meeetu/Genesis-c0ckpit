@@ -36,7 +36,7 @@ jobs:
       - name: Install UI test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install PyQt6 pytest psutil
+          python -m pip install PyQt6 pytest psutil numpy Pillow
 
       - name: Compile premium launcher
         run: python -m py_compile qt_cockpit.py qt_cockpit_linux_premium.py
