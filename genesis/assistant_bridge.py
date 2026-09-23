@@ -17,10 +17,15 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from PyQt6.QtCore import QObject, pyqtProperty, pyqtSignal, pyqtSlot
 
 from genesis import integrations
+from genesis import builder_engine, builder_proposal
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class AssistantBridge(QObject):
@@ -31,6 +36,8 @@ class AssistantBridge(QObject):
     transcriptChanged = pyqtSignal()
     modeChanged = pyqtSignal()
     providerChanged = pyqtSignal()
+    buildStateChanged = pyqtSignal()
+    inferencePausedChanged = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -44,6 +51,11 @@ class AssistantBridge(QObject):
         self._messages = []
         self._draft = ""
         self._inference_paused = os.environ.get("GENESIS_AI_PAUSED", "1") != "0"
+        self._build_task = ""
+        self._build_proposal = ""
+        self._build_patch = ""
+        self._build_result = None
+        self._build_state = "IDLE"
 
     @pyqtProperty("QVariantList", notify=messagesChanged)
     def messages(self):
@@ -53,9 +65,21 @@ class AssistantBridge(QObject):
     def draft(self):
         return self._draft
 
-    @pyqtProperty(bool, constant=True)
+    @pyqtProperty(bool, notify=inferencePausedChanged)
     def inferencePaused(self):
         return self._inference_paused
+
+    @pyqtSlot(bool)
+    def setInferencePaused(self, value: bool) -> None:
+        value = bool(value)
+        if value == self._inference_paused:
+            return
+        self._inference_paused = value
+        self.inferencePausedChanged.emit()
+        self._set_status(
+            "AI replies paused · local GPU models stay off"
+            if value else "AI enabled · heavy local models remain on-demand and safety-gated"
+        )
 
     @pyqtSlot(str)
     def setDraft(self, value):
@@ -91,6 +115,26 @@ class AssistantBridge(QObject):
     def provider(self) -> str:
         return self._provider
 
+    @pyqtProperty(str, notify=buildStateChanged)
+    def buildState(self) -> str:
+        return self._build_state
+
+    @pyqtProperty(bool, notify=buildStateChanged)
+    def buildCanDraft(self) -> bool:
+        return self._build_state == "PROPOSAL_READY"
+
+    @pyqtProperty(bool, notify=buildStateChanged)
+    def buildCanApply(self) -> bool:
+        return self._build_state == "PATCH_READY"
+
+    @pyqtProperty(bool, notify=buildStateChanged)
+    def buildCanCommit(self) -> bool:
+        return self._build_state == "APPLIED_TESTED"
+
+    @pyqtProperty(bool, notify=buildStateChanged)
+    def buildCanDiscard(self) -> bool:
+        return self._build_state in {"PATCH_READY", "APPLIED_TESTED"}
+
     @pyqtProperty(bool, notify=providerChanged)
     def cloudConfigured(self) -> bool:
         return bool(self._cloud_base_url() and self._cloud_model())
@@ -103,6 +147,8 @@ class AssistantBridge(QObject):
 
     @pyqtProperty(str, notify=modeChanged)
     def activeModel(self) -> str:
+        if self._mode == "BUILD":
+            return "LOCAL BUILDER · " + self.localModel
         if self._provider == "CLOUD":
             return self._cloud_model() or "Cloud endpoint not configured"
         if self._provider == "AUTO" and self.cloudConfigured:
@@ -125,6 +171,10 @@ class AssistantBridge(QObject):
     def _set_busy(self, value: bool) -> None:
         self._busy = value
         self.busyChanged.emit()
+
+    def _set_build_state(self, value: str) -> None:
+        self._build_state = value
+        self.buildStateChanged.emit()
 
     def _append(self, role: str, text: str) -> None:
         self._messages.append({"role": role, "content": text.strip()})
@@ -175,11 +225,126 @@ class AssistantBridge(QObject):
         message = text.strip()
         if not message or self._busy:
             return
+        if self._mode == "BUILD" and self._build_state in {"PATCH_READY", "APPLIED_TESTED"}:
+            self._set_status("Finish, commit, or discard the pending Build change first")
+            return
         self._append("user", message)
         self._history.append({"role": "user", "content": message})
+        if self._mode == "BUILD":
+            self._build_task = message
+            self._build_proposal = ""
+            self._build_patch = ""
+            self._build_result = None
+            self._set_build_state("ANALYZING")
         self._set_busy(True)
         self._set_status(f"Feefee · starting {self._mode}…")
         threading.Thread(target=self._run_chat, daemon=True).start()
+
+    @pyqtSlot()
+    def draftBuildPatch(self) -> None:
+        if self._busy or not self.buildCanDraft:
+            return
+        self._set_busy(True)
+        self._set_build_state("DRAFTING")
+        self._set_status("Feefee · BUILD · drafting a reviewable patch…")
+        threading.Thread(target=self._run_build_draft, daemon=True).start()
+
+    def _run_build_draft(self) -> None:
+        try:
+            patch = builder_engine.draft_change(
+                self._build_task, PROJECT_ROOT, proposal=self._build_proposal
+            )
+            self._build_patch = patch
+            self._set_build_state("PATCH_READY")
+            self._append("assistant", "BUILD PATCH PREVIEW\n\n" + patch)
+            self._set_status("Build patch ready · review it, then Apply + Test")
+        except (OSError, ValueError, RuntimeError, urllib.error.URLError) as exc:
+            self._set_build_state("PROPOSAL_READY")
+            self._set_status(f"Build patch unavailable · {exc}")
+            self._append("assistant", f"I couldn't draft a safe patch: {exc}")
+        finally:
+            self._set_busy(False)
+
+    @pyqtSlot()
+    def applyBuildPatch(self) -> None:
+        if self._busy or not self.buildCanApply or not self._build_patch:
+            return
+        self._set_busy(True)
+        self._set_build_state("TESTING")
+        self._set_status("Build patch isolated on a temporary branch · running tests…")
+        threading.Thread(target=self._run_build_apply, daemon=True).start()
+
+    def _run_build_apply(self) -> None:
+        try:
+            result = builder_engine.apply_and_test(PROJECT_ROOT, self._build_patch)
+            self._build_result = result
+            if result.tests_passed:
+                self._set_build_state("APPLIED_TESTED")
+                self._append(
+                    "assistant",
+                    f"BUILD TESTS PASSED\nBranch: {result.builder_branch}\n\n{result.output}",
+                )
+                self._set_status("Tests passed · Commit will fast-forward this reviewed change")
+            else:
+                self._set_build_state("PATCH_READY")
+                self._append("assistant", "BUILD TESTS FAILED\n\n" + result.output)
+                self._set_status("Tests failed · patch was rolled back; review or discard it")
+        except (OSError, ValueError, RuntimeError) as exc:
+            self._set_build_state("PATCH_READY")
+            self._set_status(f"Build apply blocked · {exc}")
+            self._append("assistant", f"Build apply was blocked safely: {exc}")
+        finally:
+            self._set_busy(False)
+
+    @pyqtSlot()
+    def commitBuildPatch(self) -> None:
+        if self._busy or not self.buildCanCommit or self._build_result is None:
+            return
+        self._set_busy(True)
+        self._set_build_state("COMMITTING")
+        self._set_status("Committing tested Builder change…")
+        threading.Thread(target=self._run_build_commit, daemon=True).start()
+
+    def _run_build_commit(self) -> None:
+        try:
+            result = self._build_result
+            output = builder_engine.commit_applied(
+                PROJECT_ROOT,
+                self._build_patch,
+                self._build_task,
+                original_branch=result.original_branch,
+            )
+            self._append("assistant", "BUILD COMMITTED\n\n" + output)
+            self._build_patch = ""
+            self._build_result = None
+            self._set_build_state("COMMITTED")
+            self._set_status("Build committed and fast-forwarded into the original branch")
+        except (OSError, ValueError, RuntimeError) as exc:
+            self._set_build_state("APPLIED_TESTED")
+            self._set_status(f"Build commit blocked · {exc}")
+            self._append("assistant", f"Build commit was blocked safely: {exc}")
+        finally:
+            self._set_busy(False)
+
+    @pyqtSlot()
+    def discardBuildPatch(self) -> None:
+        if self._busy or not self.buildCanDiscard:
+            return
+        try:
+            if self._build_state == "APPLIED_TESTED" and self._build_result is not None:
+                builder_engine.discard_applied(
+                    PROJECT_ROOT,
+                    self._build_patch,
+                    self._build_result.original_branch,
+                    self._build_result.builder_branch,
+                )
+            self._build_patch = ""
+            self._build_result = None
+            self._build_proposal = ""
+            self._set_build_state("IDLE")
+            self._set_status("Build change discarded · repository restored")
+        except (OSError, ValueError, RuntimeError) as exc:
+            self._set_status(f"Build discard needs inspection · {exc}")
 
     def _system_prompt(self) -> str:
         base = (
@@ -274,6 +439,19 @@ class AssistantBridge(QObject):
 
     def _run_chat(self) -> None:
         try:
+            if self._mode == "BUILD":
+                proposal = builder_proposal.build_proposal(self._build_task)
+                self._build_proposal = proposal
+                self._history.append({"role": "assistant", "content": proposal})
+                self._append("assistant", proposal)
+                if builder_proposal.proposal_has_change(proposal):
+                    self._set_build_state("PROPOSAL_READY")
+                    self._set_status("Evidence-backed proposal ready · review it, then Draft Patch")
+                else:
+                    self._set_build_state("IDLE")
+                    self._set_status("Build analysis complete · no evidence-backed change was proven")
+                return
+
             answer = ""
             route = "LOCAL"
             if self._provider == "CLOUD":

@@ -34,6 +34,10 @@ KLEIN_9B_LORAS = {
     "flux2klein_tocowgirl.safetensors",
     "FK_sloppydeepthroat_epoch_10.safetensors",
     "FK_teeththroat.safetensors",
+    # RunPod inventory + upstream model documentation identify this as a
+    # FLUX.2 Klein 9B reference-pose adapter. Runtime quality remains
+    # experimental until a controlled GENESIS render is reviewed.
+    "refcontrol_v2_poses.safetensors",
 }
 
 # Expose verified training triggers to the UI/assistant. Prompt adaptation never
@@ -42,6 +46,7 @@ LORA_TRIGGERS = {
     "F2K4BBabe_Engel_v1.0.safetensors": "F2K4BBabe_Engel_v1.0",
     "FK_sloppydeepthroat_epoch_10.safetensors": "FK_sloppydeepthroat",
     "FK_teeththroat.safetensors": "FK_strappadoblowjob",
+    "refcontrol_v2_poses.safetensors": "apply pose from image 1 with reference from image 2",
 }
 
 # Exact local files whose base family is known to be Krea 2.

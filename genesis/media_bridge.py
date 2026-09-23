@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import threading
 from pathlib import Path
 from typing import Callable
@@ -11,7 +13,11 @@ from PyQt6.QtWidgets import QFileDialog
 
 from genesis.media_functions import (
     OperationResult,
+    batch_remove_background,
+    batch_upscale,
     extract_media,
+    face_organizer_scan,
+    find_duplicates_in_folder,
     remove_background,
     upscale_enhance,
 )
@@ -21,16 +27,23 @@ class MediaBridge(QObject):
     statusChanged = pyqtSignal()
     busyChanged = pyqtSignal()
     resultChanged = pyqtSignal()
+    reviewChanged = pyqtSignal()
     _completed = pyqtSignal(object)
     _failed = pyqtSignal(str)
+    _duplicatesReady = pyqtSignal(object)
+    _facesReady = pyqtSignal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._status = "Media tools ready"
         self._busy = False
         self._result_url = ""
+        self._duplicate_pairs: list[dict] = []
+        self._face_groups: list[dict] = []
         self._completed.connect(self._finish)
         self._failed.connect(self._fail)
+        self._duplicatesReady.connect(self._set_duplicates)
+        self._facesReady.connect(self._set_faces)
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
@@ -43,6 +56,90 @@ class MediaBridge(QObject):
     @pyqtProperty(str, notify=resultChanged)
     def resultUrl(self) -> str:
         return self._result_url
+
+    @pyqtProperty("QVariantList", notify=reviewChanged)
+    def duplicatePairs(self) -> list[dict]:
+        return self._duplicate_pairs
+
+    @pyqtProperty("QVariantList", notify=reviewChanged)
+    def faceGroups(self) -> list[dict]:
+        return self._face_groups
+
+    @pyqtSlot(object)
+    def _set_duplicates(self, result: dict) -> None:
+        pairs: list[dict] = []
+        for group in result.get("exact_groups", []):
+            if group:
+                pairs.extend({"left": group[0], "right": other, "distance": 0, "kind": "EXACT"} for other in group[1:])
+        pairs.extend({**item, "kind": "NEAR"} for item in result.get("near_pairs", []))
+        self._duplicate_pairs = pairs
+        self._face_groups = []
+        self.reviewChanged.emit()
+        self._set_busy(False)
+        self._set_status(f"{len(pairs)} duplicate comparisons ready for review")
+
+    @pyqtSlot(object)
+    def _set_faces(self, groups: list[dict]) -> None:
+        self._face_groups = groups
+        self._duplicate_pairs = []
+        self.reviewChanged.emit()
+        self._set_busy(False)
+        self._set_status(f"{len(groups)} face groups ready for review")
+
+    @pyqtSlot(str)
+    def openPath(self, value: str) -> None:
+        raw = value
+        if raw.startswith("file://"):
+            from PyQt6.QtCore import QUrl
+            raw = QUrl(raw).toLocalFile()
+        path = Path(raw).expanduser().resolve()
+        if path.exists():
+            subprocess.Popen(["xdg-open", str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._set_status(f"Opened {path.name}")
+        else:
+            self._set_status("File no longer exists")
+
+    @pyqtSlot()
+    def openResultFolder(self) -> None:
+        if not self._result_url:
+            self._set_status("No saved result yet")
+            return
+        from PyQt6.QtCore import QUrl
+        raw = QUrl(self._result_url).toLocalFile() if self._result_url.startswith("file://") else self._result_url
+        path = Path(raw).expanduser().resolve()
+        folder = path if path.is_dir() else path.parent
+        if folder.is_dir():
+            subprocess.Popen(["xdg-open", str(folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self._set_status(f"Opened {folder.name or folder}")
+        else:
+            self._set_status("Result folder no longer exists")
+
+    @pyqtSlot(str)
+    def trashDuplicate(self, value: str) -> None:
+        path = Path(value).expanduser().resolve()
+        if not path.is_file():
+            self._set_status("Duplicate file no longer exists")
+            return
+        if not shutil.which("gio"):
+            self._set_status("Desktop Trash is unavailable; nothing removed")
+            return
+        if not any(str(path) in (pair.get("left"), pair.get("right")) for pair in self._duplicate_pairs):
+            self._set_status("Choose a file from the current duplicate review")
+            return
+        try:
+            result = subprocess.run(["gio", "trash", str(path)], capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.TimeoutExpired):
+            self._set_status("Could not move duplicate to Trash; please check the file")
+            return
+        if result.returncode:
+            self._set_status("Could not move duplicate to Trash")
+            return
+        self._duplicate_pairs = [
+            pair for pair in self._duplicate_pairs
+            if pair.get("left") != str(path) and pair.get("right") != str(path)
+        ]
+        self.reviewChanged.emit()
+        self._set_status(f"Moved {path.name} to Trash · recoverable")
 
     def _set_status(self, value: str) -> None:
         self._status = value
@@ -73,7 +170,12 @@ class MediaBridge(QObject):
         self.resultChanged.emit()
         self._set_busy(False)
         backend = "standard resize/enhance (AI unavailable)" if result.backend == "pillow" else result.backend
-        self._set_status(f"Saved with {backend}")
+        failures = result.details.get("failures", [])
+        completed = result.details.get("count")
+        summary = f"Saved {completed} files with {backend}" if completed is not None else f"Saved with {backend}"
+        if failures:
+            summary += f" · {len(failures)} failed: {failures[0].get('error', 'unknown error')}"
+        self._set_status(summary)
 
     @pyqtSlot(str)
     def _fail(self, message: str) -> None:
@@ -100,7 +202,8 @@ class MediaBridge(QObject):
             self._start("Removing background", lambda: remove_background(source, target))
 
     @pyqtSlot(float)
-    def chooseAndUpscale(self, scale: float = 2.0) -> None:
+    @pyqtSlot(float, bool)
+    def chooseAndUpscale(self, scale: float = 2.0, prefer_ai: bool = True) -> None:
         if self._busy:
             return
         source = self._choose_image("Choose image to upscale")
@@ -113,8 +216,70 @@ class MediaBridge(QObject):
         if target:
             self._start(
                 f"Upscaling {scale:g}×",
-                lambda: upscale_enhance(source, target, scale=scale, prefer_ai=True),
+                lambda: upscale_enhance(source, target, scale=scale, prefer_ai=prefer_ai),
             )
+    def _choose_images(self, title: str) -> list[Path]:
+        values, _ = QFileDialog.getOpenFileNames(
+            None, title, str(Path.home()), "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"
+        )
+        return [Path(value) for value in values]
+
+    @pyqtSlot()
+    def chooseAndBatchRemoveBackground(self) -> None:
+        if self._busy:
+            return
+        sources = self._choose_images("Choose images for batch background removal")
+        if not sources:
+            return
+        folder = QFileDialog.getExistingDirectory(None, "Choose output folder", str(Path.home()))
+        if folder:
+            self._start("Batch background removal", lambda: batch_remove_background(sources, folder))
+
+    @pyqtSlot(float)
+    def chooseAndBatchUpscale(self, scale: float = 4.0) -> None:
+        if self._busy:
+            return
+        sources = self._choose_images("Choose images for batch upscale")
+        if not sources:
+            return
+        folder = QFileDialog.getExistingDirectory(None, "Choose output folder", str(Path.home()))
+        if folder:
+            self._start(f"Batch upscaling {scale:g}×", lambda: batch_upscale(sources, folder, scale=scale))
+
+    @pyqtSlot()
+    def chooseAndFindDuplicates(self) -> None:
+        if self._busy:
+            return
+        folder = QFileDialog.getExistingDirectory(None, "Choose image library to scan", str(Path.home()))
+        if not folder:
+            return
+        self._set_busy(True)
+        self._set_status("Scanning for duplicates…")
+        def run() -> None:
+            try:
+                result = find_duplicates_in_folder(folder)
+                self._duplicatesReady.emit(result)
+            except Exception as exc:
+                self._failed.emit(str(exc))
+        threading.Thread(target=run, daemon=True).start()
+
+    @pyqtSlot()
+    def chooseAndScanFaces(self) -> None:
+        if self._busy:
+            return
+        folder = QFileDialog.getExistingDirectory(None, "Choose photo library to organise", str(Path.home()))
+        if not folder:
+            return
+        self._set_busy(True)
+        self._set_status("Grouping faces…")
+        def run() -> None:
+            try:
+                groups = face_organizer_scan(folder)
+                self._facesReady.emit(groups)
+            except Exception as exc:
+                self._failed.emit(str(exc))
+        threading.Thread(target=run, daemon=True).start()
+
     @pyqtSlot()
     def chooseAndExtractAudio(self) -> None:
         if self._busy:

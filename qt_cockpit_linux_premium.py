@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import QApplication
 
 from genesis.assistant_bridge import AssistantBridge
 from genesis.media_bridge import MediaBridge
+from genesis.canvas_bridge import CanvasBridge
 from qt_cockpit import (
     ASSET_ROOT,
     PROJECT_ROOT,
@@ -29,6 +30,7 @@ from qt_cockpit import (
     GenerationBridge,
     LayoutSettingsBridge,
     ModuleBridge,
+    RemoteRuntimeMonitor,
     load_curated_pose_presets,
     load_generation_profiles,
     load_grok_preset_items,
@@ -119,24 +121,37 @@ def main() -> int:
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
     context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
     context.setContextProperty("generationProfiles", load_generation_profiles())
-    context.setContextProperty("runtimeStatus", load_runtime_status())
+    context.setContextProperty("runtimeStatus", load_runtime_status(probe_remote=False))
 
     generation_bridge = GenerationBridge(app)
     layout_bridge = LayoutSettingsBridge(app)
     module_bridge = ModuleBridge(app)
     assistant_bridge = AssistantBridge(app)
     media_bridge = MediaBridge(app)
+    canvas_bridge = CanvasBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
     context.setContextProperty("assistantBridge", assistant_bridge)
     context.setContextProperty("mediaBridge", media_bridge)
+    context.setContextProperty("canvasBridge", canvas_bridge)
 
     qml_path = UI_ROOT / "MainPremiumLinux.qml"
     qml_source = compose_premium_qml(qml_path.read_text(encoding="utf-8"))
     engine.loadData(qml_source.encode("utf-8"), QUrl.fromLocalFile(str(qml_path)))
     if not engine.rootObjects():
         return 1
+
+    runtime_monitor = None
+    if not args.screenshot:
+        runtime_monitor = RemoteRuntimeMonitor(app)
+        runtime_monitor.statusReady.connect(
+            lambda status: context.setContextProperty("runtimeStatus", status)
+        )
+        runtime_monitor.profilesReady.connect(
+            lambda profiles: context.setContextProperty("generationProfiles", profiles)
+        )
+        QTimer.singleShot(0, runtime_monitor.start)
 
     window = engine.rootObjects()[0]
     window.setProperty("pageIndex", PAGE_INDEXES[args.page])

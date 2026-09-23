@@ -6,6 +6,7 @@ provide stable operations that any current or future UI can call.
 
 from __future__ import annotations
 
+from functools import wraps
 import hashlib
 import json
 import math
@@ -92,6 +93,32 @@ def _trim_args(start: float | None, end: float | None) -> list[str]:
         args += ["-to", str(float(end))]
     return args
 
+def _atomic_output(operation):
+    """Publish only complete results and leave originals/existing exports intact on failure."""
+    @wraps(operation)
+    def run(path, output, *args, **kwargs):
+        source = _require_file(path)
+        target = Path(output).expanduser().resolve()
+        if target == source or (target.exists() and target.samefile(source)):
+            raise MediaFunctionError("Choose a different output file; the original must be preserved")
+        if operation.__name__ == "extract_media":
+            allowed = {"." + kwargs.get("audio_format", "mp3").lower().lstrip(".")} if kwargs.get("kind", "audio") == "audio" else VIDEO_EXTENSIONS
+        else:
+            allowed = {".png"}
+        if target.suffix.lower() not in allowed:
+            raise MediaFunctionError("Choose an output extension: " + ", ".join(sorted(allowed)))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".genesis-export-", dir=target.parent) as folder:
+            staged = Path(folder) / target.name
+            result = operation(source, staged, *args, **kwargs)
+            if not staged.is_file() or staged.stat().st_size == 0:
+                raise MediaFunctionError("The tool produced no output")
+            staged.replace(target)
+        result.output = target
+        return result
+    return run
+
+@_atomic_output
 def extract_media(
     path: str | Path,
     output: str | Path,
@@ -137,6 +164,7 @@ def extract_media(
     raise ValueError("kind must be 'audio' or 'video'")
 
 
+@_atomic_output
 def remove_background(path: str | Path, output: str | Path) -> OperationResult:
     """Remove an image background with the isolated ROCm rembg worker."""
     source = _require_file(path)
@@ -195,6 +223,7 @@ def _enhance_pillow(source: Path, target: Path, scale: float) -> OperationResult
     return OperationResult(target, "pillow", {"scale": scale, "mode": "enhance", "alpha_preserved": has_alpha})
 
 
+@_atomic_output
 def upscale_enhance(
     path: str | Path,
     output: str | Path,
@@ -211,14 +240,22 @@ def upscale_enhance(
     target.parent.mkdir(parents=True, exist_ok=True)
     if not math.isfinite(scale) or scale <= 0:
         raise ValueError("scale must be greater than zero")
-    if prefer_ai and UPSCALE_MODEL.is_file():
+    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
+    if prefer_ai and (remote_url or UPSCALE_MODEL.is_file()):
         try:
-            client = ComfyClient(timeout=8)
+            client = ComfyClient(remote_url, timeout=20) if remote_url else ComfyClient(timeout=8)
             client.system_stats()
+            model_name = UPSCALE_MODEL.name
+            if remote_url:
+                info = client.object_info()
+                models = info.get("UpscaleModelLoader", {}).get("input", {}).get("required", {}).get("model_name", [[]])[0]
+                model_name = next((m for m in models if "ultrasharp" in m.lower()), "")
+                if not model_name:
+                    raise ComfyError("The active RunPod has no UltraSharp upscaler")
             uploaded = client.upload_image(source, subfolder="genesis_media")
             prompt = {
                 "1": {"class_type": "LoadImage", "inputs": {"image": f"{uploaded.get('subfolder','')}/{uploaded['name']}"}},
-                "2": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": UPSCALE_MODEL.name}},
+                "2": {"class_type": "UpscaleModelLoader", "inputs": {"model_name": model_name}},
                 "3": {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["2", 0], "image": ["1", 0]}},
                 "4": {"class_type": "SaveImage", "inputs": {"filename_prefix": "genesis_upscale", "images": ["3", 0]}},
             }

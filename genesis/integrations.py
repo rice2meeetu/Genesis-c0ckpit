@@ -25,6 +25,9 @@ LLAMA_URL = "http://127.0.0.1:8081"
 QWEN_URL = "http://127.0.0.1:8082"
 # Dedicated everyday GENESIS AI route.
 ASSISTANT_URL = "http://127.0.0.1:8083"
+# Evidence-gated repository Build Mode route.
+BUILDER_URL = "http://127.0.0.1:8080"
+BUILDER_MODEL = "genesis-builder"
 COMFYUI_URL = "http://127.0.0.1:8188"
 GO2RTC_URL = "http://127.0.0.1:1984"
 LM_STUDIO_URL = "http://127.0.0.1:1234"
@@ -262,6 +265,24 @@ def gpu_kernel_preflight():
 def gpu_kernel_abort_reason() -> str | None:
     safe, detail = gpu_kernel_preflight()
     return None if safe else detail
+
+
+def stop_user_service(name: str):
+    """Stop one declared user service without starting or probing another workload."""
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "stop", name],
+            env=_user_systemd_env(),
+            capture_output=True,
+            text=True,
+            timeout=12,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return False, str(error)
+    if result.returncode == 0:
+        return True, "Stopped."
+    return False, result.stderr.strip() or result.stdout.strip() or "Stop failed."
 
 
 def start_user_service(name: str, already_online=False):

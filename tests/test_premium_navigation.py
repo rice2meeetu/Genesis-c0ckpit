@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 
-def test_assistant_and_face_swap_are_distinct_top_level_pages():
+def test_assistant_and_face_swap_are_distinct_top_level_pages(tmp_path):
     script = r'''
 import sys
 from PyQt6.QtCore import QObject, QTimer
@@ -48,7 +48,8 @@ sys.argv = ["genesis-navigation-check", "--page", "ai"]
 sys.exit(launcher.main())
 '''
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
-               QSG_RHI_BACKEND="software", LIBGL_ALWAYS_SOFTWARE="1")
+               QSG_RHI_BACKEND="software", LIBGL_ALWAYS_SOFTWARE="1",
+               XDG_RUNTIME_DIR=str(tmp_path / "runtime"))
     result = subprocess.run([sys.executable, "-c", script],
                             cwd=Path(__file__).resolve().parents[1], env=env,
                             capture_output=True, text=True, timeout=30)

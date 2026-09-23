@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="/home/rice2meetyou/Genesis-c0ckpit"
-export GENESIS_COMFY_URL="http://127.0.0.1:18188"
+export GENESIS_COMFY_URL="${GENESIS_COMFY_URL:-https://a5yw5n79egqcxy-8188.proxy.runpod.net}"
 
-# RunPod is on-demand: start the tunnel when this launcher is used rather than
-# keeping a stale cloud endpoint in a permanent restart loop.
-systemctl --user start genesis-runpod-tunnel.service >/dev/null 2>&1 || true
+# Direct RunPod HTTPS proxy mode: no local SSH tunnel is required for this pod.
+# The URL can be overridden temporarily by exporting GENESIS_COMFY_URL first.
 
 exec /usr/bin/python3 "$SCRIPT_DIR/qt_cockpit_linux_premium.py" "$@"

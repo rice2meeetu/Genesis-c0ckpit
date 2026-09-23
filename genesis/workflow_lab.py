@@ -775,6 +775,9 @@ def discover_workflow_controls(prompt: dict) -> dict:
                 continue
             for name in names:
                 if name in inputs:
+                    # Conditioning links are graph connections, not editable text.
+                    if control in {"positive", "negative"} and not isinstance(inputs[name], str):
+                        continue
                     mapping[control] = (node_id, name)
                     break
 

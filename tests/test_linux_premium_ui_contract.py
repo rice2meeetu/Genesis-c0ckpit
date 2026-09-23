@@ -24,7 +24,7 @@ def test_premium_linux_qml_exists():
 
 def test_source_image_is_a_real_preview_not_filename_only():
     qml = source()
-    assert 'text: "Load Source Image"' in qml
+    assert '"Load image" : "Load Source Image"' in qml
     assert "genesisBridge.chooseSourceImage()" in qml
     assert "source: appRoot.generationSource" in qml
     assert "fillMode: Image.PreserveAspectFit" in qml
@@ -140,7 +140,7 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
     qml = source()
     for legacy_blue in ("#17324a", "#242a30", "#152b3b", "#39424b", "#24292f", "#5575c5ff"):
         assert legacy_blue not in qml
-    assert 'Layout.preferredWidth: 260' in qml
-    assert 'Layout.preferredWidth: 360' in qml
+    assert 'appRoot.width < 1300 ? 210 : 260' in qml
+    assert 'appRoot.width < 1300 ? 280 : 360' in qml
     assert 'objectName: "generationResultPreview"' in qml
-    assert 'Layout.preferredHeight: 168' in qml
+    assert 'appRoot.height < 800 ? 110 : 168' in qml

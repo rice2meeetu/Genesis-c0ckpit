@@ -108,7 +108,7 @@ Rectangle {
         }
         RowLayout {
             Layout.fillWidth: true
-            visible: !chat.compact
+            visible: !chat.compact && chat.bridge.mode !== "BUILD"
             Repeater {
                 model: [
                     {label:"Help with a prompt", prompt:"Help me improve this image prompt: "},
@@ -117,6 +117,36 @@ Rectangle {
                     {label:"System info", prompt:"Explain my current GENESIS system status: "}
                 ]
                 GoldButton { Layout.fillWidth: true; text: modelData.label; onClicked: { chat.bridge.setDraft(modelData.prompt); input.forceActiveFocus() } }
+            }
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: buildControls.implicitHeight + 20
+            visible: !chat.compact && chat.bridge.mode === "BUILD"
+            color: "#12100d"; radius: 11; border.color: "#876536"
+            ColumnLayout {
+                id: buildControls
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.top: parent.top; anchors.margins: 10; spacing: 7
+                RowLayout {
+                    Layout.fillWidth: true
+                    Text {
+                        Layout.fillWidth: true
+                        text: "BUILD MODE · " + chat.bridge.buildState
+                        color: "#f4d8a2"; font.pixelSize: 12; font.bold: true
+                    }
+                    Text {
+                        text: "EVIDENCE GATED · BRANCH ISOLATED · TESTS REQUIRED"
+                        color: "#a99b82"; font.pixelSize: 9; font.letterSpacing: 0.6
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 6
+                    GoldButton { Layout.fillWidth: true; text: "Draft Patch"; enabled: !chat.bridge.busy && chat.bridge.buildCanDraft; onClicked: chat.bridge.draftBuildPatch() }
+                    GoldButton { Layout.fillWidth: true; text: "Apply + Test"; enabled: !chat.bridge.busy && chat.bridge.buildCanApply; onClicked: chat.bridge.applyBuildPatch() }
+                    GoldButton { Layout.fillWidth: true; text: "Commit"; enabled: !chat.bridge.busy && chat.bridge.buildCanCommit; onClicked: chat.bridge.commitBuildPatch() }
+                    GoldButton { Layout.fillWidth: true; text: "Discard"; enabled: !chat.bridge.busy && chat.bridge.buildCanDiscard; onClicked: chat.bridge.discardBuildPatch() }
+                }
             }
         }
         Rectangle {
@@ -132,7 +162,9 @@ Rectangle {
                         objectName: chat.compact ? "feefeeQuickInput" : "feefeeFullInput"
                         text: chat.bridge.draft
                         onTextChanged: if (activeFocus) chat.bridge.setDraft(text)
-                        placeholderText: "Ask FeeFee anything…"
+                        placeholderText: chat.bridge.mode === "BUILD"
+                            ? "Describe a GENESIS code task to analyze…"
+                            : "Ask FeeFee anything…"
                         color: "#f0ede6"; placeholderTextColor: "#aaa393"; font.pixelSize: 15
                         wrapMode: TextEdit.Wrap; background: Item {}
                         Keys.onReturnPressed: function(event) {
@@ -142,7 +174,7 @@ Rectangle {
                     }
                 }
                 GoldButton {
-                    text: chat.bridge.busy ? "…" : "Send ↑"
+                    text: chat.bridge.busy ? "…" : (chat.bridge.mode === "BUILD" ? "Analyze ↑" : "Send ↑")
                     enabled: !chat.bridge.busy && !chat.bridge.inferencePaused && chat.bridge.draft.trim().length > 0
                     onClicked: chat.bridge.sendDraft()
                 }
@@ -159,7 +191,7 @@ Rectangle {
                 palette.base: "#191919"; palette.text: "#eed3a0"; palette.window: "#191919"
             }
             ComboBox {
-                visible: !chat.compact
+                visible: !chat.compact && chat.bridge.mode !== "BUILD"
                 model: ["AUTO", "LOCAL", "CLOUD"]
                 currentIndex: model.indexOf(chat.bridge.provider)
                 onActivated: chat.bridge.setProvider(currentText)
@@ -168,8 +200,13 @@ Rectangle {
                 palette.base: "#191919"; palette.text: "#eed3a0"; palette.window: "#191919"
             }
             Text {
-                Layout.fillWidth: true; text: chat.bridge.inferencePaused ? "AI replies paused · GPU investigation" : chat.bridge.status
+                Layout.fillWidth: true; text: chat.bridge.inferencePaused ? "AI paused · local GPU models stay off" : chat.bridge.status
                 color: "#c4b89f"; font.pixelSize: 11; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+            }
+            GoldButton {
+                text: chat.bridge.inferencePaused ? "Enable AI" : "Pause AI"
+                enabled: !chat.bridge.busy
+                onClicked: chat.bridge.setInferencePaused(!chat.bridge.inferencePaused)
             }
             GoldButton { text: "Clear"; enabled: !chat.bridge.busy; onClicked: chat.bridge.clearChat() }
         }
