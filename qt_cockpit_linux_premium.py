@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import QApplication
 from genesis.assistant_bridge import AssistantBridge
 from genesis.media_bridge import MediaBridge
 from genesis.canvas_bridge import CanvasBridge
+from genesis.backend_bridge import BackendBridge
 from qt_cockpit import (
     ASSET_ROOT,
     PROJECT_ROOT,
@@ -120,10 +121,13 @@ def main() -> int:
     context.setContextProperty("poseItems", load_pose_items(limit=600))
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
     context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
-    context.setContextProperty("generationProfiles", load_generation_profiles())
+    context.setContextProperty("generationProfiles", [])
     context.setContextProperty("runtimeStatus", load_runtime_status(probe_remote=False))
 
     generation_bridge = GenerationBridge(app)
+    backend_bridge = BackendBridge(generation_bridge, app)
+    generation_bridge.backend_router = backend_bridge
+    context.setContextProperty("backendBridge", backend_bridge)
     layout_bridge = LayoutSettingsBridge(app)
     module_bridge = ModuleBridge(app)
     assistant_bridge = AssistantBridge(app)
@@ -144,7 +148,7 @@ def main() -> int:
 
     runtime_monitor = None
     if not args.screenshot:
-        runtime_monitor = RemoteRuntimeMonitor(app)
+        runtime_monitor = backend_bridge
         runtime_monitor.statusReady.connect(
             lambda status: context.setContextProperty("runtimeStatus", status)
         )

@@ -30,6 +30,8 @@ from genesis.generation_pipeline import adapt_prompt, compatible_selection
 from genesis import integrations, workflow_lab
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character
 from genesis.media_bridge import MediaBridge
+from genesis.backend_routing import remote_url, local_start_allowed, use_route
+# GENESIS_COMFY_URL remains supported through backend_routing for older launchers.
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -356,9 +358,9 @@ def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=N
 
 def load_generation_profiles() -> list[dict]:
     """Read the active backend catalog without blocking the Qt startup thread."""
-    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
-    if remote_url:
-        info = read_remote_catalog(remote_url)
+    backend_url = remote_url()
+    if backend_url:
+        info = read_remote_catalog(backend_url)
         return build_remote_generation_profiles(info) if info else []
     loras: set[str] = set()
     triggers: dict[str, list[str]] = {}
@@ -431,7 +433,7 @@ def build_create_prompt(
     """Build one of the two live-validated Create graphs selected in QML."""
     # Keep the RX 9060 local path conservative, but let the remote A100
     # honor the full resolution range exposed by the premium UI.
-    max_dimension = 4096 if os.environ.get("GENESIS_COMFY_URL") else 1536
+    max_dimension = 4096 if remote_url() else 1536
     width = max(256, min(max_dimension, int(width)))
     height = max(256, min(max_dimension, int(height)))
     loras = loras or []
@@ -587,11 +589,11 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
 
 def load_runtime_status(*, probe_remote: bool = True) -> dict:
     """Probe the active backend; remote probes run off the Qt startup thread."""
-    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
-    if not remote_url and not probe_remote:
+    backend_url = remote_url()
+    if not backend_url and not probe_remote:
         return {"comfyOnline": False, "gpuName": "Checking local backend", "vramUsedGiB": 0,
                 "vramTotalGiB": 0, "ready": False, "remote": False}
-    if remote_url:
+    if backend_url:
         status = {
             "comfyOnline": False, "gpuName": "RunPod offline",
             "vramUsedGiB": 0, "vramTotalGiB": 0,
@@ -600,7 +602,7 @@ def load_runtime_status(*, probe_remote: bool = True) -> dict:
         if not probe_remote:
             return status
         try:
-            stats = workflow_lab.ComfyClient(remote_url, timeout=20).system_stats()
+            stats = workflow_lab.ComfyClient(backend_url, timeout=20).system_stats()
             metrics = workflow_lab.gpu_metrics(stats)
             status.update({
                 "comfyOnline": True, "gpuName": metrics["name"],
@@ -671,7 +673,7 @@ class RemoteRuntimeMonitor(QObject):
             status = load_runtime_status()
             self.statusReady.emit(status)
             if status["comfyOnline"] and status.get("remote"):
-                url = os.environ["GENESIS_COMFY_URL"].strip()
+                url = remote_url()
                 client = workflow_lab.ComfyClient(url, timeout=20)
                 info = load_remote_catalog(client, refresh=not self._catalog_checked)
                 self._catalog_checked = True
@@ -818,7 +820,7 @@ class ModuleBridge(QObject):
                 if item.get("online")
             ]
             summary = ", ".join(online) if online else "no local services online"
-            if os.environ.get("GENESIS_COMFY_URL", "").strip():
+            if remote_url():
                 remote = load_runtime_status()
                 summary = ("RunPod ready" if remote.get("ready") else "RunPod unavailable") + " · " + summary
             self._set_status("Health check · " + summary)
@@ -879,6 +881,7 @@ class GenerationBridge(QObject):
         self._progress = -1.0
         self._preview = ""
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
+        self.backend_router = None
         self._settings = QSettings("GENESIS", "c0ckpit")
         configured_output = str(self._settings.value("generation/output_dir", str(OUTPUT_DIR)))
         self._output_dir = Path(configured_output).expanduser()
@@ -909,7 +912,7 @@ class GenerationBridge(QObject):
 
     @pyqtProperty(bool, constant=True)
     def upscaleAvailable(self) -> bool:
-        if os.environ.get("GENESIS_COMFY_URL", "").strip():
+        if remote_url():
             # Remote assets are checked against the pod catalog before submission.
             return UPSCALE_WORKFLOW.is_file()
         return upscale_assets_available()
@@ -931,7 +934,7 @@ class GenerationBridge(QObject):
         self.previewChanged.emit()
 
     def _connect_comfyui(self):
-        comfy_url = os.environ.get("GENESIS_COMFY_URL", workflow_lab.COMFY_URL).rstrip("/")
+        comfy_url = (remote_url() or workflow_lab.COMFY_URL).rstrip("/")
         remote_backend = comfy_url != workflow_lab.COMFY_URL.rstrip("/")
         if not remote_backend:
             safe, detail = integrations.gpu_kernel_preflight()
@@ -940,6 +943,8 @@ class GenerationBridge(QObject):
             online = integrations.endpoint_online(
                 integrations.COMFYUI_URL, "/system_stats", timeout=0.8
             )
+            if not online and not local_start_allowed():
+                raise workflow_lab.ComfyError("AUTO selected Local, but it went offline. Refresh backends and retry.")
             ok, detail = integrations.start_user_service(
                 integrations.COMFYUI_SERVICE, already_online=online
             )
@@ -1245,7 +1250,12 @@ class GenerationBridge(QObject):
         if use_stage_three and source is None:
             self._set_status("Stage 3 face lock requires an original source image.")
             return
-        if use_upscale and not self.upscaleAvailable:
+        try:
+            route = self.backend_router.resolve(model_name) if self.backend_router else None
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
+        if use_upscale and not (UPSCALE_WORKFLOW.is_file() if route and route.destination == "RUNPOD" else self.upscaleAvailable):
             self._set_status("Upscale is blocked: its checkpoint, VAE, or 4x-UltraSharp asset is missing.")
             return
         try:
@@ -1294,8 +1304,8 @@ class GenerationBridge(QObject):
         }[model_name]
         self._set_status(f"Preparing validated {engine} generation…")
         threading.Thread(
-            target=self._run_generate,
-            args=(prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
+            target=self._run_routed_generate,
+            args=(route, prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
                   lora_two, lora_three, float(lora_one_strength), float(lora_two_strength),
                   float(lora_three_strength), source, pose,
                   bool(use_stage_two), bool(use_stage_three),
@@ -1306,6 +1316,9 @@ class GenerationBridge(QObject):
     @pyqtSlot(str, str, str, float)
     def queueInpaint(self, source_url: str, mask_url: str, prompt_text: str, strength: float) -> None:
         if self._busy:
+            return
+        if self.backend_router is not None:
+            self._set_status("Use Create for routed generation; this legacy edit workflow is not routed yet.")
             return
         source = Path(QUrl(source_url).toLocalFile())
         mask = Path(QUrl(mask_url).toLocalFile())
@@ -1325,6 +1338,9 @@ class GenerationBridge(QObject):
     def queueEdit(self, source_url: str, prompt_text: str, strength: float) -> None:
         if self._busy:
             return
+        if self.backend_router is not None:
+            self._set_status("Use Create for routed generation; this legacy edit workflow is not routed yet.")
+            return
         source = Path(QUrl(source_url).toLocalFile())
         prompt_text = prompt_text.strip()
         if not source.is_file() or not prompt_text:
@@ -1340,6 +1356,13 @@ class GenerationBridge(QObject):
             args=(source, prompt_text, float(strength)),
             daemon=True,
         ).start()
+
+    def _run_routed_generate(self, route, *args):
+        if route is None:
+            return self._run_generate(*args)
+        with use_route(route):
+            self._set_status(f"{route.destination} · preparing generation…")
+            return self._run_generate(*args)
 
     def _run_generate(
         self,
@@ -1362,13 +1385,13 @@ class GenerationBridge(QObject):
         generation_controls: dict | None = None,
     ) -> None:
         try:
-            if model_name == FOUR_B_MODEL and not os.environ.get("GENESIS_COMFY_URL"):
+            if model_name == FOUR_B_MODEL and not remote_url():
                 required_model = Path.home() / "AI/ComfyUI/models/diffusion_models" / FOUR_B_MODEL
                 ready, detail = integrations.ensure_ai_model_volume_readonly(required_model)
                 if not ready:
                     raise workflow_lab.ComfyError(detail)
             client, stats = self._connect_comfyui()
-            if os.environ.get("GENESIS_COMFY_URL"):
+            if remote_url():
                 info = load_remote_catalog(client)
                 if model_name == REMOTE_PHR00T_MODEL:
                     validate_remote_workflow_assets(REMOTE_PHR00T_WORKFLOW, info)
@@ -1430,7 +1453,7 @@ class GenerationBridge(QObject):
                 current = self._submit_and_save(client, prompt, stamp, "Klein")
 
             if use_stage_two:
-                if os.environ.get("GENESIS_COMFY_URL"):
+                if remote_url():
                     refine_controls = {
                         "width": width, "height": height, "steps": 5, "cfg": 1.0,
                         "sampler": "euler", "scheduler": "beta", "denoise": 1.0,
@@ -1505,7 +1528,7 @@ class GenerationBridge(QObject):
 
     def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
         # Local GPU/asset checks are deliberately skipped for a remote RunPod backend.
-        if not os.environ.get("GENESIS_COMFY_URL"):
+        if not remote_url():
             safe, detail = integrations.gpu_kernel_preflight()
             if not safe:
                 raise workflow_lab.ComfyError(detail)
@@ -1532,7 +1555,7 @@ class GenerationBridge(QObject):
             prompt_id,
             timeout=1800,
             progress=update_progress,
-            abort_check=(None if os.environ.get("GENESIS_COMFY_URL") else integrations.gpu_kernel_abort_reason),
+            abort_check=(None if remote_url() else integrations.gpu_kernel_abort_reason),
         )
         if result.status != "completed":
             raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
@@ -1557,7 +1580,7 @@ class GenerationBridge(QObject):
         if not workflow.is_file():
             raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
         prompt = workflow_lab.workflow_to_prompt(workflow, info)
-        if os.environ.get("GENESIS_COMFY_URL") and workflow == STAGE_3_WORKFLOW:
+        if remote_url() and workflow == STAGE_3_WORKFLOW:
             for node in prompt.values():
                 if node.get("class_type") == "ReActorFaceSwap":
                     node["inputs"].update({
@@ -1783,7 +1806,7 @@ class GenerationBridge(QObject):
                 progress=lambda value: self._set_status(
                     f"Image edit {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
                 ),
-                abort_check=(None if os.environ.get("GENESIS_COMFY_URL") else integrations.gpu_kernel_abort_reason),
+                abort_check=(None if remote_url() else integrations.gpu_kernel_abort_reason),
             )
             if result.status != "completed":
                 raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")

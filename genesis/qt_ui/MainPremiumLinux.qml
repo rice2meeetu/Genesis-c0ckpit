@@ -63,9 +63,17 @@ ApplicationWindow {
     property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
     property int selectedGenerationIndex: 0
     property bool modelDefaultsApplied: false
+    property string selectedModelName: ""
     onGenerationModelChanged: {
-        if (generationModel.length && !modelDefaultsApplied) {
-            Qt.callLater(function() { appRoot.selectGeneration(0); appRoot.modelDefaultsApplied = true })
+        if (generationModel.length) {
+            var index = 0
+            for (var i = 0; i < generationModel.length; ++i)
+                if (generationModel[i].model === selectedModelName) { index = i; break }
+            selectedGenerationIndex = index
+            if (!modelDefaultsApplied || generationModel[index].model !== selectedModelName) {
+                selectGeneration(index)
+                modelDefaultsApplied = true
+            }
         }
     }
     Component.onCompleted: if (generationModel.length) { selectGeneration(0); modelDefaultsApplied = true }
@@ -154,6 +162,7 @@ ApplicationWindow {
     }
 
     function selectGeneration(index) {
+        if (generationModel[index]) selectedModelName = generationModel[index].model
         selectedGenerationIndex = index
         selectedLora = "None"
         selectedLoraTwo = "None"
@@ -597,9 +606,9 @@ ApplicationWindow {
                         border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                         Text {
                             anchors.centerIn: parent
-                            text: runtimeStatus.remote
+                            text: runtimeStatus.routingSummary || (runtimeStatus.remote
                                 ? (runtimeStatus.comfyOnline ? "●  RUNPOD ONLINE" : "○  RUNPOD OFFLINE")
-                                : (runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE")
+                                : (runtimeStatus.comfyOnline ? "●  COMFYUI ONLINE" : "○  COMFYUI OFFLINE"))
                             color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
                             font.pixelSize: 11
                             font.bold: true
@@ -931,6 +940,32 @@ ApplicationWindow {
                                     SectionLabel { text: "3 · MODEL / WORKFLOW" }
                                     ComboBox {
                                         Layout.fillWidth: true
+                                        model: ["AUTO", "LOCAL", "RUNPOD"]
+                                        currentIndex: model.indexOf(backendBridge.mode)
+                                        enabled: !genesisBridge.busy
+                                        onActivated: backendBridge.setMode(currentText)
+                                    }
+                                    Text { Layout.fillWidth: true; text: backendBridge.message; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 11 }
+                                    TextField {
+                                        id: runpodEndpoint
+                                        Layout.fillWidth: true
+                                        text: backendBridge.endpoint
+                                        placeholderText: "RunPod ComfyUI URL or pod ID"
+                                        enabled: !genesisBridge.busy
+                                        selectByMouse: true
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        GButton { text: "Save endpoint"; enabled: !genesisBridge.busy; onClicked: backendBridge.setEndpoint(runpodEndpoint.text) }
+                                        GButton { text: backendBridge.checking ? "Checking…" : "Refresh"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "Destination: " + (appRoot.selectedGenerationProfile.destination || "UNAVAILABLE")
+                                        color: appRoot.gold; font.pixelSize: 12; font.bold: true
+                                    }
+                                    ComboBox {
+                                        Layout.fillWidth: true
                                         model: appRoot.generationModel
                                         textRole: "label"
                                         currentIndex: appRoot.selectedGenerationIndex
@@ -1044,7 +1079,7 @@ ApplicationWindow {
                                         CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
                                         ComboBox {
                                             Layout.fillWidth: true
-                                            visible: runtimeStatus.remote
+                                            visible: appRoot.selectedGenerationProfile.remote === true
                                             enabled: !genesisBridge.busy
                                             model: ["Aisha 9B v9.7", "Klein 9B"]
                                             onActivated: genesisBridge.setStageTwoModel(currentIndex === 0

@@ -76,10 +76,11 @@ def test_remote_connection_never_starts_local_services(monkeypatch):
     start.assert_not_called()
 
 
-def test_runpod_launcher_uses_overridable_https_proxy_without_tunnel():
+def test_runpod_launcher_uses_saved_or_environment_endpoint_without_tunnel():
     launcher = (ROOT / "launch-qt-cockpit-runpod.sh").read_text(encoding="utf-8")
-    assert "${GENESIS_COMFY_URL:-https://" in launcher
-    assert "a5yw5n79egqcxy-8188.proxy.runpod.net" in launcher
+    assert "GENESIS_BACKEND_MODE=RUNPOD" in launcher
+    assert "GENESIS_COMFY_URL" in launcher
+    assert "a5yw5n79egqcxy" not in launcher
     assert "systemctl" not in launcher
     assert "qt_cockpit_linux_premium.py" in launcher
 
