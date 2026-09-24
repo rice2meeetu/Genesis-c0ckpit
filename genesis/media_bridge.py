@@ -35,6 +35,7 @@ class MediaBridge(QObject):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.backend_router = None
         self._status = "Media tools ready"
         self._busy = False
         self._result_url = ""
@@ -164,6 +165,20 @@ class MediaBridge(QObject):
 
         threading.Thread(target=run, daemon=True).start()
 
+    def _start_upscale(self, label, operation):
+        from genesis.backend_routing import use_route
+        try:
+            route = self.backend_router.resolve_operation('upscale') if self.backend_router else None
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
+        def routed():
+            if route is None:
+                return operation()
+            with use_route(route):
+                return operation()
+        self._start((route.destination + ' · ' if route else '') + label, routed)
+
     @pyqtSlot(object)
     def _finish(self, result: OperationResult) -> None:
         self._result_url = result.output.as_uri() if result.output else ""
@@ -214,10 +229,12 @@ class MediaBridge(QObject):
             str(source.with_name(source.stem + f"_{scale:g}x.png")), "PNG (*.png)",
         )
         if target:
-            self._start(
-                f"Upscaling {scale:g}×",
-                lambda: upscale_enhance(source, target, scale=scale, prefer_ai=prefer_ai),
-            )
+            if prefer_ai:
+                self._start_upscale(f"AI upscaling {scale:g}×",
+                    lambda: upscale_enhance(source, target, scale=scale, prefer_ai=True, require_ai=True))
+            else:
+                self._start(f"Standard resize {scale:g}×",
+                    lambda: upscale_enhance(source, target, scale=scale, prefer_ai=False))
     def _choose_images(self, title: str) -> list[Path]:
         values, _ = QFileDialog.getOpenFileNames(
             None, title, str(Path.home()), "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"
@@ -244,7 +261,7 @@ class MediaBridge(QObject):
             return
         folder = QFileDialog.getExistingDirectory(None, "Choose output folder", str(Path.home()))
         if folder:
-            self._start(f"Batch upscaling {scale:g}×", lambda: batch_upscale(sources, folder, scale=scale))
+            self._start_upscale(f"Batch upscaling {scale:g}×", lambda: batch_upscale(sources, folder, scale=scale))
 
     @pyqtSlot()
     def chooseAndFindDuplicates(self) -> None:

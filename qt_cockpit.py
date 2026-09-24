@@ -340,6 +340,10 @@ def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=N
     if model_override and controls.get("model"):
         node_id, field = controls["model"]
         prompt[str(node_id)]["inputs"][field] = model_override
+    validate_operation_prompt(prompt, info, f"Workflow {workflow.stem}")
+
+
+def validate_operation_prompt(prompt, info, label):
     validation = workflow_lab.validate_prompt(prompt, info)
     problems = validation["missing_nodes"] + validation["missing_inputs"]
     asset_fields = {"ckpt_name", "unet_name", "clip_name", "vae_name", "lora_name",
@@ -352,7 +356,7 @@ def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=N
                 problems.append(f"{field}: {value}")
     if problems:
         raise workflow_lab.ComfyError(
-            f"RunPod workflow {workflow.stem} requires unavailable components: " + ", ".join(problems)
+            f"{label} requires unavailable components: " + ", ".join(problems)
         )
 
 
@@ -1016,6 +1020,16 @@ class GenerationBridge(QObject):
         selected = choose_image("GENESIS · Saved results", folder=str(OUTPUT_DIR))
         return QUrl.fromLocalFile(selected).toString() if selected else ""
 
+    def _operation_route(self, operation):
+        return self.backend_router.resolve_operation(operation) if self.backend_router else None
+
+    def _run_routed_operation(self, route, operation, *args):
+        if route is None:
+            return operation(*args)
+        with use_route(route):
+            self._set_status(f"{route.destination} · preparing operation…")
+            return operation(*args)
+
     @pyqtSlot(str, str)
     def queueFaceSwap(self, target_url: str, source_url: str) -> None:
         """Run the isolated two-image ReActor route for ordinary images."""
@@ -1026,11 +1040,16 @@ class GenerationBridge(QObject):
         if not target.is_file() or not source.is_file():
             self._set_status("Choose both a target image and a source image.")
             return
+        try:
+            route = self._operation_route('face_swap')
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
         self._set_busy(True)
         self._set_status("Preparing two-image face swap…")
         threading.Thread(
-            target=self._run_face_swap,
-            args=(target, source),
+            target=self._run_routed_operation,
+            args=(route, self._run_face_swap, target, source),
             daemon=True,
         ).start()
 
@@ -1061,6 +1080,13 @@ class GenerationBridge(QObject):
             self._set_status("Choose both a target image and a source image.")
             return
 
+        if self.backend_router is not None and self.backend_router.mode != 'LOCAL':
+            self._set_status("FaceFusion is local image-only. Select LOCAL explicitly to run it; RunPod video is not connected.")
+            return
+        safe, detail = integrations.gpu_kernel_preflight()
+        if not safe:
+            self._set_status(detail)
+            return
         ff_root = integrations.FACEFUSION_ROOT
         ff_python = Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
         ff_entry = ff_root / "facefusion.py"
@@ -1317,8 +1343,10 @@ class GenerationBridge(QObject):
     def queueInpaint(self, source_url: str, mask_url: str, prompt_text: str, strength: float) -> None:
         if self._busy:
             return
-        if self.backend_router is not None:
-            self._set_status("Use Create for routed generation; this legacy edit workflow is not routed yet.")
+        try:
+            route = self._operation_route('inpaint')
+        except ValueError as exc:
+            self._set_status(str(exc))
             return
         source = Path(QUrl(source_url).toLocalFile())
         mask = Path(QUrl(mask_url).toLocalFile())
@@ -1329,8 +1357,8 @@ class GenerationBridge(QObject):
         self._set_busy(True)
         self._set_status("Preparing masked inpaint workflow…")
         threading.Thread(
-            target=self._run_inpaint,
-            args=(source, mask, prompt_text, float(strength)),
+            target=self._run_routed_operation,
+            args=(route, self._run_inpaint, source, mask, prompt_text, float(strength)),
             daemon=True,
         ).start()
 
@@ -1338,8 +1366,10 @@ class GenerationBridge(QObject):
     def queueEdit(self, source_url: str, prompt_text: str, strength: float) -> None:
         if self._busy:
             return
-        if self.backend_router is not None:
-            self._set_status("Use Create for routed generation; this legacy edit workflow is not routed yet.")
+        try:
+            route = self._operation_route('edit')
+        except ValueError as exc:
+            self._set_status(str(exc))
             return
         source = Path(QUrl(source_url).toLocalFile())
         prompt_text = prompt_text.strip()
@@ -1352,8 +1382,8 @@ class GenerationBridge(QObject):
         self._set_busy(True)
         self._set_status("Preparing validated image-edit workflow…")
         threading.Thread(
-            target=self._run_edit,
-            args=(source, prompt_text, float(strength)),
+            target=self._run_routed_operation,
+            args=(route, self._run_edit, source, prompt_text, float(strength)),
             daemon=True,
         ).start()
 
@@ -1526,7 +1556,7 @@ class GenerationBridge(QObject):
             raise workflow_lab.ComfyError("Klein 4B source workflow is not runnable: " + ", ".join(missing))
         return self._submit_and_save(client, prompt, stamp, "Klein4B")
 
-    def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str) -> Path:
+    def _submit_and_save(self, client, prompt: dict, stamp: str, stage: str, *, timeout=1800) -> Path:
         # Local GPU/asset checks are deliberately skipped for a remote RunPod backend.
         if not remote_url():
             safe, detail = integrations.gpu_kernel_preflight()
@@ -1553,12 +1583,13 @@ class GenerationBridge(QObject):
 
         result = client.wait(
             prompt_id,
-            timeout=1800,
+            timeout=timeout,
             progress=update_progress,
             abort_check=(None if remote_url() else integrations.gpu_kernel_abort_reason),
         )
         if result.status != "completed":
             raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
+        self._output_dir.mkdir(parents=True, exist_ok=True)
         saved: list[Path] = []
         for index, output in enumerate(result.outputs, 1):
             if output.get("kind") != "images":
@@ -1708,6 +1739,7 @@ class GenerationBridge(QObject):
         if not validation["valid"]:
             missing = validation["missing_nodes"] + validation["missing_inputs"]
             raise workflow_lab.ComfyError(f"{stage} is not runnable: " + ", ".join(missing))
+        validate_operation_prompt(prompt, info, stage)
         return self._submit_and_save(client, prompt, stamp, stage)
 
 
@@ -1752,6 +1784,7 @@ class GenerationBridge(QObject):
             if not validation["valid"]:
                 missing = validation["missing_nodes"] + validation["missing_inputs"]
                 raise workflow_lab.ComfyError("Inpaint workflow is not runnable: " + ", ".join(missing))
+            validate_operation_prompt(prompt, info, "Inpaint")
             stamp = time.strftime("%Y%m%d-%H%M%S")
             current = self._submit_and_save(client, prompt, stamp, "Inpaint")
             self._set_preview(QUrl.fromLocalFile(str(current)).toString())
@@ -1798,33 +1831,11 @@ class GenerationBridge(QObject):
                 missing = validation["missing_nodes"] + validation["missing_inputs"]
                 raise workflow_lab.ComfyError("Workflow is not runnable: " + ", ".join(missing))
 
-            prompt_id = client.submit(prompt)
-            self._set_status(f"Queued {prompt_id[:8]}…")
-            result = client.wait(
-                prompt_id,
-                timeout=3600,
-                progress=lambda value: self._set_status(
-                    f"Image edit {value.get('status', 'working')} · {int(value.get('elapsed', 0))}s"
-                ),
-                abort_check=(None if remote_url() else integrations.gpu_kernel_abort_reason),
-            )
-            if result.status != "completed":
-                raise workflow_lab.ComfyError(result.error or f"Edit ended: {result.status}")
-
-            self._output_dir.mkdir(parents=True, exist_ok=True)
-            saved: list[Path] = []
+            validate_operation_prompt(prompt, info, "Image edit")
             stamp = time.strftime("%Y%m%d-%H%M%S")
-            for index, output in enumerate(result.outputs, 1):
-                if output.get("kind") != "images":
-                    continue
-                suffix = Path(output.get("filename", "image.png")).suffix or ".png"
-                target = self._output_dir / f"GENESIS-Edit-{stamp}-{index}{suffix}"
-                target.write_bytes(client.view(output))
-                saved.append(target)
-            if not saved:
-                raise workflow_lab.ComfyError("ComfyUI completed without an image output.")
-            self._set_preview(QUrl.fromLocalFile(str(saved[-1])).toString())
-            self._set_status(f"Complete · {saved[-1].name}")
+            current = self._submit_and_save(client, prompt, stamp, "Edit", timeout=3600)
+            self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._set_status(f"Complete · {current.name}")
         except Exception as exc:
             self._set_status(f"Edit failed · {exc}")
         finally:

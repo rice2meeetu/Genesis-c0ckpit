@@ -127,6 +127,20 @@ class BackendBridge(QObject):
         self._local_status, self._remote_status = result['local_status'], result['remote_status']
         self._publish()
 
+    def resolve_operation(self, operation):
+        """Capture an online destination; workers validate exact workflow assets.
+
+        AUTO never starts services, and a failed operation never falls back to
+        another backend. Explicit LOCAL is still subject to the kernel guard.
+        """
+        if operation not in {'face_swap', 'edit', 'inpaint', 'upscale'}:
+            raise ValueError('Unsupported routed operation: ' + operation)
+        if self._mode != 'RUNPOD' and self._local_safe and self._local_status.get('ready'):
+            return Route('LOCAL', '')
+        if self._mode != 'LOCAL' and self._endpoint and self._remote_status.get('ready'):
+            return Route('RUNPOD', self._endpoint)
+        raise ValueError(f'{self._mode}: no ready safe backend for {operation}. Refresh backends in Create.')
+
     def resolve(self, model):
         import qt_cockpit as cockpit
         return choose_route(self._mode, model,

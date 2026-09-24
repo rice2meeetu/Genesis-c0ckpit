@@ -11,6 +11,11 @@ import sys
 from PyQt6.QtCore import QObject, QTimer
 from PyQt6.QtWidgets import QApplication
 import qt_cockpit_linux_premium as launcher
+# Keep real user presets and backend discovery outside this UI test.
+launcher.load_pose_items = lambda **kwargs: []
+launcher.load_grok_preset_items = lambda: []
+launcher.load_curated_pose_presets = lambda: []
+launcher.BackendBridge.start = lambda self: None
 real_engine = launcher.QQmlApplicationEngine
 engines = []
 def make_engine():

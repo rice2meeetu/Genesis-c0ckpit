@@ -132,6 +132,7 @@ def main() -> int:
     module_bridge = ModuleBridge(app)
     assistant_bridge = AssistantBridge(app)
     media_bridge = MediaBridge(app)
+    media_bridge.backend_router = backend_bridge
     canvas_bridge = CanvasBridge(app)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)

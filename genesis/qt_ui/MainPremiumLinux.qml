@@ -1318,15 +1318,15 @@ ApplicationWindow {
                                 model: [
                                     {title:"Background Remover", body:"Create one transparent cut-out while preserving the source.", action:"background remover", icon:"✂", status:"GPU / LOCAL"},
                                     {title:"Batch Cut-outs", body:"Remove backgrounds from multiple selected images into an output folder.", action:"batch background", icon:"✂", status:"GPU / BATCH"},
-                                    {title:"Upscale 2×", body:"Upscale through the active backend; standard resize is labelled when used.", action:"upscale", icon:"⇧", status:runtimeStatus.remote ? "RUNPOD" : "LOCAL"},
+                                    {title:"Upscale 2×", body:"AI upscale through the selected backend. Use Standard Resize for CPU resizing.", action:"upscale", icon:"⇧", status:backendBridge.mode},
                                     {title:"Standard Resize 2×", body:"Resize locally without starting an AI model. Keeps transparency.", action:"standard resize", icon:"⇧", status:"CPU"},
-                                    {title:"Batch Upscale 4×", body:"Quality-upscale multiple selected images into an output folder.", action:"batch upscale", icon:"⇧", status:runtimeStatus.remote ? "RUNPOD / BATCH" : "LOCAL / BATCH"},
+                                    {title:"Batch Upscale 4×", body:"Quality-upscale multiple selected images into an output folder.", action:"batch upscale", icon:"⇧", status:backendBridge.mode + " / BATCH"},
                                     {title:"Extract MP3", body:"Extract an MP3 audio track from a video or audio file.", action:"extract audio", icon:"♫", status:"FFMPEG"},
                                     {title:"Extract Video", body:"Save a video copy while keeping its original audio track.", action:"extract video", icon:"▷", status:"FFMPEG"},
                                     {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
                                     {title:"Duplicate Finder", body:"Review exact and near duplicates before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
                                     {title:"Face Organiser", body:"Group and organise photos by people.", action:"face organiser", icon:"◎", status:"PEOPLE"},
-                                    {title:"Face Swap", body:"Swap a source identity onto a target image using the dedicated local workflow.", action:"face swap", icon:"◎", status:"LOCAL"},
+                                    {title:"Face Swap", body:"ReActor uses the selected backend. FaceFusion runs local images only.", action:"face swap", icon:"◎", status:backendBridge.mode},
                                     {title:"Canvas", body:"Layer images and cutouts, arrange your scene and export a PNG.", action:"canvas", icon:"Ps", status:"LOCAL EDITOR"}
                                 ]
                                 MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
@@ -1476,7 +1476,7 @@ ApplicationWindow {
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }
                                 GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN REACTOR"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
-                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN FACEFUSION"; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
+                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "FACEFUSION · LOCAL IMAGE"; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
                                 GButton { Layout.preferredWidth: implicitWidth; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
                             } }
                         }

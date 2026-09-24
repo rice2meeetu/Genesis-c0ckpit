@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=GENESIS Cockpit
+Comment=Open the current repaired GENESIS Cockpit
+Exec=/home/rice2meetyou/Genesis-c0ckpit/launch-qt-cockpit.sh --page create
+TryExec=/home/rice2meetyou/Genesis-c0ckpit/launch-qt-cockpit.sh
+Path=/home/rice2meetyou/Genesis-c0ckpit
+Icon=/home/rice2meetyou/Genesis-c0ckpit/genesis/assets/genesis-cockpit-icon-balanced-final.png
+Terminal=false
+StartupNotify=true
+Categories=Graphics;Photography;

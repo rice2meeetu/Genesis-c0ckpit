@@ -271,3 +271,8 @@ only deliberate milestone files. Nothing from this UI session has been pushed.
   /tmp/genesis-media-viewer-review.png, /tmp/genesis-canvas-review.png.
   These temporary files are not committed. Use --screenshot with --review-image
   and QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software to repeat visual QA.
+
+
+## Routing repair checkpoint — 2026-09-24
+
+ReActor, Edit/Inpaint and media AI upscale now capture the selected backend per job. FaceFusion is explicitly local image-only. Safe validation passed 186 tests and all 13 offscreen page destinations; live inference/playback is not certified. Six tests reading user preset payloads were excluded. See [repair evidence and remaining work](docs/GENESIS_ROUTING_REPAIR_20260924.md). No redesign, paid service start or photo-library mutation.

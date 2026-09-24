@@ -22,6 +22,7 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from genesis.comfy_client import ComfyClient, ComfyError
+from genesis.backend_routing import remote_url as routed_remote_url
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v", ".mpeg", ".mpg"}
@@ -240,9 +241,14 @@ def upscale_enhance(
     target.parent.mkdir(parents=True, exist_ok=True)
     if not math.isfinite(scale) or scale <= 0:
         raise ValueError("scale must be greater than zero")
-    remote_url = os.environ.get("GENESIS_COMFY_URL", "").strip()
+    remote_url = routed_remote_url()
     if prefer_ai and (remote_url or UPSCALE_MODEL.is_file()):
         try:
+            if not remote_url:
+                from genesis import integrations
+                safe, detail = integrations.gpu_kernel_preflight()
+                if not safe:
+                    raise MediaFunctionError(detail)
             client = ComfyClient(remote_url, timeout=20) if remote_url else ComfyClient(timeout=8)
             client.system_stats()
             model_name = UPSCALE_MODEL.name
@@ -259,8 +265,13 @@ def upscale_enhance(
                 "3": {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["2", 0], "image": ["1", 0]}},
                 "4": {"class_type": "SaveImage", "inputs": {"filename_prefix": "genesis_upscale", "images": ["3", 0]}},
             }
+            if not remote_url:
+                safe, detail = integrations.gpu_kernel_preflight()
+                if not safe:
+                    raise MediaFunctionError(detail)
             prompt_id = client.submit(prompt)
-            result = client.wait(prompt_id, timeout=900)
+            result = client.wait(prompt_id, timeout=900,
+                abort_check=None if remote_url else integrations.gpu_kernel_abort_reason)
             if result.status != "completed" or not result.outputs:
                 raise ComfyError(result.error or "Upscale workflow returned no image")
             target.write_bytes(client.view(result.outputs[0]))
