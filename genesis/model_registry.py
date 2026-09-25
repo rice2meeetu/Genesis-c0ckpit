@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import os
 import tkinter as tk
 from pathlib import Path
 
@@ -19,14 +20,22 @@ RED = "#d16a6a"
 BLUE = "#1c3656"
 
 
-MODEL_ROOTS = (
+_DEFAULT_COMFYUI_ROOT = Path(os.environ.get("GENESIS_COMFYUI_ROOT") or os.environ.get("COMFYUI_ROOT") or (Path.home() / ("ComfyUI" if os.name == "nt" else "AI/ComfyUI")))
+
+MODEL_ROOTS = tuple(dict.fromkeys([
+    *([Path(os.environ["GENESIS_MODEL_ROOT"]).expanduser()] if os.environ.get("GENESIS_MODEL_ROOT") else []),
+    _DEFAULT_COMFYUI_ROOT / "models",
+    Path.home() / "Documents" / "ComfyUI" / "models",
+    Path.home() / "Desktop" / "ComfyUI" / "models",
     Path("/mnt/AI-Storage/ComfyUI/models"),
     Path.home() / "AI" / "ComfyUI" / "models",
     Path.home() / "AI" / "AI-Models",
     Path("/run/media") / getpass.getuser() / "Ai" / "AI-Models",
-)
+]))
 
 WORKFLOW_ROOTS = (
+    _DEFAULT_COMFYUI_ROOT / "user" / "default" / "workflows",
+    _DEFAULT_COMFYUI_ROOT / "workflows",
     Path("/mnt/AI-Storage/ComfyUI/workflows"),
     Path.home() / "AI" / "ComfyUI" / "user" / "default" / "workflows",
     Path.home() / "AI" / "GENESIS_POSE_MAKER" / "workflows",

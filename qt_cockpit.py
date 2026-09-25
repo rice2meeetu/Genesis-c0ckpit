@@ -34,12 +34,16 @@ from genesis.backend_routing import remote_url, local_start_allowed, use_route
 # GENESIS_COMFY_URL remains supported through backend_routing for older launchers.
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent
 UI_ROOT = PROJECT_ROOT / "genesis" / "qt_ui"
 ASSET_ROOT = PROJECT_ROOT / "genesis" / "assets" / "panel_backgrounds"
 POSE_INDEX = PROJECT_ROOT / "genesis" / "reference" / "pose_library_index.json"
 POSE_THUMB_CACHE = Path.home() / "GENESIS-Photo-Studio" / "cache" / "thumbnails"
-WORKFLOW_ROOT = Path.home() / "AI" / "ComfyUI" / "user" / "default" / "workflows"
+_DEFAULT_COMFYUI_ROOT = Path(os.environ.get("GENESIS_COMFYUI_ROOT") or os.environ.get("COMFYUI_ROOT") or (Path.home() / ("ComfyUI" if os.name == "nt" else "AI/ComfyUI")))
+WORKFLOW_ROOT = Path(os.environ.get("GENESIS_WORKFLOW_ROOT") or (_DEFAULT_COMFYUI_ROOT / "user" / "default" / "workflows"))
 GENERATION_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUX2_KLEIN_9B_KV_OFFICIAL_T2I.json"
 REGULAR_9B_WORKFLOWS = (
     Path("/mnt/AI-Storage/ComfyUI/workflows/Flux.2 Klein 9b Text To Image.json"),
@@ -250,25 +254,26 @@ def _remote_choice_values(info: dict, node_types: tuple[str, ...], input_name: s
     return sorted(values, key=str.casefold)
 
 
-def build_remote_generation_profiles(info: dict) -> list[dict]:
-    """Build GENESIS model rows from a live remote ComfyUI /object_info catalog."""
+def build_remote_generation_profiles(info: dict, *, remote: bool = True) -> list[dict]:
+    """Build GENESIS model rows from a live ComfyUI /object_info catalog."""
     checkpoints = _remote_choice_values(info, ("CheckpointLoaderSimple",), "ckpt_name")
     diffusion = _remote_choice_values(info, ("UNETLoader", "UnetLoaderGGUF"), "unet_name")
     loras = _remote_choice_values(
         info, ("LoraLoader", "LoraLoaderModelOnly", "LoraLoaderBypass"), "lora_name"
     )
     models = list(dict.fromkeys([*checkpoints, *diffusion]))
+    backend_label = "Remote" if remote else "Local"
     labels = {
-        REMOTE_PHR00T_MODEL: "RunPod · Phr00t v23 · Prompt",
-        REMOTE_PHR00T_V19_MODEL: "Phr00t v19 · Consistency",
-        REMOTE_KLEIN_9B_MODEL: "RunPod · FLUX.2 Klein 9B",
-        REMOTE_AISHA_9B_MODEL: "RunPod · Aisha 9B v9.7",
-        REMOTE_PORNMASTER_9B_MODEL: "RunPod · PornMaster FLUX.2 Klein v3 FP8",
-        REMOTE_MIRACLEIN_9B_MODEL: "RunPod · Miraclein FLUX.2 Klein 2.0 FP8",
-        REMOTE_DARKBEAST_9B_MODEL: "RunPod · DarkBeast FLUX.2 Klein",
-        FOUR_B_MODEL: "RunPod · FLUX.2 Klein 4B",
-        REGULAR_9B_MODEL: "RunPod · FLUX.2 Klein 9B Base",
-        KV_9B_MODEL: "RunPod · FLUX.2 Klein 9B-KV FP8",
+        REMOTE_PHR00T_MODEL: f"{backend_label} · Phr00t v23 · Prompt",
+        REMOTE_PHR00T_V19_MODEL: f"{backend_label} · Phr00t v19 · Consistency",
+        REMOTE_KLEIN_9B_MODEL: f"{backend_label} · FLUX.2 Klein 9B",
+        REMOTE_AISHA_9B_MODEL: f"{backend_label} · Aisha 9B v9.7",
+        REMOTE_PORNMASTER_9B_MODEL: f"{backend_label} · PornMaster FLUX.2 Klein v3 FP8",
+        REMOTE_MIRACLEIN_9B_MODEL: f"{backend_label} · Miraclein FLUX.2 Klein 2.0 FP8",
+        REMOTE_DARKBEAST_9B_MODEL: f"{backend_label} · DarkBeast FLUX.2 Klein",
+        FOUR_B_MODEL: f"{backend_label} · FLUX.2 Klein 4B",
+        REGULAR_9B_MODEL: f"{backend_label} · FLUX.2 Klein 9B Base",
+        KV_9B_MODEL: f"{backend_label} · FLUX.2 Klein 9B-KV FP8",
     }
     defaults = {
     }
@@ -289,9 +294,9 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
         compatible = compatible_loras(model_name, loras)
         runnable = model_name in SUPPORTED_CREATE_MODELS
         row = {
-            "label": labels.get(model_name, "RunPod · " + model_name),
+            "label": labels.get(model_name, backend_label + " · " + model_name),
             "model": model_name,
-            "note": (compatibility_note(model_name) if runnable else "Remote model detected · workflow mapping pending"),
+            "note": (compatibility_note(model_name) if runnable else "Backend model detected · workflow mapping pending"),
             "loras": ["None", *compatible],
             "triggers": {
                 name: ([lora_trigger(name)] if lora_trigger(name) else [])
@@ -302,7 +307,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "sourceRequired": model_name in REMOTE_SOURCE_MODELS or model_name == QWEN_MODEL,
             "maxLoras": 1 if model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL} else 0,
             "experimentalLoras": model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL},
-            "remote": True,
+            "remote": remote,
         }
         row.update(defaults.get(model_name, {}))
         rows.append(row)

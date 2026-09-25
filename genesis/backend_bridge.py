@@ -95,9 +95,14 @@ class BackendBridge(QObject):
         result = {'revision': revision}
         try:
             with use_route(Route('LOCAL', '')):
-                result['local'] = cockpit.load_generation_profiles()
                 result['local_status'] = cockpit.load_runtime_status()
                 result['local_safe'] = bool(cockpit.integrations.gpu_kernel_preflight()[0])
+                if result['local_status'].get('ready'):
+                    client = cockpit.workflow_lab.ComfyClient(cockpit.workflow_lab.COMFY_URL, timeout=8)
+                    info = cockpit.load_remote_catalog(client, refresh=True)
+                    result['local'] = cockpit.build_remote_generation_profiles(info, remote=False)
+                else:
+                    result['local'] = cockpit.load_generation_profiles()
         except Exception:
             result['local'] = []
             result['local_status'] = {'ready': False, 'comfyOnline': False, 'remote': False}
@@ -147,7 +152,7 @@ class BackendBridge(QObject):
             {p['model'] for p in self._local if p.get('runnable')},
             {p['model'] for p in self._remote if p.get('runnable')},
             self._local_status.get('ready', False), self._remote_status.get('ready', False),
-            self._endpoint, local_safe=model == cockpit.FOUR_B_MODEL and self._local_safe)
+            self._endpoint, local_safe=self._local_safe)
 
     @pyqtSlot()
     def _publish(self):
@@ -171,7 +176,7 @@ class BackendBridge(QObject):
         self.profilesReady.emit(rows)
         local = ('ready' if self._local_safe else 'safety blocked') if self._local_status.get('ready') else 'offline'
         remote = ('ready' if self._remote_status.get('ready') else 'offline') if self._endpoint else 'not configured'
-        self._message = f'Local {local} · RunPod {remote}'
+        self._message = f'Local {local} · Remote {remote}'
         status = dict(self._remote_status if self._mode == 'RUNPOD' else self._local_status)
         status['routingSummary'] = self._message
         self.statusReady.emit(status)
