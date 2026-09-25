@@ -1,0 +1,31 @@
+name: Brother Windows Wrapper
+
+on:
+  push:
+    branches:
+      - brother-standalone-wrapper
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout brother wrapper
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build and smoke-test standalone wrapper
+        shell: cmd
+        run: BUILD_BROTHER_WRAPPER_WINDOWS.bat
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GENESIS-Brother-Image-Wrapper-Windows
+          path: GENESIS-Brother-Image-Wrapper-Windows.zip
+          if-no-files-found: error
