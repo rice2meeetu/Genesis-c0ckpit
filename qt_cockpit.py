@@ -770,6 +770,8 @@ class ModuleBridge(QObject):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._status = "Ready · choose a module action"
+        self.backend_router = None
+        self._grok_sessions = {}
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
@@ -865,6 +867,48 @@ class ModuleBridge(QObject):
         self._set_status("Running health check…")
         threading.Thread(target=worker, daemon=True).start()
 
+    def _open_grok_runpod(self) -> None:
+        """Open an isolated studio bound to the selected remote endpoint."""
+        from genesis.backend_routing import normalize_endpoint
+        import socket
+
+        router = self.backend_router
+        if router is None or router.mode != "RUNPOD":
+            self._set_status("Select RUNPOD before opening Grok from GENESIS.")
+            return
+        try:
+            endpoint = normalize_endpoint(router.endpoint)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
+        if not endpoint:
+            self._set_status("Set the RunPod ComfyUI endpoint before opening Grok.")
+            return
+        grok_root = Path.home() / "MUNGBEAN"
+        launcher = grok_root / "START_LOCAL.sh"
+        if not launcher.is_file():
+            self._set_status("MUNGBEAN Grok Imagine is not installed")
+            return
+        session = self._grok_sessions.get(endpoint)
+        if session and session[0].poll() is None:
+            self._open(session[1], "Grok · RunPod")
+            return
+        try:
+            with socket.socket() as listener:
+                listener.bind(("127.0.0.1", 0))
+                port = listener.getsockname()[1]
+            env = os.environ.copy()
+            env.update(COMFY_URL=endpoint, IMAGINE_HOST="127.0.0.1", IMAGINE_PORT=str(port))
+            process = subprocess.Popen(
+                [str(launcher)], cwd=str(grok_root), env=env,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self._grok_sessions[endpoint] = (process, f"http://127.0.0.1:{port}")
+            self._set_status("Grok launched for RunPod · connection and models must be ready")
+        except OSError as exc:
+            self._set_status(f"Grok launch failed · {exc}")
+
     @pyqtSlot(str)
     def triggerAction(self, action: str) -> None:
         key = action.strip().lower()
@@ -888,22 +932,7 @@ class ModuleBridge(QObject):
         elif "ai settings" in key or "ai assistant" in key:
             self._service(integrations.QWEN_URL, "/health", integrations.QWEN_SERVICE, "GENESIS AI")
         elif "grok imagine" in key or "mungbean" in key:
-            grok_root = Path.home() / "MUNGBEAN"
-            launcher = grok_root / "START_LOCAL.sh"
-            if not launcher.is_file():
-                self._set_status("MUNGBEAN Grok Imagine is not installed")
-                return
-            try:
-                subprocess.Popen(
-                    [str(launcher)],
-                    cwd=str(grok_root),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                self._set_status("MUNGBEAN Grok Imagine opened")
-            except OSError as exc:
-                self._set_status(f"MUNGBEAN Grok Imagine failed · {exc}")
+            self._open_grok_runpod()
         elif "monitor" in key:
             try:
                 subprocess.Popen(["gnome-system-monitor"], start_new_session=True)
