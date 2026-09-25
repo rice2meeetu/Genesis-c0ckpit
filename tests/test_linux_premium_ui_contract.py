@@ -56,6 +56,14 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert 'text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()' in qml
     assert 'text: "Stage 2 · refine"' in qml
     assert 'text: "Stage 3 · identity lock"' in qml
+    assert 'model: ["Single model", "3-stage · Phr00t → Refine → Identity"]' in qml
+    assert "appRoot.useStageTwo = fullPipeline" in qml
+    assert "appRoot.useStageThree = fullPipeline" in qml
+    assert '"ReActor · Inswapper ✓"' in qml
+    assert '"ReActor · ReSwapper ✓"' in qml
+    assert '"ReActor · HyperSwap ✓"' in qml
+    assert '"PuLID FLUX.2 · pending"' in qml
+    assert "genesisBridge.setStageThreeEngine" in qml
     assert 'text: "Final upscale"' in qml
     assert "genesisBridge.queueGenerateAdvanced(" in qml
 
@@ -67,6 +75,10 @@ def test_linux_launcher_loads_full_pose_index_premium_qml_and_ai():
     assert '"settings": 10' in launcher
     assert '"ai": 11' in launcher
     assert 'label:"AI Assistant", page:11' in launcher
+    assert '"grok": 13' in launcher
+    assert 'label:"Grok Imagine", page:13' in source()
+    assert "GROK_PAGE_QML" in launcher
+    assert 'moduleBridge.triggerAction("grok imagine")' in launcher
     assert "AssistantBridge" in launcher
     feefee = Path("genesis/qt_ui/FeeFeeChat.qml").read_text(encoding="utf-8")
     assert "FeeFeeChat" in launcher

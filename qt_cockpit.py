@@ -45,7 +45,7 @@ REGULAR_9B_WORKFLOWS = (
     Path("/mnt/AI-Storage/ComfyUI/workflows/Flux.2 Klein 9b Text To Image.json"),
     WORKFLOW_ROOT / "Flux.2 Klein 9b Text To Image.json",
 )
-EDIT_WORKFLOW = WORKFLOW_ROOT / "GENESIS_FLUXUP_IMG2IMG_RX9060.json"
+EDIT_WORKFLOW = PROJECT_ROOT / "genesis" / "reference" / "pose_workflows" / "FLUXUP_IMG2IMG_RX9060.json"
 INPAINT_CHECKPOINT = "juggernautXL_ragnarokBy.safetensors"
 REGULAR_9B_MODEL = "flux-2-klein-base-9b-Q4_K_M.gguf"
 KV_9B_MODEL = "flux-2-klein-9b-kv-fp8.safetensors"
@@ -56,13 +56,26 @@ TEXT_ENCODER_9B = "qwen_3_8b_fp8mixed.safetensors"
 
 # MARTY RunPod models verified from the live ComfyUI catalog.
 REMOTE_PHR00T_MODEL = "Qwen-Rapid-NSFW-v23_Q8_0.gguf"
+REMOTE_PHR00T_V19_MODEL = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+REMOTE_PHR00T_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_PHR00T_V19_MODEL}
 REMOTE_PHR00T_CLIP = "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
 REMOTE_PHR00T_VAE = "qwen_image_vae.safetensors"
 REMOTE_KLEIN_9B_MODEL = "flux-2-klein-9b.safetensors"
 REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"
-REMOTE_9B_CLIP = "qwen_3_8b_fp8mixed.safetensors"
+REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
+REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v2.0 FP8 - Klein9B -,euler,cfg1.1.safetensors"
+REMOTE_DARKBEAST_9B_MODEL = "DarkBeast-Klein9b-V2-BFS-FP8-ComfyUI.safetensors"
+REMOTE_9B_CLIP = "qwen_3_8b.safetensors"
+REMOTE_9B_CLIP_CANDIDATES = (REMOTE_9B_CLIP, "qwen_3_8b_fp8mixed.safetensors")
 REMOTE_9B_VAE = "flux2-vae.safetensors"
-REMOTE_SOURCE_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}
+REMOTE_KLEIN9B_SOURCE_MODELS = {
+    REMOTE_KLEIN_9B_MODEL,
+    REMOTE_AISHA_9B_MODEL,
+    REMOTE_PORNMASTER_9B_MODEL,
+    REMOTE_MIRACLEIN_9B_MODEL,
+    REMOTE_DARKBEAST_9B_MODEL,
+}
+REMOTE_SOURCE_MODELS = {*REMOTE_PHR00T_MODELS, *REMOTE_KLEIN9B_SOURCE_MODELS}
 
 SUPPORTED_CREATE_MODELS = {
     FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL,
@@ -246,31 +259,31 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
     )
     models = list(dict.fromkeys([*checkpoints, *diffusion]))
     labels = {
-        REMOTE_PHR00T_MODEL: "RunPod · Phr00t v23",
+        REMOTE_PHR00T_MODEL: "RunPod · Phr00t v23 · Prompt",
+        REMOTE_PHR00T_V19_MODEL: "Phr00t v19 · Consistency",
         REMOTE_KLEIN_9B_MODEL: "RunPod · FLUX.2 Klein 9B",
         REMOTE_AISHA_9B_MODEL: "RunPod · Aisha 9B v9.7",
-        QWEN_MODEL: "RunPod · Phr00t / QwenRapid AIO",
+        REMOTE_PORNMASTER_9B_MODEL: "RunPod · PornMaster FLUX.2 Klein v3 FP8",
+        REMOTE_MIRACLEIN_9B_MODEL: "RunPod · Miraclein FLUX.2 Klein 2.0 FP8",
+        REMOTE_DARKBEAST_9B_MODEL: "RunPod · DarkBeast FLUX.2 Klein",
         FOUR_B_MODEL: "RunPod · FLUX.2 Klein 4B",
         REGULAR_9B_MODEL: "RunPod · FLUX.2 Klein 9B Base",
         KV_9B_MODEL: "RunPod · FLUX.2 Klein 9B-KV FP8",
     }
     defaults = {
-        REMOTE_PHR00T_MODEL: {
+    }
+    for model_name in REMOTE_PHR00T_MODELS:
+        defaults[model_name] = {
             "defaultWidth": 2264, "defaultHeight": 1360, "defaultSteps": 4,
             "defaultCfg": 1.2, "defaultDenoise": 1.0,
             "defaultSampler": "euler_ancestral", "defaultScheduler": "beta",
-        },
-        REMOTE_KLEIN_9B_MODEL: {
+        }
+    for model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
+        defaults[model_name] = {
             "defaultWidth": 1920, "defaultHeight": 1520, "defaultSteps": 5,
             "defaultCfg": 1.0, "defaultDenoise": 1.0,
             "defaultSampler": "euler", "defaultScheduler": "beta",
-        },
-        REMOTE_AISHA_9B_MODEL: {
-            "defaultWidth": 1920, "defaultHeight": 1520, "defaultSteps": 5,
-            "defaultCfg": 1.0, "defaultDenoise": 1.0,
-            "defaultSampler": "euler", "defaultScheduler": "beta",
-        },
-    }
+        }
     rows: list[dict] = []
     for model_name in models:
         compatible = compatible_loras(model_name, loras)
@@ -294,8 +307,9 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
         row.update(defaults.get(model_name, {}))
         rows.append(row)
     priority = {
-        REMOTE_PHR00T_MODEL: 0, REMOTE_KLEIN_9B_MODEL: 1, REMOTE_AISHA_9B_MODEL: 2,
-        QWEN_MODEL: 3, FOUR_B_MODEL: 4, REGULAR_9B_MODEL: 5, KV_9B_MODEL: 6,
+        REMOTE_PHR00T_MODEL: 0, REMOTE_PHR00T_V19_MODEL: 1,
+        REMOTE_KLEIN_9B_MODEL: 2, REMOTE_AISHA_9B_MODEL: 3,
+        FOUR_B_MODEL: 5, REGULAR_9B_MODEL: 6, KV_9B_MODEL: 7,
     }
     rows.sort(key=lambda item: (priority.get(item["model"], 99), item["label"].casefold()))
     return rows
@@ -334,12 +348,32 @@ def load_remote_catalog(client, *, refresh: bool = False) -> dict:
     return info
 
 
+def _reconcile_remote_klein_clip(prompt: dict, info: dict) -> None:
+    """Use whichever verified Qwen 3 8B encoder the connected catalog exposes."""
+    clip_spec = (
+        info.get("CLIPLoader", {})
+        .get("input", {}).get("required", {}).get("clip_name", [[], {}])
+    )
+    available = set(clip_spec[0]) if clip_spec and isinstance(clip_spec[0], list) else set()
+    if not available:
+        return
+    selected = next((name for name in REMOTE_9B_CLIP_CANDIDATES if name in available), None)
+    if not selected:
+        return
+    for node in prompt.values():
+        if node.get("class_type") == "CLIPLoader" and "clip_name" in node.get("inputs", {}):
+            if node["inputs"]["clip_name"] in REMOTE_9B_CLIP_CANDIDATES:
+                node["inputs"]["clip_name"] = selected
+
+
 def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=None):
     prompt = workflow_lab.workflow_to_prompt(workflow, info)
     controls = workflow_lab.discover_workflow_controls(prompt)
     if model_override and controls.get("model"):
         node_id, field = controls["model"]
         prompt[str(node_id)]["inputs"][field] = model_override
+    if workflow == REMOTE_KLEIN9B_WORKFLOW:
+        _reconcile_remote_klein_clip(prompt, info)
     validate_operation_prompt(prompt, info, f"Workflow {workflow.stem}")
 
 
@@ -853,6 +887,23 @@ class ModuleBridge(QObject):
             self._service(integrations.COMFYUI_URL, "/system_stats", integrations.COMFYUI_SERVICE, "ComfyUI")
         elif "ai settings" in key or "ai assistant" in key:
             self._service(integrations.QWEN_URL, "/health", integrations.QWEN_SERVICE, "GENESIS AI")
+        elif "grok imagine" in key or "mungbean" in key:
+            grok_root = Path.home() / "MUNGBEAN"
+            launcher = grok_root / "START_LOCAL.sh"
+            if not launcher.is_file():
+                self._set_status("MUNGBEAN Grok Imagine is not installed")
+                return
+            try:
+                subprocess.Popen(
+                    [str(launcher)],
+                    cwd=str(grok_root),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                self._set_status("MUNGBEAN Grok Imagine opened")
+            except OSError as exc:
+                self._set_status(f"MUNGBEAN Grok Imagine failed · {exc}")
         elif "monitor" in key:
             try:
                 subprocess.Popen(["gnome-system-monitor"], start_new_session=True)
@@ -885,6 +936,8 @@ class GenerationBridge(QObject):
         self._progress = -1.0
         self._preview = ""
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
+        self._stage_three_engine = "reactor_inswapper"
+        self._cancel_requested = False
         self.backend_router = None
         self._settings = QSettings("GENESIS", "c0ckpit")
         configured_output = str(self._settings.value("generation/output_dir", str(OUTPUT_DIR)))
@@ -936,6 +989,24 @@ class GenerationBridge(QObject):
     def _set_preview(self, value: str) -> None:
         self._preview = value
         self.previewChanged.emit()
+
+    @pyqtSlot()
+    def cancelGeneration(self) -> None:
+        if not self._busy:
+            return
+        self._cancel_requested = True
+        self._set_status("Cancelling generation…")
+
+    def _abort_reason(self) -> str | None:
+        if self._cancel_requested:
+            return "Cancelled by user"
+        if not remote_url():
+            return integrations.gpu_kernel_abort_reason()
+        return None
+
+    def _check_cancelled(self) -> None:
+        if self._cancel_requested:
+            raise workflow_lab.ComfyError("Generation cancelled.")
 
     def _connect_comfyui(self):
         comfy_url = (remote_url() or workflow_lab.COMFY_URL).rstrip("/")
@@ -1142,8 +1213,14 @@ class GenerationBridge(QObject):
 
     @pyqtSlot(str)
     def setStageTwoModel(self, model_name: str) -> None:
-        if model_name in {REMOTE_AISHA_9B_MODEL, REMOTE_KLEIN_9B_MODEL}:
+        if model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
             self._stage_two_model = model_name
+
+    @pyqtSlot(str)
+    def setStageThreeEngine(self, engine: str) -> None:
+        # Only engines verified through live RunPod /object_info + smoke tests are selectable.
+        if engine in {"reactor_inswapper", "reactor_reswapper", "reactor_hyperswap"}:
+            self._stage_three_engine = engine
 
     @pyqtProperty(str, notify=statusChanged)
     def outputFolder(self) -> str:
@@ -1294,7 +1371,7 @@ class GenerationBridge(QObject):
         except ValueError as exc:
             self._set_status(str(exc))
             return
-        if model_name == REMOTE_PHR00T_MODEL:
+        if model_name in REMOTE_PHR00T_MODELS:
             fallback_controls = {
                 "steps": 4, "cfg": 1.2, "seed": -1, "denoise": 1.0,
                 "sampler": "euler_ancestral", "scheduler": "beta",
@@ -1317,15 +1394,16 @@ class GenerationBridge(QObject):
         generation_controls = getattr(self, "_next_generation_controls", None) or fallback_controls
         generation_controls["stage2_model"] = self._stage_two_model
         self._next_generation_controls = None
+        self._cancel_requested = False
         self._set_progress(-1.0)
         self._set_busy(True)
         engine = {
             REMOTE_PHR00T_MODEL: "RunPod Phr00t v23",
+            REMOTE_PHR00T_V19_MODEL: "Phr00t v19",
             REMOTE_KLEIN_9B_MODEL: "RunPod Klein 9B",
             REMOTE_AISHA_9B_MODEL: "RunPod Aisha 9B",
             REGULAR_9B_MODEL: "Klein 9B Base",
             KV_9B_MODEL: "Klein 9B-KV",
-            QWEN_MODEL: "Phr00t/Qwen",
             FOUR_B_MODEL: "Klein 4B Fast",
         }[model_name]
         self._set_status(f"Preparing validated {engine} generation…")
@@ -1424,13 +1502,15 @@ class GenerationBridge(QObject):
             if remote_url():
                 info = load_remote_catalog(client)
                 if model_name == REMOTE_PHR00T_MODEL:
-                    validate_remote_workflow_assets(REMOTE_PHR00T_WORKFLOW, info)
-                elif model_name in {REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}:
+                    validate_remote_workflow_assets(REMOTE_PHR00T_WORKFLOW, info, model_name)
+                elif model_name == REMOTE_PHR00T_V19_MODEL:
+                    validate_remote_workflow_assets(STAGE_1_WORKFLOW, info, model_name)
+                elif model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
                     validate_remote_workflow_assets(REMOTE_KLEIN9B_WORKFLOW, info, model_name)
                 if use_stage_two:
                     stage_two_model = (generation_controls or {}).get("stage2_model", REMOTE_AISHA_9B_MODEL)
-                    if stage_two_model not in {REMOTE_AISHA_9B_MODEL, REMOTE_KLEIN_9B_MODEL}:
-                        raise workflow_lab.ComfyError("Select Aisha 9B or Klein 9B for RunPod Stage 2.")
+                    if stage_two_model not in REMOTE_KLEIN9B_SOURCE_MODELS:
+                        raise workflow_lab.ComfyError("Select a verified FLUX.2 Klein 9B family model for RunPod Stage 2.")
                     validate_remote_workflow_assets(REMOTE_KLEIN9B_WORKFLOW, info, stage_two_model)
                 for enabled, workflow in ((use_stage_three, STAGE_3_WORKFLOW),
                                           (use_upscale, UPSCALE_WORKFLOW)):
@@ -1449,11 +1529,18 @@ class GenerationBridge(QObject):
             elif source is not None and model_name == REMOTE_PHR00T_MODEL:
                 current = self._run_reference_stage(
                     client, info, REMOTE_PHR00T_WORKFLOW, source,
-                    adapt_prompt(prompt_text, REMOTE_PHR00T_MODEL, source_image=True),
-                    stamp, "Phr00t", secondary_image=pose,
-                    controls=generation_controls,
+                    adapt_prompt(prompt_text, model_name, source_image=True),
+                    stamp, "Phr00t-v23", secondary_image=pose,
+                    controls=generation_controls, model_override=model_name,
                 )
-            elif source is not None and model_name in {REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL}:
+            elif source is not None and model_name == REMOTE_PHR00T_V19_MODEL:
+                current = self._run_reference_stage(
+                    client, info, STAGE_1_WORKFLOW, source,
+                    adapt_prompt(prompt_text, model_name, source_image=True),
+                    stamp, "Phr00t-v19", secondary_image=pose,
+                    controls=generation_controls, model_override=model_name,
+                )
+            elif source is not None and model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
                 current = self._run_reference_stage(
                     client, info, REMOTE_KLEIN9B_WORKFLOW, source,
                     adapt_prompt(prompt_text, model_name, source_image=True),
@@ -1482,6 +1569,7 @@ class GenerationBridge(QObject):
                 _ = negative_prompt
                 current = self._submit_and_save(client, prompt, stamp, "Klein")
 
+            self._check_cancelled()
             if use_stage_two:
                 if remote_url():
                     refine_controls = {
@@ -1501,11 +1589,14 @@ class GenerationBridge(QObject):
                         adapt_prompt(prompt_text, "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors"),
                         stamp, "Stage2",
                     )
+            self._check_cancelled()
             if use_stage_three:
+                self._set_status("Stage 2 complete · preparing Stage 3 identity lock…")
                 current = self._run_reference_stage(
                     client, info, STAGE_3_WORKFLOW, current, "", stamp, "Stage3",
                     secondary_image=source,
                 )
+            self._check_cancelled()
             if use_upscale:
                 current = self._run_reference_stage(
                     client, info, UPSCALE_WORKFLOW, current, "", stamp, "Upscale"
@@ -1515,8 +1606,12 @@ class GenerationBridge(QObject):
             self._set_status(f"Complete · {current.name}")
         except Exception as exc:
             self._set_progress(-1.0)
-            self._set_status(f"Generation failed · {exc}")
+            if self._cancel_requested:
+                self._set_status("Generation cancelled.")
+            else:
+                self._set_status(f"Generation failed · {exc}")
         finally:
+            self._cancel_requested = False
             self._set_busy(False)
 
     def _run_4b_source(
@@ -1585,7 +1680,7 @@ class GenerationBridge(QObject):
             prompt_id,
             timeout=timeout,
             progress=update_progress,
-            abort_check=(None if remote_url() else integrations.gpu_kernel_abort_reason),
+            abort_check=self._abort_reason,
         )
         if result.status != "completed":
             raise workflow_lab.ComfyError(result.error or f"{stage} ended: {result.status}")
@@ -1611,10 +1706,23 @@ class GenerationBridge(QObject):
         if not workflow.is_file():
             raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
         prompt = workflow_lab.workflow_to_prompt(workflow, info)
+        if workflow == REMOTE_KLEIN9B_WORKFLOW:
+            _reconcile_remote_klein_clip(prompt, info)
         if remote_url() and workflow == STAGE_3_WORKFLOW:
+            swap_models = {
+                "reactor_inswapper": "inswapper_128.onnx",
+                "reactor_reswapper": "reswapper_256.onnx",
+                "reactor_hyperswap": "hyperswap_1a_256.onnx",
+            }
+            swap_model = swap_models.get(self._stage_three_engine)
+            if swap_model is None:
+                raise workflow_lab.ComfyError(
+                    f"Stage 3 engine is not verified: {self._stage_three_engine}"
+                )
             for node in prompt.values():
                 if node.get("class_type") == "ReActorFaceSwap":
                     node["inputs"].update({
+                        "swap_model": swap_model,
                         "face_restore_model": "codeformer-v0.1.0.pth",
                         "codeformer_weight": 0.40,
                     })

@@ -54,11 +54,70 @@ PAGE_INDEXES = {
     "settings": 10,
     "ai": 11,
     "face-swap": 12,
+    "grok": 13,
 }
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
 STACK_END_MARKER = "\n            }\n        }\n    }\n}"
 FACE_SWAP_STACK_MARKER = "\n                // GENESIS_FACE_SWAP_PAGE"
+GROK_STACK_MARKER = "\n                // GENESIS_GROK_PAGE_INSERT"
+GROK_PAGE_QML = r"""
+                Item {
+                    objectName: "grokImagineWorkspace"
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 10
+                        Panel {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 10
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text { Layout.fillWidth: true; text: "GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                                    Text { text: backendBridge.message; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.maximumWidth: 520 }
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "MUNGBEAN Grok-style image/video studio. It shares the GENESIS RunPod backend and keeps its own route-aware frontend."
+                                    color: appRoot.textMain
+                                    font.pixelSize: 12
+                                    wrapMode: Text.Wrap
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    TextField {
+                                        Layout.fillWidth: true
+                                        text: backendBridge.endpoint
+                                        placeholderText: "RunPod ComfyUI URL or pod ID"
+                                        enabled: !genesisBridge.busy
+                                        selectByMouse: true
+                                        onEditingFinished: backendBridge.setEndpoint(text)
+                                    }
+                                    GButton { text: backendBridge.checking ? "Checking…" : "Refresh backend"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
+                                    GButton { text: "Open Grok UI"; active: true; onClicked: moduleBridge.triggerAction("grok imagine") }
+                                }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    color: "#070707"
+                                    radius: 2
+                                    border.color: appRoot.line
+                                    Column {
+                                        anchors.centerIn: parent
+                                        spacing: 8
+                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "MUNGBEAN GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Auto · Klein 9B · Aisha · Qwen Edit · WAN Fast · WAN Quality"; color: appRoot.textDim; font.pixelSize: 11 }
+                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Use Open Grok UI for the full canvas, reference-image, history and video interface."; color: appRoot.textDim; font.pixelSize: 11 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+"""
 
 AI_PAGE_QML = r'''
                 Item {
@@ -87,8 +146,11 @@ def compose_premium_qml(source: str) -> str:
     face_swap_start = source.find(FACE_SWAP_STACK_MARKER)
     if source.count(FACE_SWAP_STACK_MARKER) != 1:
         raise ValueError("Premium Linux QML Face Swap page boundary changed.")
-    # Insert before the complete top-level page, never inside its layout.
+    # Keep the established page order: Assistant 11, Face Swap 12, Grok 13.
     source = source[:face_swap_start] + AI_PAGE_QML + source[face_swap_start:]
+    if source.count(GROK_STACK_MARKER) != 1:
+        raise ValueError("Premium Linux QML Grok page boundary changed.")
+    source = source.replace(GROK_STACK_MARKER, GROK_PAGE_QML + GROK_STACK_MARKER, 1)
     root_end = source.rfind("\n}")
     return source[:root_end] + FEEFEE_OVERLAY_QML + source[root_end:]
 

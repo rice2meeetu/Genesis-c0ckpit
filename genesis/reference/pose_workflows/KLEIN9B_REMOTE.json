@@ -328,12 +328,12 @@
         "ver": "0.25.1"
       },
       "widgets_values": [
-        "qwen_3_8b_fp8mixed.safetensors",
+        "qwen_3_8b.safetensors",
         "flux2",
         "default"
       ],
       "widgets_values_named": {
-        "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+        "clip_name": "qwen_3_8b.safetensors",
         "type": "flux2",
         "device": "default"
       },

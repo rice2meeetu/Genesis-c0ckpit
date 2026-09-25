@@ -42,7 +42,7 @@ def normalize_endpoint(value):
     if not value:
         return ''
     if re.fullmatch(r'[a-z0-9]{10,32}', value):
-        value = f'https://{value}-8188.proxy.runpod.net'
+        value = f'https://{value}-3000.proxy.runpod.net'
     parsed = urlsplit(value)
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError('Use a ComfyUI endpoint without credentials, query parameters or fragments.')

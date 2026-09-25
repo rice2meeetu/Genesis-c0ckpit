@@ -71,7 +71,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "GENESIS_STAGE3_REACTOR_ROCM"
+        "GENESIS_STAGE3_IDENTITY_LOCK"
       ]
     },
     {
@@ -94,7 +94,7 @@
         "text": ""
       },
       "widgets_values": [
-        "STAGE 3 \u2014 REACTOR ROCm\n\u2022 Target = exact Stage 2 output\n\u2022 Source = original person/face image\n\u2022 inswapper_128.onnx | retinaface_resnet50\n\u2022 restoration OFF by default\n\u2022 provider is selected by your patched ReActor backend: ROCM first, CPU fallback"
+        "STAGE 3 \u2014 IDENTITY LOCK (ReActor)\n\u2022 Target = exact Stage 2 output\n\u2022 Source = original identity/face image\n\u2022 Selectable engines verified from RunPod catalog: inswapper_128.onnx, reswapper_256.onnx, hyperswap_1a_256.onnx\n\u2022 Default = Inswapper for compatibility\n\u2022 Remote GENESIS applies CodeFormer 0.40; local ROCm keeps backend-safe defaults\n\u2022 PuLID FLUX.2 remains separate/pending until its live workflow is verified"
       ],
       "color": "#432",
       "bgcolor": "#653"

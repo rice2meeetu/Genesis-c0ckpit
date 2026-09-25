@@ -5,7 +5,7 @@ from genesis.backend_routing import Route, choose_route, normalize_endpoint, rem
 
 
 def test_endpoint_accepts_pod_id_and_rejects_embedded_credentials():
-    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-8188.proxy.runpod.net'
+    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-3000.proxy.runpod.net'
     with pytest.raises(ValueError): normalize_endpoint('https://user:secret@pod.example')
     with pytest.raises(ValueError): normalize_endpoint('http://pod.example')
 

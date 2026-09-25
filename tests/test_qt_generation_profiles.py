@@ -70,6 +70,30 @@ class QtGenerationProfileTests(unittest.TestCase):
             ["woman"],
         )
 
+    def test_remote_inventory_files_are_all_visible_in_genesis_picker(self):
+        from qt_cockpit import REMOTE_PHR00T_MODEL, REMOTE_AISHA_9B_MODEL
+        extra = "pornmasterFlux2Klein_v3_pruned_bf16.safetensors"
+        info = {
+            "CheckpointLoaderSimple": {
+                "input": {"required": {"ckpt_name": [[extra], {}]}}
+            },
+            "UNETLoader": {
+                "input": {"required": {"unet_name": [[
+                    REMOTE_PHR00T_MODEL, REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL
+                ], {}]}}
+            },
+        }
+        profiles = build_remote_generation_profiles(info)
+        by_model = {row["model"]: row for row in profiles}
+        self.assertEqual(set(by_model), {
+            extra, REMOTE_PHR00T_MODEL, REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL
+        })
+        self.assertTrue(by_model[REMOTE_PHR00T_MODEL]["runnable"])
+        self.assertTrue(by_model[REMOTE_KLEIN_9B_MODEL]["runnable"])
+        self.assertTrue(by_model[REMOTE_AISHA_9B_MODEL]["runnable"])
+        self.assertFalse(by_model[extra]["runnable"])
+        self.assertIn("workflow mapping pending", by_model[extra]["note"])
+
     def test_remote_klein_profile_exposes_known_lora_trigger_metadata(self):
         info = {
             "UNETLoader": {
@@ -234,6 +258,44 @@ class QtGenerationProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(workflow_lab.ComfyError, "reboot required"):
                 GenerationBridge._connect_comfyui(object())
         start.assert_not_called()
+
+    def test_verified_reactor_stage3_engine_selects_inswapper_model(self):
+        from qt_cockpit import GenerationBridge, STAGE_3_WORKFLOW
+
+        bridge = GenerationBridge()
+        bridge.setStageThreeEngine("reactor_inswapper")
+        client = Mock()
+        client.upload_image.return_value = {"subfolder": "", "name": "target.png"}
+        prompt = {
+            "1": {"class_type": "LoadImage", "inputs": {"image": ""}},
+            "3": {"class_type": "ReActorFaceSwap", "inputs": {
+                "swap_model": "inswapper_128.onnx",
+                "face_restore_model": "none",
+                "codeformer_weight": 0.5,
+            }},
+        }
+        with patch("qt_cockpit.remote_url", return_value="http://runpod"), \
+             patch("qt_cockpit.workflow_lab.workflow_to_prompt", return_value=prompt), \
+             patch("qt_cockpit.workflow_lab.validate_prompt", return_value={
+                 "valid": True, "missing_nodes": [], "missing_inputs": []
+             }), patch("qt_cockpit.validate_operation_prompt"), \
+             patch.object(bridge, "_submit_and_save", return_value=Path("/tmp/out.png")) as submit:
+            bridge._run_reference_stage(
+                client, {}, STAGE_3_WORKFLOW, Path("/tmp/target.png"),
+                "", "stamp", "Stage3",
+            )
+        sent = submit.call_args.args[1]
+        self.assertEqual(sent["3"]["inputs"]["swap_model"], "inswapper_128.onnx")
+        self.assertEqual(
+            sent["3"]["inputs"]["face_restore_model"], "codeformer-v0.1.0.pth"
+        )
+        self.assertEqual(sent["3"]["inputs"]["codeformer_weight"], 0.40)
+
+    def test_pending_stage3_engine_is_not_accepted(self):
+        from qt_cockpit import GenerationBridge
+        bridge = GenerationBridge()
+        bridge.setStageThreeEngine("pulid_flux2")
+        self.assertEqual(bridge._stage_three_engine, "reactor_inswapper")
 
     def test_two_image_face_swap_route_is_exposed(self):
         from qt_cockpit import GenerationBridge
