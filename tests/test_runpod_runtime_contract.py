@@ -107,12 +107,14 @@ def test_missing_refinement_asset_blocks_before_any_generation(monkeypatch, tmp_
     bridge = qt_cockpit.GenerationBridge()
     client = Mock(base_url=URL)
     monkeypatch.setattr(bridge, "_connect_comfyui", lambda: (client, {}))
-    info = {"CheckpointLoaderSimple": {"input": {"required": {"ckpt_name": [["available.safetensors"]]}}}}
+    info = {"CheckpointLoaderSimple": {"input": {"required": {
+        "ckpt_name": [[qt_cockpit.REMOTE_PHR00T_MODEL]]}}}}
     monkeypatch.setattr(qt_cockpit, "load_remote_catalog", lambda client: info)
     monkeypatch.setattr(qt_cockpit.workflow_lab, "workflow_to_prompt", lambda path, info: {
-        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "missing.safetensors"}}
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {
+            "ckpt_name": qt_cockpit.REMOTE_PHR00T_MODEL}}
     })
-    bridge._run_generate("a mug", "", 512, 512, qt_cockpit.QWEN_MODEL,
+    bridge._run_generate("a mug", "", 512, 512, qt_cockpit.REMOTE_PHR00T_MODEL,
                          "None", "None", "None", 0.0, 0.0, 0.0,
                          tmp_path / "source.png", None, True, False, False)
     assert qt_cockpit.REMOTE_AISHA_9B_MODEL in bridge.status

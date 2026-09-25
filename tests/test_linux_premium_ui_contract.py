@@ -96,13 +96,26 @@ def test_media_tools_are_wired_to_real_backend_operations():
     launcher = LAUNCHER.read_text(encoding="utf-8")
     bridge = MEDIA_BRIDGE.read_text(encoding="utf-8")
     assert 'context.setContextProperty("mediaBridge", media_bridge)' in launcher
-    assert "mediaBridge.chooseAndRemoveBackground()" in qml
-    assert "mediaBridge.chooseAndUpscale(2.0)" in qml
-    assert "mediaBridge.chooseAndExtractAudio()" in qml
-    assert "mediaBridge.chooseAndExtractVideo()" in qml
+    assert "mediaBridge.chooseToolInput(mediaToolKey)" in qml
+    assert "mediaBridge.runSelectedTool(mediaToolKey)" in qml
+    assert "def chooseToolInput(self, kind: str)" in bridge
+    assert "def runSelectedTool(self, kind: str)" in bridge
     assert "remove_background" in bridge
     assert "upscale_enhance" in bridge
     assert "extract_media" in bridge
+
+
+def test_media_cards_open_dedicated_workspace_before_running_tools():
+    qml = source()
+    assert "property bool mediaToolOpen: false" in qml
+    assert "function openMediaTool(key, title, description, status)" in qml
+    assert 'text: "‹  MEDIA TOOLS"' in qml
+    assert 'text: mediaBridge.busy ? "WORKING…" : appRoot.mediaToolRunLabel()' in qml
+    assert "function mediaToolInputHint()" in qml
+    assert "function mediaToolIsReview()" in qml
+    assert "onClicked: appRoot.runMediaTool()" in qml
+    assert "visible: appRoot.mediaToolOpen" in qml
+    assert "appRoot.openMediaTool(mediaCard.actionKey, mediaCard.titleText, mediaCard.bodyText, mediaCard.statusText)" in qml
 
 
 def test_page_header_binds_to_component_properties():

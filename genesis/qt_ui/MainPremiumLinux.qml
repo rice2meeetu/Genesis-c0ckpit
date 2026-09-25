@@ -122,6 +122,73 @@ ApplicationWindow {
     property string editPrompt: ""
     property real editStrength: 0.40
 
+    property bool mediaToolOpen: false
+    property string mediaToolKey: ""
+    property string mediaToolTitle: "Media Tool"
+    property string mediaToolDescription: ""
+    property string mediaToolStatus: ""
+
+    function openMediaTool(key, title, description, status) {
+        mediaToolKey = key
+        mediaToolTitle = title
+        mediaToolDescription = description
+        mediaToolStatus = status
+        mediaBridge.clearInput()
+        mediaToolOpen = true
+    }
+
+    function closeMediaTool() {
+        mediaToolOpen = false
+    }
+
+    function mediaToolRunLabel() {
+        if (mediaToolKey === "batch background") return "RUN BATCH"
+        if (mediaToolKey === "batch upscale") return "RUN BATCH"
+        if (mediaToolKey === "duplicate finder") return "SCAN LIBRARY"
+        if (mediaToolKey === "face organiser") return "GROUP FACES"
+        if (mediaToolKey === "extract audio") return "EXTRACT MP3"
+        if (mediaToolKey === "extract video") return "EXTRACT VIDEO"
+        if (mediaToolKey === "standard resize") return "RESIZE 2×"
+        if (mediaToolKey === "upscale") return "UPSCALE 2×"
+        return "REMOVE BACKGROUND"
+    }
+
+    function mediaToolInputHint() {
+        if (mediaToolKey === "batch background" || mediaToolKey === "batch upscale")
+            return "Select multiple images, then choose the destination folder."
+        if (mediaToolKey === "duplicate finder")
+            return "Select an image library folder. GENESIS will prepare safe review pairs before anything can be moved to Trash."
+        if (mediaToolKey === "face organiser")
+            return "Select a photo library folder. GENESIS will group detected faces for review."
+        if (mediaToolKey === "extract audio")
+            return "Select a video or audio file. GENESIS will create a separate MP3 and keep the source unchanged."
+        if (mediaToolKey === "extract video")
+            return "Select a video file. GENESIS will create a separate MP4 while preserving the source."
+        if (mediaToolKey === "standard resize")
+            return "Select one image for a local CPU 2× resize. Transparency is preserved."
+        if (mediaToolKey === "upscale")
+            return "Select one image for AI 2× upscale through the currently selected backend."
+        return "Select one image. The source file is preserved."
+    }
+
+    function mediaToolHasVisualResult() {
+        return mediaToolKey === "background remover"
+            || mediaToolKey === "upscale"
+            || mediaToolKey === "standard resize"
+    }
+
+    function mediaToolIsReview() {
+        return mediaToolKey === "duplicate finder" || mediaToolKey === "face organiser"
+    }
+
+    function chooseMediaToolInput() {
+        mediaBridge.chooseToolInput(mediaToolKey)
+    }
+
+    function runMediaTool() {
+        mediaBridge.runSelectedTool(mediaToolKey)
+    }
+
     function selectedLoraTriggerText() {
         var profile = selectedGenerationProfile
         var triggerMap = profile && profile.triggers ? profile.triggers : ({})
@@ -449,32 +516,14 @@ ApplicationWindow {
                 active: !mediaBridge.busy
                 enabled: !mediaBridge.busy
                 onClicked: {
-                    if (mediaCard.actionKey === "background remover")
-                        mediaBridge.chooseAndRemoveBackground()
-                    else if (mediaCard.actionKey === "upscale")
-                        mediaBridge.chooseAndUpscale(2.0)
-                    else if (mediaCard.actionKey === "standard resize")
-                        mediaBridge.chooseAndUpscale(2.0, false)
-                    else if (mediaCard.actionKey === "batch background")
-                        mediaBridge.chooseAndBatchRemoveBackground()
-                    else if (mediaCard.actionKey === "batch upscale")
-                        mediaBridge.chooseAndBatchUpscale(4.0)
-                    else if (mediaCard.actionKey === "duplicate finder")
-                        mediaBridge.chooseAndFindDuplicates()
-                    else if (mediaCard.actionKey === "face organiser")
-                        mediaBridge.chooseAndScanFaces()
-                    else if (mediaCard.actionKey === "extract audio")
-                        mediaBridge.chooseAndExtractAudio()
-                    else if (mediaCard.actionKey === "extract video")
-                        mediaBridge.chooseAndExtractVideo()
-                    else if (mediaCard.actionKey === "face swap")
+                    if (mediaCard.actionKey === "face swap")
                         appRoot.pageIndex = 12
                     else if (mediaCard.actionKey === "media viewer")
                         appRoot.pageIndex = 4
                     else if (mediaCard.actionKey === "canvas")
                         appRoot.pageIndex = 8
                     else
-                        moduleBridge.triggerAction(mediaCard.actionKey)
+                        appRoot.openMediaTool(mediaCard.actionKey, mediaCard.titleText, mediaCard.bodyText, mediaCard.statusText)
                 }
             }
         }
@@ -1257,57 +1306,6 @@ ApplicationWindow {
                             Text { Layout.fillWidth:true; text:"MEDIA TOOLS"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true }
                             Text { Layout.preferredWidth:260; text:mediaBridge.status; color:appRoot.textDim; elide:Text.ElideRight }
                         }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            GButton { text: "Open saved result"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: Qt.openUrlExternally(mediaBridge.resultUrl) }
-                            GButton { text: "Open folder"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: mediaBridge.openResultFolder() }
-                            GButton {
-                                text: "Send to Canvas"
-                                enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0
-                                onClicked: { appRoot.editSource = mediaBridge.resultUrl; appRoot.pageIndex = 8 }
-                            }
-                            Text { Layout.fillWidth: true; text: mediaBridge.resultUrl; color: appRoot.textDim; elide: Text.ElideMiddle }
-                            BusyIndicator { running: mediaBridge.busy; visible: running; Layout.preferredWidth: 32; Layout.preferredHeight: 32 }
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 185
-                            visible: mediaBridge.duplicatePairs.length > 0 || mediaBridge.faceGroups.length > 0
-                            color: appRoot.panel; radius: 8; border.color: appRoot.line
-                            ColumnLayout {
-                                anchors.fill: parent; anchors.margins: 10; spacing: 7
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    SectionLabel { text: mediaBridge.duplicatePairs.length > 0 ? "DUPLICATE REVIEW" : "FACE GROUP REVIEW" }
-                                    Item { Layout.fillWidth: true }
-                                    Text { text: mediaBridge.duplicatePairs.length > 0 ? mediaBridge.duplicatePairs.length + " comparisons" : mediaBridge.faceGroups.length + " groups"; color: appRoot.textDim; font.pixelSize: 10 }
-                                }
-                                ListView {
-                                    Layout.fillWidth: true; Layout.fillHeight: true
-                                    orientation: ListView.Horizontal; spacing: 8; clip: true
-                                    model: mediaBridge.duplicatePairs.length > 0 ? mediaBridge.duplicatePairs : mediaBridge.faceGroups
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        width: 380; height: ListView.view.height; radius: 6
-                                        color: appRoot.raised; border.color: appRoot.line
-                                        RowLayout {
-                                            anchors.fill: parent; anchors.margins: 7; spacing: 6
-                                            Image { Layout.preferredWidth: 105; Layout.fillHeight: true; source: "file://" + (modelData.left || (modelData.members && modelData.members.length ? modelData.members[0].path : "")); fillMode: Image.PreserveAspectFit; asynchronous: true }
-                                            Image { Layout.preferredWidth: 105; Layout.fillHeight: true; visible: modelData.right !== undefined; source: "file://" + (modelData.right || ""); fillMode: Image.PreserveAspectFit; asynchronous: true }
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                Text { text: modelData.kind || ("GROUP " + modelData.group_id); color: appRoot.brightGold; font.pixelSize: 9; font.bold: true }
-                                                Text { text: modelData.right !== undefined ? "distance " + modelData.distance : modelData.count + " faces"; color: appRoot.textDim; font.pixelSize: 9 }
-                                                Item { Layout.fillHeight: true }
-                                                GButton { visible: modelData.left !== undefined; text: "KEEP LEFT"; Layout.fillWidth: true; onClicked: mediaBridge.trashDuplicate(modelData.right) }
-                                                GButton { visible: modelData.right !== undefined; text: "KEEP RIGHT"; Layout.fillWidth: true; onClicked: mediaBridge.trashDuplicate(modelData.left) }
-                                                GButton { visible: modelData.right === undefined && modelData.members && modelData.members.length; text: "OPEN"; Layout.fillWidth: true; onClicked: mediaBridge.openPath(modelData.members[0].path) }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
                         ScrollView {
                             Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                             id: mediaScroll
@@ -1332,6 +1330,238 @@ ApplicationWindow {
                                 MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
                             }
                         }
+                        }
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        objectName: "mediaToolWorkspace"
+                        visible: appRoot.mediaToolOpen
+                        z: 30
+                        color: appRoot.bg
+                        border.color: appRoot.line
+                        radius: 2
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                GButton { text: "‹  MEDIA TOOLS"; active: true; onClicked: appRoot.closeMediaTool() }
+                                Text { Layout.fillWidth: true; text: appRoot.mediaToolTitle.toUpperCase(); color: appRoot.brightGold; font.pixelSize: 22; font.bold: true }
+                                Rectangle {
+                                    radius: 2
+                                    height: 24
+                                    width: toolStatus.implicitWidth + 18
+                                    color: "#241c11"
+                                    border.color: appRoot.gold
+                                    Text { id: toolStatus; anchors.centerIn: parent; text: appRoot.mediaToolStatus; color: appRoot.brightGold; font.pixelSize: 9; font.bold: true }
+                                }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: appRoot.mediaToolDescription
+                                color: appRoot.textDim
+                                font.pixelSize: 12
+                                wrapMode: Text.Wrap
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: 10
+
+                                Panel {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 10
+                                        SectionLabel { text: "SOURCE / INPUT" }
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            Layout.minimumHeight: 240
+                                            color: "#070707"
+                                            border.color: appRoot.line
+                                            radius: 2
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                source: mediaBridge.inputUrl
+                                                fillMode: Image.PreserveAspectFit
+                                                visible: mediaBridge.inputUrl.length > 0
+                                                    && appRoot.mediaToolHasVisualResult()
+                                                    && !appRoot.privacyMode
+                                            }
+                                            Column {
+                                                anchors.centerIn: parent
+                                                spacing: 8
+                                                visible: mediaBridge.inputUrl.length === 0
+                                                    || !appRoot.mediaToolHasVisualResult()
+                                                    || appRoot.privacyMode
+                                                Text {
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    text: mediaBridge.inputCount > 0 ? "✓" : "＋"
+                                                    color: appRoot.gold
+                                                    font.pixelSize: 42
+                                                }
+                                                Text {
+                                                    width: 380
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    horizontalAlignment: Text.AlignHCenter
+                                                    wrapMode: Text.Wrap
+                                                    text: mediaBridge.inputCount > 0
+                                                        ? mediaBridge.inputSummary
+                                                        : appRoot.mediaToolInputHint()
+                                                    color: mediaBridge.inputCount > 0 ? appRoot.textMain : appRoot.textDim
+                                                    font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            GButton {
+                                                Layout.fillWidth: true
+                                                text: mediaBridge.inputCount > 0 ? "CHANGE INPUT" : "CHOOSE INPUT"
+                                                enabled: !mediaBridge.busy
+                                                onClicked: appRoot.chooseMediaToolInput()
+                                            }
+                                            GButton {
+                                                Layout.fillWidth: true
+                                                text: mediaBridge.busy ? "WORKING…" : appRoot.mediaToolRunLabel()
+                                                active: mediaBridge.inputCount > 0 && !mediaBridge.busy
+                                                enabled: mediaBridge.inputCount > 0 && !mediaBridge.busy
+                                                onClicked: appRoot.runMediaTool()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Panel {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 10
+                                        SectionLabel { text: "OUTPUT / RESULT" }
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            Layout.minimumHeight: 240
+                                            color: "#070707"
+                                            border.color: mediaBridge.resultUrl.length ? appRoot.gold : appRoot.line
+                                            radius: 2
+                                            Image {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                source: mediaBridge.resultUrl
+                                                fillMode: Image.PreserveAspectFit
+                                                visible: appRoot.mediaToolHasVisualResult()
+                                                    && mediaBridge.resultUrl.length > 0
+                                                    && !appRoot.privacyMode
+                                            }
+                                            ListView {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                spacing: 8
+                                                clip: true
+                                                visible: appRoot.mediaToolIsReview()
+                                                model: appRoot.mediaToolKey === "duplicate finder"
+                                                    ? mediaBridge.duplicatePairs
+                                                    : mediaBridge.faceGroups
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    width: ListView.view.width
+                                                    height: 112
+                                                    radius: 2
+                                                    color: appRoot.raised
+                                                    border.color: appRoot.line
+                                                    RowLayout {
+                                                        anchors.fill: parent
+                                                        anchors.margins: 7
+                                                        spacing: 8
+                                                        Image {
+                                                            Layout.preferredWidth: 105
+                                                            Layout.fillHeight: true
+                                                            source: "file://" + (modelData.left || (modelData.members && modelData.members.length ? modelData.members[0].path : ""))
+                                                            fillMode: Image.PreserveAspectFit
+                                                            asynchronous: true
+                                                        }
+                                                        Image {
+                                                            Layout.preferredWidth: 105
+                                                            Layout.fillHeight: true
+                                                            visible: modelData.right !== undefined
+                                                            source: "file://" + (modelData.right || "")
+                                                            fillMode: Image.PreserveAspectFit
+                                                            asynchronous: true
+                                                        }
+                                                        ColumnLayout {
+                                                            Layout.fillWidth: true
+                                                            Text { text: modelData.kind || ("GROUP " + modelData.group_id); color: appRoot.brightGold; font.pixelSize: 10; font.bold: true }
+                                                            Text { text: modelData.right !== undefined ? "distance " + modelData.distance : modelData.count + " faces"; color: appRoot.textDim; font.pixelSize: 9 }
+                                                            Item { Layout.fillHeight: true }
+                                                            RowLayout {
+                                                                visible: modelData.right !== undefined
+                                                                GButton { text: "KEEP LEFT"; onClicked: mediaBridge.trashDuplicate(modelData.right) }
+                                                                GButton { text: "KEEP RIGHT"; onClicked: mediaBridge.trashDuplicate(modelData.left) }
+                                                            }
+                                                            GButton {
+                                                                visible: modelData.right === undefined && modelData.members && modelData.members.length
+                                                                text: "OPEN GROUP"
+                                                                onClicked: mediaBridge.openPath(modelData.members[0].path)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                width: parent.width - 40
+                                                horizontalAlignment: Text.AlignHCenter
+                                                wrapMode: Text.Wrap
+                                                visible: !appRoot.mediaToolIsReview()
+                                                    && (!appRoot.mediaToolHasVisualResult() || mediaBridge.resultUrl.length === 0 || appRoot.privacyMode)
+                                                text: appRoot.privacyMode && mediaBridge.resultUrl.length
+                                                    ? "PRIVATE"
+                                                    : (mediaBridge.resultUrl.length
+                                                        ? "RESULT SAVED · use Open Result or Open Folder below"
+                                                        : "NO RESULT YET")
+                                                color: appRoot.textDim
+                                                font.pixelSize: 15
+                                            }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                width: parent.width - 40
+                                                horizontalAlignment: Text.AlignHCenter
+                                                visible: appRoot.mediaToolIsReview()
+                                                    && ((appRoot.mediaToolKey === "duplicate finder" && mediaBridge.duplicatePairs.length === 0)
+                                                        || (appRoot.mediaToolKey === "face organiser" && mediaBridge.faceGroups.length === 0))
+                                                text: mediaBridge.busy ? "SCANNING…" : "NO REVIEW RESULTS YET"
+                                                color: appRoot.textDim
+                                                font.pixelSize: 14
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            GButton { text: "OPEN RESULT"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: Qt.openUrlExternally(mediaBridge.resultUrl) }
+                                            GButton { text: "OPEN FOLDER"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: mediaBridge.openResultFolder() }
+                                            GButton { text: "SEND TO CANVAS"; enabled: !mediaBridge.busy && appRoot.mediaToolHasVisualResult() && mediaBridge.resultUrl.length > 0; onClicked: { appRoot.editSource = mediaBridge.resultUrl; appRoot.pageIndex = 8; appRoot.closeMediaTool() } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                BusyIndicator { running: mediaBridge.busy; visible: running; Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
+                                Text { Layout.fillWidth: true; text: mediaBridge.status; color: mediaBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                GButton { text: "CLEAR RESULT"; enabled: !mediaBridge.busy && mediaBridge.resultUrl.length > 0; onClicked: mediaBridge.clearResult() }
+                            }
                         }
                     }
                 }

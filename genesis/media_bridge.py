@@ -28,6 +28,7 @@ class MediaBridge(QObject):
     busyChanged = pyqtSignal()
     resultChanged = pyqtSignal()
     reviewChanged = pyqtSignal()
+    inputChanged = pyqtSignal()
     _completed = pyqtSignal(object)
     _failed = pyqtSignal(str)
     _duplicatesReady = pyqtSignal(object)
@@ -39,6 +40,8 @@ class MediaBridge(QObject):
         self._status = "Media tools ready"
         self._busy = False
         self._result_url = ""
+        self._input_paths: list[Path] = []
+        self._input_kind = ""
         self._duplicate_pairs: list[dict] = []
         self._face_groups: list[dict] = []
         self._completed.connect(self._finish)
@@ -57,6 +60,28 @@ class MediaBridge(QObject):
     @pyqtProperty(str, notify=resultChanged)
     def resultUrl(self) -> str:
         return self._result_url
+
+    @pyqtProperty(str, notify=inputChanged)
+    def inputUrl(self) -> str:
+        if len(self._input_paths) != 1 or self._input_paths[0].is_dir():
+            return ""
+        try:
+            return self._input_paths[0].resolve().as_uri()
+        except ValueError:
+            return ""
+
+    @pyqtProperty(str, notify=inputChanged)
+    def inputSummary(self) -> str:
+        if not self._input_paths:
+            return "No input selected"
+        if len(self._input_paths) == 1:
+            path = self._input_paths[0]
+            return path.name if path.name else str(path)
+        return f"{len(self._input_paths)} items selected"
+
+    @pyqtProperty(int, notify=inputChanged)
+    def inputCount(self) -> int:
+        return len(self._input_paths)
 
     @pyqtProperty("QVariantList", notify=reviewChanged)
     def duplicatePairs(self) -> list[dict]:
@@ -201,6 +226,134 @@ class MediaBridge(QObject):
         from genesis.qt_media_picker import choose_image
         value = choose_image(title)
         return Path(value) if value else None
+
+    def _set_inputs(self, kind: str, paths: list[Path]) -> None:
+        self._result_url = ""
+        self._duplicate_pairs = []
+        self._face_groups = []
+        self.resultChanged.emit()
+        self.reviewChanged.emit()
+        self._input_kind = kind
+        self._input_paths = paths
+        self.inputChanged.emit()
+        if paths:
+            self._set_status(self.inputSummary)
+        else:
+            self._set_status("No input selected")
+
+    @pyqtSlot()
+    def clearInput(self) -> None:
+        self._set_inputs("", [])
+
+    @pyqtSlot(str)
+    def chooseToolInput(self, kind: str) -> None:
+        if self._busy:
+            return
+        if kind in {"background remover", "upscale", "standard resize"}:
+            source = self._choose_image("Choose source image")
+            if source:
+                self._set_inputs(kind, [source])
+            return
+        if kind in {"batch background", "batch upscale"}:
+            sources = self._choose_images("Choose images")
+            if sources:
+                self._set_inputs(kind, sources)
+            return
+        if kind in {"duplicate finder", "face organiser"}:
+            title = "Choose image library to scan" if kind == "duplicate finder" else "Choose photo library to organise"
+            folder = QFileDialog.getExistingDirectory(None, title, str(Path.home()))
+            if folder:
+                self._set_inputs(kind, [Path(folder)])
+            return
+        if kind == "extract audio":
+            source, _ = QFileDialog.getOpenFileName(
+                None, "Choose video or audio source", str(Path.home()),
+                "Media (*.mp4 *.mkv *.mov *.avi *.webm *.m4v *.mpeg *.mpg *.mp3 *.wav *.flac *.m4a)",
+            )
+            if source:
+                self._set_inputs(kind, [Path(source)])
+            return
+        if kind == "extract video":
+            source, _ = QFileDialog.getOpenFileName(
+                None, "Choose video source", str(Path.home()),
+                "Video (*.mp4 *.mkv *.mov *.avi *.webm *.m4v *.mpeg *.mpg)",
+            )
+            if source:
+                self._set_inputs(kind, [Path(source)])
+
+    @pyqtSlot(str)
+    def runSelectedTool(self, kind: str) -> None:
+        if self._busy:
+            return
+        if kind != self._input_kind or not self._input_paths:
+            self._set_status("Choose input first")
+            return
+        if kind == "background remover":
+            source = self._input_paths[0]
+            target, _ = QFileDialog.getSaveFileName(
+                None, "Save transparent cutout",
+                str(source.with_name(source.stem + "_cutout.png")), "PNG (*.png)",
+            )
+            if target:
+                self._start("Removing background", lambda: remove_background(source, target))
+        elif kind in {"upscale", "standard resize"}:
+            source = self._input_paths[0]
+            scale = 2.0
+            target, _ = QFileDialog.getSaveFileName(
+                None, "Save upscaled image",
+                str(source.with_name(source.stem + f"_{scale:g}x.png")), "PNG (*.png)",
+            )
+            if target:
+                if kind == "upscale":
+                    self._start_upscale("AI upscaling 2×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=True, require_ai=True))
+                else:
+                    self._start("Standard resize 2×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=False))
+        elif kind == "batch background":
+            folder = QFileDialog.getExistingDirectory(None, "Choose output folder", str(Path.home()))
+            if folder:
+                sources = list(self._input_paths)
+                self._start("Batch background removal", lambda: batch_remove_background(sources, folder))
+        elif kind == "batch upscale":
+            folder = QFileDialog.getExistingDirectory(None, "Choose output folder", str(Path.home()))
+            if folder:
+                sources = list(self._input_paths)
+                self._start_upscale("Batch upscaling 4×", lambda: batch_upscale(sources, folder, scale=4.0))
+        elif kind == "duplicate finder":
+            folder = self._input_paths[0]
+            self._set_busy(True)
+            self._set_status("Scanning for duplicates…")
+            def run_duplicates() -> None:
+                try:
+                    self._duplicatesReady.emit(find_duplicates_in_folder(folder))
+                except Exception as exc:
+                    self._failed.emit(str(exc))
+            threading.Thread(target=run_duplicates, daemon=True).start()
+        elif kind == "face organiser":
+            folder = self._input_paths[0]
+            self._set_busy(True)
+            self._set_status("Grouping faces…")
+            def run_faces() -> None:
+                try:
+                    self._facesReady.emit(face_organizer_scan(folder))
+                except Exception as exc:
+                    self._failed.emit(str(exc))
+            threading.Thread(target=run_faces, daemon=True).start()
+        elif kind == "extract audio":
+            source = self._input_paths[0]
+            target, _ = QFileDialog.getSaveFileName(
+                None, "Save extracted MP3",
+                str(source.with_name(source.stem + "_audio.mp3")), "MP3 (*.mp3)",
+            )
+            if target:
+                self._start("Extracting MP3", lambda: extract_media(source, target, kind="audio", audio_format="mp3"))
+        elif kind == "extract video":
+            source = self._input_paths[0]
+            target, _ = QFileDialog.getSaveFileName(
+                None, "Save extracted video",
+                str(source.with_name(source.stem + "_video.mp4")), "MP4 (*.mp4)",
+            )
+            if target:
+                self._start("Extracting video", lambda: extract_media(source, target, kind="video"))
 
     @pyqtSlot()
     def chooseAndRemoveBackground(self) -> None:

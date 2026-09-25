@@ -10,6 +10,7 @@ def test_assistant_and_face_swap_are_distinct_top_level_pages(tmp_path):
 import sys
 from PyQt6.QtCore import QObject, QTimer
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtQml import QQmlExpression
 import qt_cockpit_linux_premium as launcher
 # Keep real user presets and backend discovery outside this UI test.
 launcher.load_pose_items = lambda **kwargs: []
@@ -36,6 +37,26 @@ def verify():
             QApplication.processEvents()
             assert expected.property("visible"), (index, "expected page hidden")
             assert not hidden.property("visible"), (index, "wrong page visible")
+        window.setProperty("pageIndex", 3)
+        media = engines[0].rootContext().contextProperty("mediaBridge")
+        workspace = window.findChild(QObject, "mediaToolWorkspace")
+        assert workspace is not None
+        for key in ["background remover", "batch background", "upscale", "standard resize",
+                    "batch upscale", "extract audio", "extract video", "duplicate finder", "face organiser"]:
+            media._result_url = "file:///previous-tool-result.png"
+            media._duplicate_pairs = [{"left": "/old", "right": "/copy"}]
+            expression = QQmlExpression(engines[0].rootContext(), window,
+                "openMediaTool(" + repr(key) + ", 'Tool', 'Description', 'Ready')")
+            expression.evaluate()
+            assert not expression.hasError(), expression.error().toString()
+            QApplication.processEvents()
+            assert workspace.property("visible"), key
+            assert window.property("mediaToolKey") == key
+            assert media.resultUrl == "" and media.duplicatePairs == []
+            expression = QQmlExpression(engines[0].rootContext(), window, "closeMediaTool()")
+            expression.evaluate()
+            QApplication.processEvents()
+            assert not workspace.property("visible"), key
         print("NAVIGATION_OK", flush=True)
         QApplication.instance().exit(0)
     except Exception:
