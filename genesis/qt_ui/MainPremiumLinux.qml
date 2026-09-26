@@ -479,6 +479,18 @@ ApplicationWindow {
         font.letterSpacing: 1.1
     }
 
+    component PageArtwork: Image {
+        property int pageNumber: -1
+        property url artwork: ""
+        anchors.fill: parent
+        source: appRoot.pageIndex === pageNumber && !appRoot.privacyMode ? artwork : ""
+        sourceSize.width: 1600
+        sourceSize.height: 1000
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        opacity: 0.24
+    }
+
     component MediaCard: Panel {
         id: mediaCard
         objectName: "mediaCard_" + actionKey
@@ -488,7 +500,8 @@ ApplicationWindow {
         property string actionKey: ""
         property string statusText: "LOCAL TOOL"
         property var tools: []
-        property url backgroundSource: ""
+        gradient: null
+        color: "#b3101215"
         Layout.fillWidth: true
         Layout.minimumWidth: 0
         Layout.preferredWidth: 1
@@ -518,17 +531,6 @@ ApplicationWindow {
                 clip: true
                 radius: 4
                 color: "#101215"
-                // Decode artwork at card size, off the UI thread; no blur or animation.
-                Image {
-                    anchors.fill: parent
-                    objectName: "mediaArtwork"
-                    source: appRoot.pageIndex === 3 && !appRoot.privacyMode ? mediaCard.backgroundSource : ""
-                    sourceSize.width: 640
-                    sourceSize.height: 320
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    opacity: 0.18
-                }
                 Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.rightMargin: 20; text: mediaCard.iconText; color: appRoot.gold; opacity: 0.35; font.pixelSize: 48 }
                 Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 12; text: mediaCard.statusText; color: appRoot.textMain; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1 }
             }
@@ -766,6 +768,8 @@ ApplicationWindow {
                 currentIndex: appRoot.pageIndex
 
                 Item {
+                    clip: true
+                    PageArtwork { objectName: "generationPageArtwork"; pageNumber: 0; artwork: "../assets/media_cards/reference-5.jpg" }
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 9
@@ -785,6 +789,8 @@ ApplicationWindow {
                             spacing: 8
 
                             Panel {
+                                gradient: null
+                                color: "#b3101215"
                                 Layout.preferredWidth: appRoot.width < 1300 ? 210 : 260
                                 Layout.minimumWidth: appRoot.width < 1300 ? 210 : 240
                                 Layout.maximumWidth: 280
@@ -869,6 +875,8 @@ ApplicationWindow {
                             }
 
                             Panel {
+                                gradient: null
+                                color: "#b3101215"
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 ColumnLayout {
@@ -877,30 +885,36 @@ ApplicationWindow {
                                     spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 60
-                                        Layout.minimumHeight: 60
-                                        Layout.maximumHeight: 60
+                                        Layout.preferredHeight: appRoot.compactNavigation ? 96 : 148
+                                        Layout.minimumHeight: Layout.preferredHeight
+                                        Layout.maximumHeight: Layout.preferredHeight
                                         objectName: "generationStageStrip"
-                                        spacing: 6
+                                        spacing: 10
                                         Repeater {
                                             model: [
-                                                {title:"STAGE 1", name:"Phr00t / Qwen", enabled:true},
-                                                {title:"STAGE 2", name:"Aisha 9B / Klein 9B", enabled:appRoot.useStageTwo},
-                                                {title:"STAGE 3", name:"Identity engine", enabled:appRoot.useStageThree}
+                                                {title:"STAGE 1", name:"Phr00t / Qwen", detail:"Create the base image", enabled:true},
+                                                {title:"STAGE 2", name:"Aisha 9B / Klein 9B", detail:"Refine the previous output", enabled:appRoot.useStageTwo},
+                                                {title:"STAGE 3", name:"Identity engine", detail:"Apply the identity pass", enabled:appRoot.useStageThree}
                                             ]
                                             Rectangle {
+                                                objectName: "generationStageCard" + index
                                                 Layout.fillWidth: true
+                                                Layout.preferredWidth: 1
+                                                Layout.minimumWidth: 0
                                                 Layout.fillHeight: true
-                                                radius: 2
+                                                radius: 4
                                                 color: modelData.enabled ? "#17140d" : appRoot.raised
                                                 border.color: modelData.enabled ? appRoot.gold : appRoot.line
                                                 border.width: modelData.enabled ? 2 : 1
-                                                Column {
-                                                    anchors.centerIn: parent
-                                                    spacing: 1
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 10; font.bold: true }
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.name; color: appRoot.textMain; font.pixelSize: 10; font.bold: true }
-                                                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 8 }
+                                                ColumnLayout {
+                                                    anchors.fill: parent
+                                                    anchors.margins: appRoot.compactNavigation ? 10 : 14
+                                                    spacing: 5
+                                                    Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
+                                                    Text { Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: appRoot.compactNavigation ? 11 : 14; font.bold: true; wrapMode: Text.Wrap }
+                                                    Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                                    Item { Layout.fillHeight: true }
+                                                    Text { text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9; font.bold: true }
                                                 }
                                             }
                                         }
@@ -910,6 +924,8 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         Layout.minimumHeight: 72
+                                        Layout.preferredHeight: 180
+                                        objectName: "generationPromptEditor"
                                         text: appRoot.generationPrompt
                                         placeholderText: "Preset or pose fills this automatically — edit anything you want."
                                         color: appRoot.textMain
@@ -965,10 +981,10 @@ ApplicationWindow {
                                     SectionLabel { text: "RESULT" }
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: appRoot.height < 800 ? 110 : 168
+                                        Layout.fillHeight: true
+                                        Layout.preferredHeight: 180
                                         objectName: "generationResultPreview"
                                         Layout.minimumHeight: 100
-                                        Layout.maximumHeight: 190
                                         radius: 2
                                         color: "#080808"
                                         border.color: genesisBridge.previewUrl.length > 0 ? appRoot.gold : appRoot.line
@@ -1014,6 +1030,8 @@ ApplicationWindow {
                             }
 
                             Panel {
+                                gradient: null
+                                color: "#b3101215"
                                 Layout.preferredWidth: appRoot.width < 1300 ? 280 : 360
                                 Layout.minimumWidth: appRoot.width < 1300 ? 280 : 340
                                 Layout.maximumWidth: 400
@@ -1049,7 +1067,7 @@ ApplicationWindow {
                                     }
                                     GridLayout {
                                         Layout.fillWidth: true
-                                        columns: 2
+                                        columns: generationSettings.availableWidth < 290 ? 1 : 2
                                         columnSpacing: 6
                                         rowSpacing: 6
                                         GButton { text: "Save endpoint"; enabled: !genesisBridge.busy; onClicked: backendBridge.setEndpoint(runpodEndpoint.text) }
@@ -1386,6 +1404,8 @@ ApplicationWindow {
                 }
 
                 Item {
+                    clip: true
+                    PageArtwork { objectName: "mediaPageArtwork"; pageNumber: 3; artwork: "../assets/media_cards/reference-3.jpg" }
                     ColumnLayout {
                         anchors.fill: parent
                         spacing: 8
@@ -1422,7 +1442,6 @@ ApplicationWindow {
                                     Layout.maximumWidth: Layout.preferredWidth
                                     titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action
                                     iconText:modelData.icon; statusText:modelData.status; tools:modelData.tools
-                                    backgroundSource: "../assets/media_cards/reference-" + (index + 1) + (index < 2 ? ".png" : ".jpg")
                                 }
                             }
                         }

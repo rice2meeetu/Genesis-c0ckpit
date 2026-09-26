@@ -169,4 +169,5 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
     assert 'appRoot.width < 1300 ? 210 : 260' in qml
     assert 'appRoot.width < 1300 ? 280 : 360' in qml
     assert 'objectName: "generationResultPreview"' in qml
-    assert 'appRoot.height < 800 ? 110 : 168' in qml
+    assert 'Layout.preferredHeight: 180' in qml
+    assert 'appRoot.compactNavigation ? 96 : 148' in qml

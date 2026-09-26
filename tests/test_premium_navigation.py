@@ -88,12 +88,11 @@ def verify():
         assert all(card is not None for card in cards)
         window.setProperty("privacyMode", True)
         QApplication.processEvents()
-        for card in cards:
-            assert not card.findChild(QObject, "mediaArtwork").property("source").toString()
+        artwork = window.findChild(QObject, "mediaPageArtwork")
+        assert not artwork.property("source").toString()
         window.setProperty("privacyMode", False)
         QApplication.processEvents()
-        for card in cards:
-            assert card.findChild(QObject, "mediaArtwork").property("source").toString()
+        assert artwork.property("source").toString()
         for removed in ["upscale", "standard resize", "batch upscale"]:
             assert window.findChild(QObject, "mediaOpen_" + removed) is None
         for key, actions in [("canvas", ["canvas", "background remover", "batch background"]),
@@ -127,6 +126,28 @@ def verify():
                 assert card.property("height") >= 250
             if width >= 1600:
                 assert abs(cards[0].property("width") - cards[1].property("width")) < 2
+        window.setProperty("pageIndex", 0)
+        for width, height in [(1120, 720), (1600, 1000)]:
+            window.resize(width, height)
+            QTest.qWait(100)
+            strip = window.findChild(QObject, "generationStageStrip")
+            expression = QQmlExpression(engines[0].rootContext(), strip,
+                "(function() { var cards = []; for (var i=0; i<children.length; ++i) "
+                "if (children[i].objectName.indexOf('generationStageCard') === 0) cards.push(children[i]); "
+                "return cards.length === 3 && Math.abs(cards[0].width-cards[1].width)<2 "
+                "&& Math.abs(cards[1].width-cards[2].width)<2 && cards[0].height >= 96; })()")
+            result, undefined = expression.evaluate()
+            assert result, expression.error().toString()
+            prompt = window.findChild(QObject, "generationPromptEditor")
+            preview = window.findChild(QObject, "generationResultPreview")
+            assert prompt.property("height") >= 72
+            assert preview.property("height") >= 100
+            assert prompt.property("y") + prompt.property("height") < preview.property("y")
+        assert not artwork.property("source").toString()
+        generation_art = window.findChild(QObject, "generationPageArtwork")
+        assert generation_art.property("source").toString()
+        window.setProperty("privacyMode", True)
+        assert not generation_art.property("source").toString()
         print("NAVIGATION_OK", flush=True)
         QApplication.instance().exit(0)
     except Exception:
