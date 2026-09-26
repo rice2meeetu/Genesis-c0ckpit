@@ -715,7 +715,7 @@ ApplicationWindow {
             spacing: 8
 
             Panel {
-                Layout.preferredWidth: appRoot.width < 1300 ? 165 : 205
+                Layout.preferredWidth: appRoot.width < 1300 ? 190 : 245
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent
@@ -723,7 +723,7 @@ ApplicationWindow {
                     spacing: 5
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: appRoot.compactNavigation ? 82 : 160
+                        Layout.preferredHeight: appRoot.compactNavigation ? 104 : 200
                         radius: 2
                         color: appRoot.panel
                         border.color: appRoot.line
