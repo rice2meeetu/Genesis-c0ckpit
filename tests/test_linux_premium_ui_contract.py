@@ -127,7 +127,7 @@ def test_media_cards_open_dedicated_workspace_before_running_tools():
     assert "function mediaToolIsReview()" in qml
     assert "onClicked: appRoot.runMediaTool()" in qml
     assert "visible: appRoot.mediaToolOpen" in qml
-    assert "appRoot.openMediaTool(mediaCard.actionKey, mediaCard.titleText, mediaCard.bodyText, mediaCard.statusText)" in qml
+    assert "appRoot.openMediaTool(key, title, mediaCard.bodyText, mediaCard.statusText)" in qml
 
 
 def test_page_header_binds_to_component_properties():

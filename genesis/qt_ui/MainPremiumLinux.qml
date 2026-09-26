@@ -107,11 +107,11 @@ ApplicationWindow {
 
     property var poseModel: typeof poseItems !== "undefined" ? poseItems : []
     property var easyPresetModel: typeof curatedPosePresets !== "undefined" ? curatedPosePresets : []
-    property url selectedPoseSource: poseModel.length ? poseModel[0].source : ""
-    property url selectedPoseThumbnail: poseModel.length ? (poseModel[0].thumbnail || poseModel[0].source) : ""
-    property string selectedPoseName: poseModel.length ? poseModel[0].name : "No pose selected"
-    property string selectedPoseCategory: poseModel.length ? poseModel[0].category : ""
-    property string selectedPosePrompt: poseModel.length ? poseModel[0].prompt : ""
+    property url selectedPoseSource: ""
+    property url selectedPoseThumbnail: ""
+    property string selectedPoseName: "No pose selected"
+    property string selectedPoseCategory: ""
+    property string selectedPosePrompt: ""
     property string selectedPresetName: "No preset selected"
     property string presetSearch: ""
     property string presetCategory: "All"
@@ -251,8 +251,17 @@ ApplicationWindow {
         if (profile.defaultScheduler !== undefined) generationScheduler = profile.defaultScheduler
     }
 
+    function clearPose() {
+        selectedPoseSource = ""
+        selectedPoseThumbnail = ""
+        selectedPoseName = "No pose selected"
+        selectedPoseCategory = ""
+        selectedPosePrompt = ""
+    }
+
     function applyPreset(row) {
         if (!row) return
+        clearPose()
         selectedPresetName = row.label || row.name || "Preset"
         if (row.prompt && row.prompt.length)
             generationPrompt = row.prompt
@@ -260,13 +269,13 @@ ApplicationWindow {
 
     function applyPose(row) {
         if (!row) return
+        selectedPresetName = ""
         selectedPoseSource = row.source || ""
         selectedPoseThumbnail = row.thumbnail || row.source || ""
         selectedPoseName = row.name || "Pose"
         selectedPoseCategory = row.category || ""
         selectedPosePrompt = row.prompt || ""
-        if (row.prompt && row.prompt.length)
-            generationPrompt = row.prompt
+        generationPrompt = row.prompt || ""
     }
 
     function filteredPresets() {
@@ -472,60 +481,82 @@ ApplicationWindow {
 
     component MediaCard: Panel {
         id: mediaCard
+        objectName: "mediaCard_" + actionKey
         property string titleText: "Tool"
         property string bodyText: ""
         property string iconText: "◆"
         property string actionKey: ""
         property string statusText: "LOCAL TOOL"
+        property var tools: []
+        property url backgroundSource: ""
         Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.minimumHeight: 190
+        Layout.minimumWidth: 0
+        Layout.preferredWidth: 1
+        Layout.minimumHeight: 250
+        Layout.preferredHeight: 270
+
+        function launchTool(key, title) {
+            if (key === "face swap") appRoot.pageIndex = 12
+            else if (key === "media viewer") appRoot.pageIndex = 4
+            else if (key === "canvas") appRoot.pageIndex = 8
+            else appRoot.openMediaTool(key, title, mediaCard.bodyText, mediaCard.statusText)
+        }
+
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 11
-            spacing: 7
+            anchors.margins: 18
+            spacing: 12
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: mediaCard.iconText; color: appRoot.gold; font.pixelSize: 18; font.bold: true }
-                Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.family: "Noto Sans Display"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
-                Rectangle {
-                    radius: 2; height: 22; width: statusLabel.implicitWidth + 18
-                    color: "#241c11"; border.color: appRoot.gold
-                    Text { id: statusLabel; anchors.centerIn: parent; text: mediaCard.statusText; color: appRoot.brightGold; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.7 }
-                }
+                Text { text: mediaCard.iconText; color: appRoot.gold; font.pixelSize: 24; font.bold: true }
+                Text { Layout.fillWidth: true; text: mediaCard.titleText; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true; wrapMode: Text.Wrap }
             }
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.minimumHeight: 72
-                radius: 2
-                color: "#0a0a09"
-                border.color: "#40372a"
-                border.width: 1
-                gradient: Gradient {
-                    orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: "#12100d" }
-                    GradientStop { position: 1.0; color: "#0a0a09" }
+                Layout.minimumHeight: 68
+                clip: true
+                radius: 4
+                color: "#101215"
+                // Decode artwork at card size, off the UI thread; no blur or animation.
+                Image {
+                    anchors.fill: parent
+                    objectName: "mediaArtwork"
+                    source: appRoot.pageIndex === 3 && !appRoot.privacyMode ? mediaCard.backgroundSource : ""
+                    sourceSize.width: 640
+                    sourceSize.height: 320
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    opacity: 0.18
                 }
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 2; color: appRoot.gold; opacity: 0.7 }
-                Text { anchors.centerIn: parent; text: mediaCard.iconText; color: "#55f3d28b"; font.pixelSize: 58; font.bold: true }
-                Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10; text: "GENESIS · " + mediaCard.titleText.toUpperCase(); color: appRoot.textDim; font.pixelSize: 9; font.bold: true; font.letterSpacing: 0.8 }
+                Text { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.rightMargin: 20; text: mediaCard.iconText; color: appRoot.gold; opacity: 0.35; font.pixelSize: 48 }
+                Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 12; text: mediaCard.statusText; color: appRoot.textMain; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1 }
             }
-            Text { Layout.fillWidth: true; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
+            Text { Layout.fillWidth: true; Layout.minimumHeight: 36; text: mediaCard.bodyText; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
             GButton {
+                id: mediaOpenButton
+                objectName: "mediaOpen_" + mediaCard.actionKey
                 Layout.fillWidth: true
-                text: mediaBridge.busy ? "WORKING…" : "OPEN  " + mediaCard.titleText.toUpperCase()
-                active: !mediaBridge.busy
+                Layout.preferredHeight: 44
+                text: mediaCard.tools.length ? "CHOOSE TOOL  ▾" : "OPEN  " + mediaCard.titleText.toUpperCase()
                 enabled: !mediaBridge.busy
                 onClicked: {
-                    if (mediaCard.actionKey === "face swap")
-                        appRoot.pageIndex = 12
-                    else if (mediaCard.actionKey === "media viewer")
-                        appRoot.pageIndex = 4
-                    else if (mediaCard.actionKey === "canvas")
-                        appRoot.pageIndex = 8
-                    else
-                        appRoot.openMediaTool(mediaCard.actionKey, mediaCard.titleText, mediaCard.bodyText, mediaCard.statusText)
+                    if (mediaCard.tools.length) toolMenu.popup()
+                    else mediaCard.launchTool(mediaCard.actionKey, mediaCard.titleText)
+                }
+                Menu {
+                    id: toolMenu
+                    objectName: "mediaMenu_" + mediaCard.actionKey
+                    width: mediaOpenButton.width
+                    Repeater {
+                        model: mediaCard.tools
+                        MenuItem {
+                            required property var modelData
+                            text: modelData.title
+                            enabled: !mediaBridge.busy
+                            onTriggered: mediaCard.launchTool(modelData.action, modelData.title)
+                        }
+                    }
                 }
             }
         }
@@ -897,7 +928,7 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text: "Preset: " + appRoot.selectedPresetName; color: appRoot.gold; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
-                                        Text { text: "Pose: " + appRoot.selectedPoseName; color: appRoot.textDim; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight; horizontalAlignment: Text.AlignRight }
+                                        Text { text: "Pose reference: " + appRoot.selectedPoseName; color: appRoot.textDim; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight; horizontalAlignment: Text.AlignRight }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -1016,8 +1047,11 @@ ApplicationWindow {
                                         enabled: !genesisBridge.busy
                                         selectByMouse: true
                                     }
-                                    RowLayout {
+                                    GridLayout {
                                         Layout.fillWidth: true
+                                        columns: 2
+                                        columnSpacing: 6
+                                        rowSpacing: 6
                                         GButton { text: "Save endpoint"; enabled: !genesisBridge.busy; onClicked: backendBridge.setEndpoint(runpodEndpoint.text) }
                                         GButton { text: backendBridge.checking ? "Checking…" : "Refresh"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
                                     }
@@ -1366,23 +1400,30 @@ ApplicationWindow {
                             id: mediaScroll
                             contentWidth: availableWidth
                         GridLayout {
-                            width: mediaScroll.availableWidth; columns: width < 1050 ? 2 : 3; rowSpacing: 10; columnSpacing: 10
+                            id: mediaGrid
+                            objectName: "mediaToolsGrid"
+                            width: mediaScroll.availableWidth
+                            columns: width >= 1050 ? 6 : (width >= 650 ? 2 : 1)
+                            rowSpacing: 16
+                            columnSpacing: 16
                             Repeater {
+                                id: mediaCardRepeater
+                                objectName: "mediaCardRepeater"
                                 model: [
-                                    {title:"Background Remover", body:"Create one transparent cut-out while preserving the source.", action:"background remover", icon:"✂", status:"GPU / LOCAL"},
-                                    {title:"Batch Cut-outs", body:"Remove backgrounds from multiple selected images into an output folder.", action:"batch background", icon:"✂", status:"GPU / BATCH"},
-                                    {title:"Upscale 2×", body:"AI upscale through the selected backend. Use Standard Resize for CPU resizing.", action:"upscale", icon:"⇧", status:backendBridge.mode},
-                                    {title:"Standard Resize 2×", body:"Resize locally without starting an AI model. Keeps transparency.", action:"standard resize", icon:"⇧", status:"CPU"},
-                                    {title:"Batch Upscale 4×", body:"Quality-upscale multiple selected images into an output folder.", action:"batch upscale", icon:"⇧", status:backendBridge.mode + " / BATCH"},
-                                    {title:"Extract MP3", body:"Extract an MP3 audio track from a video or audio file.", action:"extract audio", icon:"♫", status:"FFMPEG"},
-                                    {title:"Extract Video", body:"Save a video copy while keeping its original audio track.", action:"extract video", icon:"▷", status:"FFMPEG"},
-                                    {title:"Media Viewer", body:"Browse, preview and inspect your local images and metadata.", action:"media viewer", icon:"▧", status:"LIBRARY"},
-                                    {title:"Duplicate Finder", body:"Review exact and near duplicates before moving copies to Trash.", action:"duplicate finder", icon:"◫", status:"SAFE REVIEW"},
-                                    {title:"Face Organiser", body:"Group and organise photos by people.", action:"face organiser", icon:"◎", status:"PEOPLE"},
-                                    {title:"Face Swap", body:"ReActor uses the selected backend. FaceFusion runs local images only.", action:"face swap", icon:"◎", status:backendBridge.mode},
-                                    {title:"Canvas", body:"Layer images and cutouts, arrange your scene and export a PNG.", action:"canvas", icon:"Ps", status:"LOCAL EDITOR"}
+                                    {title:"Canvas & Cut-outs", body:"Build a layered scene or prepare transparent images, one at a time or in a batch.", action:"canvas", icon:"✂", status:"CREATE / EDIT", tools:[{title:"Open Canvas", action:"canvas"}, {title:"Background Remover", action:"background remover"}, {title:"Batch Cut-outs", action:"batch background"}]},
+                                    {title:"Audio & Video", body:"Extract an MP3 audio track or save a video copy with its original audio.", action:"audio video", icon:"♫", status:"FFMPEG", tools:[{title:"Extract MP3", action:"extract audio"}, {title:"Extract Video", action:"extract video"}]},
+                                    {title:"Media Library", body:"Browse local images, inspect metadata and revisit your results.", action:"media viewer", icon:"▧", status:"BROWSE / INSPECT", tools:[]},
+                                    {title:"Photo Organisation", body:"Review duplicate images or organise your photo library by people.", action:"organisation", icon:"◫", status:"REVIEW / ORGANISE", tools:[{title:"Duplicate Finder", action:"duplicate finder"}, {title:"Face Organiser", action:"face organiser"}]},
+                                    {title:"Face Swap", body:"Open the identity workspace with ReActor and local FaceFusion options.", action:"face swap", icon:"◎", status:backendBridge.mode, tools:[]}
                                 ]
-                                MediaCard { titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action; iconText:modelData.icon; statusText:modelData.status }
+                                MediaCard {
+                                    Layout.columnSpan: mediaGrid.columns === 6 ? (index < 3 ? 2 : 3) : (mediaGrid.columns === 2 && index === 4 ? 2 : 1)
+                                    Layout.preferredWidth: (mediaGrid.width - (mediaGrid.columns - 1) * mediaGrid.columnSpacing) / mediaGrid.columns * Layout.columnSpan + (Layout.columnSpan - 1) * mediaGrid.columnSpacing
+                                    Layout.maximumWidth: Layout.preferredWidth
+                                    titleText:modelData.title; bodyText:modelData.body; actionKey:modelData.action
+                                    iconText:modelData.icon; statusText:modelData.status; tools:modelData.tools
+                                    backgroundSource: "../assets/media_cards/reference-" + (index + 1) + (index < 2 ? ".png" : ".jpg")
+                                }
                             }
                         }
                         }
