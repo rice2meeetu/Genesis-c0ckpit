@@ -1,4 +1,4 @@
-"""Qt adapter for local Canvas composition. Never imports AI/service bridges."""
+"""Qt adapter for Canvas composition and explicitly requested image processing."""
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
@@ -18,6 +18,76 @@ class CanvasBridge(QObject):
         self._status = "Add a background, then stack images or transparent cutouts."
         self._dirty = False
         self._project_path = ""
+        self.media_tools = None
+        self._pending_image = None
+
+    @pyqtProperty(bool, notify=changed)
+    def busy(self):
+        return bool(self.media_tools and self.media_tools.busy)
+
+    def attach_media_tools(self, tools):
+        self.media_tools = tools
+        tools.busyChanged.connect(self.changed.emit)
+        tools.statusChanged.connect(lambda: self._message(tools.status))
+        tools.resultChanged.connect(self._receive_processed_image)
+
+    def _receive_processed_image(self):
+        if not self._pending_image or not self.media_tools.resultUrl:
+            return
+        document, layer_id = self._pending_image
+        self._pending_image = None
+        if document is self.document:
+            path = QUrl(self.media_tools.resultUrl).toLocalFile()
+            self._apply(lambda: document.add_processed_layer(layer_id, path))
+
+    @pyqtSlot(str, int)
+    def processSelected(self, kind, scale):
+        if self.busy or not self.selected or not self.media_tools:
+            return
+        if kind not in {"background remover", "upscale", "standard resize"} or scale not in (2, 4):
+            self._message("Unsupported image operation")
+            return
+        source = Path(self.selected["path"])
+        suffix = "cutout" if kind == "background remover" else f"{scale}x"
+        target, _ = QFileDialog.getSaveFileName(None, "Save processed layer", str(source.with_name(source.stem + "_" + suffix + ".png")), "PNG (*.png)")
+        if not target:
+            return
+        target = Path(target).with_suffix(".png").resolve()
+        if any(target == Path(path) or (target.exists() and target.samefile(path)) for path in self.document._source_paths if Path(path).exists()):
+            self._message("Choose a new file; Canvas source images must stay unchanged.")
+            return
+        self._pending_image = (self.document, self.selected["id"])
+        self.media_tools.process_canvas_image(source, target, kind, scale)
+        if not self.busy:
+            self._pending_image = None
+
+    @pyqtSlot(int, int, result=bool)
+    def createProject(self, width, height):
+        from genesis.canvas_document import _size
+        try:
+            _size(width, height)
+        except ValueError as exc:
+            self._message(str(exc))
+            return False
+        if self.busy or not self.confirm_discard():
+            return False
+        self.document = CanvasDocument()
+        self.document.set_size(width, height)
+        self.document._undo.clear()
+        self._dirty = True
+        self._project_path = ""
+        self.changed.emit()
+        self._message(f"New transparent canvas · {width} × {height} px")
+        return True
+
+    @pyqtSlot(int, int)
+    def setCanvasSize(self, width, height):
+        self._apply(lambda: self.document.set_size(width, height))
+
+    @pyqtSlot(int, int)
+    def setSelectedSize(self, width, height):
+        if self.selected:
+            self._apply(lambda: self.document.update_layer(self.selected["id"], width=width, height=height))
 
     @pyqtProperty('QVariantList', notify=changed)
     def layers(self):
@@ -154,6 +224,9 @@ class CanvasBridge(QObject):
         self._apply(self.document.redo)
 
     def confirm_discard(self):
+        if self.busy:
+            self._message("Wait for image processing to finish before changing projects.")
+            return False
         if not self._dirty:
             return True
         answer = QMessageBox.question(None, "Unsaved Canvas composition", "Save your Canvas project before continuing?", QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel)
@@ -172,8 +245,8 @@ class CanvasBridge(QObject):
 
     @pyqtSlot(result=bool)
     def saveProject(self):
-        if not self.document.layers:
-            self._message("Add an image before saving a project.")
+        if not self.document.width:
+            self._message("Create a canvas before saving a project.")
             return False
         initial = self._project_path or str(Path.home() / "GENESIS-Exports" / "composition.genesis-canvas.json")
         target, _ = QFileDialog.getSaveFileName(None, "Save Canvas project", initial, "Canvas project (*.genesis-canvas.json)")
@@ -212,8 +285,8 @@ class CanvasBridge(QObject):
 
     @pyqtSlot()
     def exportPng(self):
-        if not self.document.layers:
-            self._message("Add an image before exporting.")
+        if not self.document.width:
+            self._message("Create a canvas before exporting.")
             return
         target, _ = QFileDialog.getSaveFileName(None, "Export composition", str(Path.home() / "GENESIS-Exports" / "composition.png"), "PNG (*.png)")
         if not target:

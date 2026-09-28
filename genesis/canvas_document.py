@@ -83,6 +83,32 @@ class CanvasDocument:
     def _layer(self, layer_id):
         return next((layer for layer in self.layers if layer["id"] == layer_id), None)
 
+    def set_size(self, width, height):
+        _size(width, height)
+        if (width, height) == (self.width, self.height):
+            return False
+        self._checkpoint()
+        self.width, self.height = width, height
+        return True
+
+    def add_processed_layer(self, layer_id, path):
+        original = self._layer(layer_id)
+        if original is None:
+            raise ValueError("The source layer was removed; the processed image remains saved on disk.")
+        if len(self.layers) >= MAX_LAYERS:
+            raise ValueError("Canvas supports at most 32 layers")
+        resolved = str(Path(path).resolve(strict=True))
+        with _image(resolved):
+            pass
+        self._checkpoint()
+        result = dict(original, id=uuid.uuid4().hex, path=resolved,
+                      name=Path(resolved).name[:256], visible=True)
+        original["visible"] = False
+        self.layers.insert(self.layers.index(original) + 1, result)
+        self._source_paths.add(resolved)
+        self.selected_id = result["id"]
+        return True
+
     def add_image(self, path):
         if len(self.layers) >= MAX_LAYERS:
             raise ValueError("Canvas supports at most 32 layers")

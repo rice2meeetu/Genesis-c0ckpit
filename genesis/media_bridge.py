@@ -190,6 +190,18 @@ class MediaBridge(QObject):
 
         threading.Thread(target=run, daemon=True).start()
 
+    def process_canvas_image(self, source, target, kind, scale):
+        if self.busy:
+            return
+        if kind == "background remover":
+            self._start("Removing background", lambda: remove_background(source, target))
+        elif kind == "upscale" and scale in (2, 4):
+            self._start_upscale(f"AI upscaling {scale}×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=True, require_ai=True))
+        elif kind == "standard resize" and scale in (2, 4):
+            self._start(f"Standard resize {scale}×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=False))
+        else:
+            self._set_status("Unsupported Canvas image operation")
+
     def _start_upscale(self, label, operation):
         from genesis.backend_routing import use_route
         try:

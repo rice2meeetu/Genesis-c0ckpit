@@ -4,8 +4,10 @@ import QtQuick.Layouts
 
 Item {
     id: canvasWorkspace
+    objectName: "canvasWorkspace"
     property url sourceUrl: ""
     property real zoom: 1
+    property bool resizeMode: false
     readonly property bool compact: width < 1100
     readonly property var selection: canvasBridge.selected
     onSourceUrlChanged: if (sourceUrl.toString().length) canvasBridge.addSourceOnce(sourceUrl.toString())
@@ -32,6 +34,34 @@ Item {
         validator: DoubleValidator { bottom: -32000; top: 32000; decimals: 1; locale: "C" }
     }
 
+    Dialog {
+        id: sizeDialog
+        objectName: "canvasSizeDialog"
+        property bool creating: true
+        anchors.centerIn: parent
+        modal: true
+        title: creating ? "New canvas" : "Canvas size"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            if (creating) canvasBridge.createProject(canvasWidthInput.value, canvasHeightInput.value)
+            else canvasBridge.setCanvasSize(canvasWidthInput.value, canvasHeightInput.value)
+            canvasWorkspace.zoom = 1
+        }
+        ColumnLayout {
+            Label { text: "Transparent canvas · dimensions in pixels" }
+            ComboBox {
+                model: ["Custom", "Square · 1024 × 1024", "Portrait · 768 × 1152", "Landscape · 1920 × 1080"]
+                onActivated: {
+                    var sizes = [[0,0], [1024,1024], [768,1152], [1920,1080]]
+                    if (currentIndex > 0) { canvasWidthInput.value = sizes[currentIndex][0]; canvasHeightInput.value = sizes[currentIndex][1] }
+                }
+            }
+            RowLayout { Label { text: "Width" } SpinBox { id: canvasWidthInput; objectName: "canvasWidthInput"; from: 1; to: 16384; value: 1024; editable: true } }
+            RowLayout { Label { text: "Height" } SpinBox { id: canvasHeightInput; objectName: "canvasHeightInput"; from: 1; to: 16384; value: 1024; editable: true } }
+            Label { text: "Up to 32 megapixels. Changing size keeps layer positions." }
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent; spacing: 10
         RowLayout {
@@ -49,10 +79,13 @@ Item {
             Layout.fillWidth: true; Layout.preferredHeight: childrenRect.height
             spacing: 7
             Action { text: "＋ Add image / cutout"; onClicked: canvasBridge.chooseLayer() }
-            Action { text: "New"; onClicked: canvasBridge.newProject() }
+            Action { objectName: "canvasNewButton"; text: "New…"; enabled: !canvasBridge.busy; onClicked: { sizeDialog.creating = true; sizeDialog.open() } }
+            Action { text: "Canvas size…"; enabled: canvasBridge.canvasWidth > 0 && !canvasBridge.busy; onClicked: { sizeDialog.creating = false; canvasWidthInput.value = canvasBridge.canvasWidth; canvasHeightInput.value = canvasBridge.canvasHeight; sizeDialog.open() } }
+            Action { text: "↖ Move"; checkable: true; checked: !canvasWorkspace.resizeMode; onClicked: canvasWorkspace.resizeMode = false }
+            Action { objectName: "canvasResizeTool"; text: "⤢ Resize"; checkable: true; checked: canvasWorkspace.resizeMode; onClicked: canvasWorkspace.resizeMode = true }
             Action { text: "Open project"; onClicked: canvasBridge.openProject() }
-            Action { text: "Save project"; enabled: canvasBridge.layers.length > 0; onClicked: canvasBridge.saveProject() }
-            Action { text: "Export PNG"; enabled: canvasBridge.layers.length > 0; onClicked: canvasBridge.exportPng() }
+            Action { text: "Save project"; enabled: canvasBridge.canvasWidth > 0; onClicked: canvasBridge.saveProject() }
+            Action { text: "Export PNG"; enabled: canvasBridge.canvasWidth > 0; onClicked: canvasBridge.exportPng() }
         }
         RowLayout {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 10
@@ -126,7 +159,7 @@ Item {
                             y: Math.max(0, (stage.height - height) / 2)
                             width: canvasBridge.canvasWidth * stage.documentScale
                             height: canvasBridge.canvasHeight * stage.documentScale
-                            visible: canvasBridge.layers.length > 0
+                            visible: canvasBridge.canvasWidth > 0
                             color: "#2d2d2d"; clip: true
                             Canvas {
                                 anchors.fill: parent
@@ -146,6 +179,7 @@ Item {
                                 model: canvasBridge.layers
                                 delegate: Item {
                                     id: layerItem
+                                    objectName: "canvasLayerItem"
                                     required property var modelData
                                     property real dragX: 0
                                     property real dragY: 0
@@ -159,11 +193,11 @@ Item {
                                     Image { anchors.fill: parent; source: layerItem.modelData.source; opacity: layerItem.modelData.opacity; fillMode: Image.Stretch; asynchronous: true; autoTransform: true; sourceSize.width: 1600; sourceSize.height: 1600 }
                                     Rectangle { anchors.fill: parent; color: "transparent"; border.color: "#e5bd75"; border.width: 1; visible: canvasWorkspace.selection.id === layerItem.modelData.id }
                                     MouseArea {
-                                        anchors.fill: parent; preventStealing: true; cursorShape: Qt.SizeAllCursor
+                                        anchors.fill: parent; preventStealing: true; cursorShape: canvasWorkspace.resizeMode ? Qt.ArrowCursor : Qt.SizeAllCursor
                                         property point pressPoint
                                         onPressed: function(mouse) { pressPoint = mapToItem(composition, mouse.x, mouse.y) }
                                         onPositionChanged: function(mouse) {
-                                            if (pressed) {
+                                            if (pressed && !canvasWorkspace.resizeMode) {
                                                 var p = mapToItem(composition, mouse.x, mouse.y)
                                                 layerItem.dragX += p.x - pressPoint.x
                                                 layerItem.dragY += p.y - pressPoint.y
@@ -180,19 +214,41 @@ Item {
                                         }
                                         onCanceled: { layerItem.dragX = 0; layerItem.dragY = 0 }
                                     }
+                                    Rectangle {
+                                        objectName: "layerResizeHandle"
+                                        anchors.right: parent.right; anchors.bottom: parent.bottom
+                                        width: 18; height: 18; radius: 3; color: "#e5bd75"
+                                        visible: canvasWorkspace.resizeMode && canvasWorkspace.selection.id === layerItem.modelData.id
+                                        MouseArea {
+                                            anchors.fill: parent; preventStealing: true; cursorShape: Qt.SizeFDiagCursor
+                                            property point initial
+                                            property real originalWidth
+                                            property real originalHeight
+                                            onPressed: function(mouse) {
+                                                initial = mapToItem(layerItem, mouse.x, mouse.y)
+                                                originalWidth = layerItem.width
+                                                originalHeight = layerItem.height
+                                            }
+                                            onReleased: function(mouse) {
+                                                var point = mapToItem(layerItem, mouse.x, mouse.y)
+                                                var factor = Math.max(0.05, Math.max((originalWidth + point.x - initial.x) / originalWidth, (originalHeight + point.y - initial.y) / originalHeight))
+                                                canvasBridge.resizeSelected(factor)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                         Column {
-                            anchors.centerIn: parent; spacing: 12; visible: canvasBridge.layers.length === 0
+                            anchors.centerIn: parent; spacing: 12; visible: canvasBridge.canvasWidth === 0
                             Label { anchors.horizontalCenter: parent.horizontalCenter; text: "＋"; color: "#c5a267"; font.pixelSize: 48 }
-                            Label { anchors.horizontalCenter: parent.horizontalCenter; text: "Start with an image"; color: "#eee7dc"; font.pixelSize: 19 }
+                            Label { anchors.horizontalCenter: parent.horizontalCenter; text: "Create a canvas or add an image"; color: "#eee7dc"; font.pixelSize: 19 }
                             Label { anchors.horizontalCenter: parent.horizontalCenter; text: "Stack cutouts and arrange your scene"; color: "#aaa7a1"; font.pixelSize: 11 }
                         }
                         ScrollBar.vertical: ScrollBar { }
                         ScrollBar.horizontal: ScrollBar { }
                     }
-                    Label { Layout.fillWidth: true; text: "Drag a layer to move it · Fit returns to the full canvas"; color: "#81796b"; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
+                    Label { Layout.fillWidth: true; text: canvasWorkspace.resizeMode ? "Drag the gold corner to resize · Size fields give exact pixels" : "Move tool · Drag an image to reposition it"; color: "#81796b"; font.pixelSize: 10; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap }
                 }
             }
             Rectangle {
@@ -212,6 +268,12 @@ Item {
                             onEditingFinished: if (text.trim().length) canvasBridge.renameSelected(text)
                             background: Rectangle { color: "#090909"; radius: 4; border.color: "#4a4033" }
                         }
+                        Caption { text: "SELECTED IMAGE TOOLS" }
+                        Action { Layout.fillWidth: true; text: "Remove background"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("background remover", 2) }
+                        Action { Layout.fillWidth: true; text: "AI upscale 2×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("upscale", 2) }
+                        Action { Layout.fillWidth: true; text: "AI upscale 4×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("upscale", 4) }
+                        Action { Layout.fillWidth: true; text: "Standard resize 2×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("standard resize", 2) }
+                        Label { Layout.fillWidth: true; text: "Processes the selected source image. The result replaces its view at the same position and size; the original stays as a hidden layer. AI upscale uses the selected backend."; color: "#aaa7a1"; font.pixelSize: 11; wrapMode: Text.Wrap }
                         Caption { text: "POSITION / PX" }
                         RowLayout {
                             Layout.fillWidth: true
@@ -220,8 +282,14 @@ Item {
                             Label { text: "Y"; color: "#aaa7a1" }
                             ValueInput { Layout.fillWidth: true; enabled: !!canvasWorkspace.selection.id; text: Math.round(canvasWorkspace.selection.y || 0); onEditingFinished: if (acceptableInput) canvasBridge.moveLayer(canvasWorkspace.selection.id, canvasWorkspace.selection.x, Number(text)) }
                         }
-                        Caption { text: "SIZE" }
-                        Label { text: canvasWorkspace.selection.id ? Math.round(canvasWorkspace.selection.width) + " × " + Math.round(canvasWorkspace.selection.height) + " px" : "—"; color: "#aaa7a1"; font.pixelSize: 12 }
+                        Caption { text: "LAYER SIZE / PX" }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: "W"; color: "#aaa7a1" }
+                            ValueInput { Layout.fillWidth: true; enabled: !!canvasWorkspace.selection.id; text: Math.round(canvasWorkspace.selection.width || 0); validator: IntValidator { bottom: 1; top: 16384 } onEditingFinished: if (acceptableInput) canvasBridge.setSelectedSize(Number(text), canvasWorkspace.selection.height) }
+                            Label { text: "H"; color: "#aaa7a1" }
+                            ValueInput { Layout.fillWidth: true; enabled: !!canvasWorkspace.selection.id; text: Math.round(canvasWorkspace.selection.height || 0); validator: IntValidator { bottom: 1; top: 16384 } onEditingFinished: if (acceptableInput) canvasBridge.setSelectedSize(canvasWorkspace.selection.width, Number(text)) }
+                        }
                         RowLayout {
                             Layout.fillWidth: true
                             Action { Layout.fillWidth: true; text: "Smaller"; enabled: !!canvasWorkspace.selection.id; onClicked: canvasBridge.resizeSelected(0.9) }
@@ -241,8 +309,7 @@ Item {
                         Rectangle { Layout.fillWidth: true; height: 1; color: "#343434" }
                         Caption { text: "SOURCE PROTECTION" }
                         Label { Layout.fillWidth: true; text: "Your originals stay unchanged. Save a project to keep layers editable, or export a transparent PNG."; color: "#aaa7a1"; font.pixelSize: 11; wrapMode: Text.Wrap }
-                        Caption { text: "AI TOOLS" }
-                        Label { Layout.fillWidth: true; text: "Generation and automatic cutout tools remain separate. This workspace uses local image composition."; color: "#81796b"; font.pixelSize: 11; wrapMode: Text.Wrap }
+
                     }
                 }
             }

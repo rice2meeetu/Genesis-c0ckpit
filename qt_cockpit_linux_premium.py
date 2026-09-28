@@ -197,6 +197,9 @@ def main() -> int:
     media_bridge = MediaBridge(app)
     media_bridge.backend_router = backend_bridge
     canvas_bridge = CanvasBridge(app)
+    canvas_media_bridge = MediaBridge(app)
+    canvas_media_bridge.backend_router = backend_bridge
+    canvas_bridge.attach_media_tools(canvas_media_bridge)
     context.setContextProperty("genesisBridge", generation_bridge)
     context.setContextProperty("genesisLayout", layout_bridge)
     context.setContextProperty("moduleBridge", module_bridge)
