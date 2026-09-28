@@ -2,7 +2,7 @@
 
 Open GENESIS Premium → Pose Library → Edit Skeleton.
 This is a native GENESIS editor, not an installation of third-party OpenPose Studio.
-It runs in the existing application process and does not use ComfyUI, models, network calls or GPU inference.
+The editor runs in the existing application process. Its optional DWPose action uses installed local detector models in a separate CPU-only process; it does not start ComfyUI, contact a remote service or run GPU inference.
 
 ## Implemented
 
@@ -29,8 +29,9 @@ Navigation and operation-routing regression tests: 32 passed.
 
 ## Scope remaining
 
-DWPose weights loaded and ran a CPU-only detector check on a synthetic neutral image;
-no person was detected in that drawing. Detection on a real photo has not yet been verified.
+DWPose ran on a neutral bundled photo and extracted two people with 18 body points each.
+The Qt editor displayed both skeletons, then saved and reopened their JSON unchanged.
+A simple synthetic drawing yielded no detection, as expected for that input.
 No generation route was changed, and no models were downloaded.
 FLUX conditioning, Depth/regional conditioning, identity engines and AMD rendered benchmarks are not implemented by this change.
 RunPod/MUNGBEAN were not contacted or modified. The live and repository Pose Maker copies were not replaced.
