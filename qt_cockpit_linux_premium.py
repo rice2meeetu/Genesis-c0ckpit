@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import QApplication
 from genesis.assistant_bridge import AssistantBridge
 from genesis.media_bridge import MediaBridge
 from genesis.canvas_bridge import CanvasBridge
+from genesis.skeleton_editor import SkeletonEditorBridge
 from genesis.backend_bridge import BackendBridge
 from qt_cockpit import (
     ASSET_ROOT,
@@ -206,6 +207,8 @@ def main() -> int:
     context.setContextProperty("assistantBridge", assistant_bridge)
     context.setContextProperty("mediaBridge", media_bridge)
     context.setContextProperty("canvasBridge", canvas_bridge)
+    skeleton_bridge = SkeletonEditorBridge(app)
+    context.setContextProperty("skeletonBridge", skeleton_bridge)
 
     qml_path = UI_ROOT / "MainPremiumLinux.qml"
     qml_source = compose_premium_qml(qml_path.read_text(encoding="utf-8"))

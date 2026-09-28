@@ -27,7 +27,7 @@ ApplicationWindow {
     readonly property color textDim: "#918e87"
     readonly property color success: "#62d27a"
 
-    onClosing: function(close) { close.accepted = canvasBridge.confirmClose() }
+    onClosing: function(close) { close.accepted = canvasBridge.confirmClose() && skeletonBridge.confirmClose() }
 
     property int pageIndex: 0
     property bool feefeeOpen: false
@@ -1304,6 +1304,7 @@ ApplicationWindow {
                                         Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
                                     }
                                     SectionLabel { text: "SELECTED POSE" }
+                                    GButton { objectName: "openSkeletonEditor"; Layout.fillWidth: true; text: "Edit Skeleton"; onClicked: skeletonBridge.openEditor(String(appRoot.selectedPoseSource)) }
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 160
