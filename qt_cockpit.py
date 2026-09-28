@@ -65,6 +65,10 @@ REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"
 REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
 REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v2.0 FP8 - Klein9B -,euler,cfg1.1.safetensors"
 REMOTE_DARKBEAST_9B_MODEL = "DarkBeast-Klein9b-V2-BFS-FP8-ComfyUI.safetensors"
+LOCAL_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
+LOCAL_PORNMASTER_9B_MODEL = REMOTE_PORNMASTER_9B_MODEL
+LOCAL_DARKBEAST_9B_MODEL = REMOTE_DARKBEAST_9B_MODEL
+LOCAL_PENDING_KLEIN_MODELS = {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}
 REMOTE_9B_CLIP = "qwen_3_8b.safetensors"
 REMOTE_9B_CLIP_CANDIDATES = (REMOTE_9B_CLIP, "qwen_3_8b_fp8mixed.safetensors")
 REMOTE_9B_VAE = "flux2-vae.safetensors"
@@ -173,10 +177,13 @@ def build_generation_profiles(
         model_name = Path(model_path).name
         compatible = compatible_loras(model_name, installed_loras)
         ready = bool(profile.get("ready"))
-        runnable = ready and model_name in SUPPORTED_CREATE_MODELS
+        runnable = ready and model_name in SUPPORTED_CREATE_MODELS and model_name not in LOCAL_PENDING_KLEIN_MODELS
         note = compatibility_note(model_name)
         if ready and not runnable:
-            note += " · Create workflow not yet validated"
+            if model_name in {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}:
+                note = "Installed · editable workflow available · AMD/KFD render pending"
+            else:
+                note += " · Create workflow not yet validated"
         profiles.append({
             "label": str(profile.get("name") or model_name),
             "model": model_name,
@@ -1386,6 +1393,9 @@ class GenerationBridge(QObject):
             route = self.backend_router.resolve(model_name) if self.backend_router else None
         except ValueError as exc:
             self._set_status(str(exc))
+            return
+        if model_name in LOCAL_PENDING_KLEIN_MODELS and (route is None or route.destination != "RUNPOD"):
+            self._set_status("Local Klein model is installed; AMD/KFD render verification is pending.")
             return
         if use_upscale and not (UPSCALE_WORKFLOW.is_file() if route and route.destination == "RUNPOD" else self.upscaleAvailable):
             self._set_status("Upscale is blocked: its checkpoint, VAE, or 4x-UltraSharp asset is missing.")
