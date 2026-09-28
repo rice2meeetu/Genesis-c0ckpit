@@ -21,6 +21,7 @@ BLUE = "#1c3656"
 
 MODEL_ROOTS = (
     Path("/mnt/AI-Storage/ComfyUI/models"),
+    Path.home() / "GENESIS-Models",
     Path.home() / "AI" / "ComfyUI" / "models",
     Path.home() / "AI" / "AI-Models",
     Path("/run/media") / getpass.getuser() / "Ai" / "AI-Models",
@@ -67,6 +68,24 @@ MODEL_PROFILES = (
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_4b", "qwen3_4b"),
         "workflow": ("klein_img", "klein_4b", "klein-4b", "klein 4b"),
+    },
+    {
+        "name": "Miraclein 9B v3 FP8 · GPU test pending",
+        "model": ("Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",),
+        "lora": (), "vae": ("flux2-vae",), "encoder": ("qwen_3_8b",),
+        "workflow": ("GENESIS_MIRACLEIN_9B_T2I",),
+    },
+    {
+        "name": "PornMaster Klein 9B v3 FP8 · GPU test pending",
+        "model": ("pornmasterFlux2Klein_v3-fp8.safetensors",),
+        "lora": (), "vae": ("flux2-vae",), "encoder": ("qwen_3_8b",),
+        "workflow": ("GENESIS_PORNMASTER_9B_T2I",),
+    },
+    {
+        "name": "DarkBeast 9B v2 BFS · post-pose identity · GPU test pending",
+        "model": ("DarkBeast-Klein9b-V2-BFS-FP8-ComfyUI.safetensors",),
+        "lora": (), "vae": ("flux2-vae",), "encoder": ("qwen_3_8b",),
+        "workflow": ("GENESIS_DARKBEAST_9B_IDENTITY",),
     },
     {
         "name": "FluxedUp",

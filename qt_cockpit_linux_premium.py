@@ -13,6 +13,11 @@ import argparse
 import json
 import os
 import sys
+
+# Keep embedded ComfyUI graph editing on software rendering.
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "") + " --disable-gpu --disable-gpu-compositing"
+).strip()
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QLockFile, QTimer, QUrl
@@ -24,6 +29,7 @@ from genesis.assistant_bridge import AssistantBridge
 from genesis.media_bridge import MediaBridge
 from genesis.canvas_bridge import CanvasBridge
 from genesis.skeleton_editor import SkeletonEditorBridge
+from genesis.workflow_graph_editor import WorkflowGraphBridge
 from genesis.backend_bridge import BackendBridge
 from qt_cockpit import (
     ASSET_ROOT,
@@ -209,6 +215,8 @@ def main() -> int:
     context.setContextProperty("canvasBridge", canvas_bridge)
     skeleton_bridge = SkeletonEditorBridge(app)
     context.setContextProperty("skeletonBridge", skeleton_bridge)
+    workflow_graph_bridge = WorkflowGraphBridge(app)
+    context.setContextProperty("workflowGraphBridge", workflow_graph_bridge)
 
     qml_path = UI_ROOT / "MainPremiumLinux.qml"
     qml_source = compose_premium_qml(qml_path.read_text(encoding="utf-8"))

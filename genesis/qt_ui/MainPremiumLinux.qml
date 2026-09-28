@@ -1381,23 +1381,46 @@ ApplicationWindow {
                             GButton { Layout.preferredWidth: implicitWidth; text: "Canvas"; onClicked: appRoot.pageIndex = 8 }
                             GButton { Layout.preferredWidth: implicitWidth; text: "Results"; onClicked: { appRoot.viewerSource = genesisBridge.previewUrl; appRoot.pageIndex = 4 } }
                         }
-                        GridLayout {
+                        ColumnLayout {
+                            objectName: "workflowGraphWorkspace"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            columns: 2
-                            rowSpacing: 10
-                            columnSpacing: 10
-                            Repeater {
-                                model: [
-                                    {title:"Stage 1 · Phr00t / Qwen", body:"Source-aware pose and identity generation. Best choice when you load a source image."},
-                                    {title:"Stage 2 · Aisha 9B / Klein 9B", body:"RunPod refinement using the preserved Stage 1 output; choose Aisha 9B v9.7 or FLUX.2 Klein 9B."},
-                                    {title:"Stage 3 · selectable identity lock", body:"Verified ReActor Inswapper stays active. ReSwapper, HyperSwap and PuLID remain pending until RunPod verification passes."},
-                                    {title:"Final Upscale", body:"Optional finishing pass when the required local assets are available."}
-                                ]
-                                Panel {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    ColumnLayout { anchors.fill: parent; anchors.margins: 18; Text { text: modelData.title; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true } Text { Layout.fillWidth: true; text: modelData.body; color: appRoot.textDim; font.pixelSize: 13; wrapMode: Text.Wrap } Item { Layout.fillHeight: true } GButton { text: "Open workflow folder"; onClicked: moduleBridge.triggerAction("workflow") } }
+                            spacing: 10
+                            Text { Layout.fillWidth: true; text: "COMFYUI NODE GRAPH IN GENESIS"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                            Text { Layout.fillWidth: true; text: workflowGraphBridge.status; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                GButton { text: "New graph"; onClicked: { workflowGraphBridge.openGraph(""); workflowGraphBridge.newGraph() } }
+                                GButton { text: "Load JSON graph"; onClicked: { workflowGraphBridge.openGraph(""); workflowGraphBridge.chooseGraph() } }
+                            }
+                            ScrollView {
+                                id: workflowScroll
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                contentWidth: availableWidth
+                                clip: true
+                                GridLayout {
+                                    id: workflowGrid
+                                    width: workflowScroll.availableWidth
+                                    columns: width >= 850 ? 2 : 1
+                                    rowSpacing: 10
+                                    columnSpacing: 10
+                                    Repeater {
+                                        model: workflowGraphBridge.workflows
+                                        Panel {
+                                            Layout.fillWidth: true
+                                            Layout.preferredWidth: (workflowGrid.width - (workflowGrid.columns - 1) * workflowGrid.columnSpacing) / workflowGrid.columns
+                                            Layout.preferredHeight: 146
+                                            ColumnLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 14
+                                                Text { text: modelData.name; color: appRoot.brightGold; font.pixelSize: 17; font.bold: true }
+                                                Text { Layout.fillWidth: true; text: modelData.file; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideMiddle }
+                                                Item { Layout.fillHeight: true }
+                                                GButton { text: "Edit node graph"; active: true; onClicked: workflowGraphBridge.openGraph(modelData.file) }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
