@@ -40,7 +40,7 @@
         }
       },
       "widgets_values": [
-        "Qwen-Rapid-NSFW-v23_Q8_0.gguf"
+        "Qwen-Rapid-NSFW-v23_Q2_K.gguf"
       ]
     },
     {
@@ -79,7 +79,7 @@
         }
       },
       "widgets_values": [
-        "Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
+        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
         "qwen_image"
       ]
     },

@@ -22,7 +22,7 @@ from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtWidgets import QApplication, QFileDialog
 
-from genesis.model_compatibility import compatibility_note, compatible_loras, lora_trigger
+from genesis.model_compatibility import compatibility_note, compatible_loras, lora_trigger, model_family
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.asset_inventory import unavailable_local_assets
 from genesis.pose_prompt_profiles import PosePromptMap
@@ -50,8 +50,8 @@ INPAINT_CHECKPOINT = "juggernautXL_ragnarokBy.safetensors"
 REGULAR_9B_MODEL = "flux-2-klein-base-9b-Q4_K_M.gguf"
 KV_9B_MODEL = "flux-2-klein-9b-kv-fp8.safetensors"
 QWEN_MODEL = "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf"
-FOUR_B_MODEL = "flux-2-klein-4b.safetensors"
-TEXT_ENCODER_4B = "qwen_3_4b_fp4_flux2.safetensors"
+FOUR_B_MODEL = "aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors"
+TEXT_ENCODER_4B = "qwen_3_4b.safetensors"
 TEXT_ENCODER_9B = "qwen_3_8b_fp8mixed.safetensors"
 
 # MARTY RunPod models verified from the live ComfyUI catalog.
@@ -65,10 +65,10 @@ REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
 REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
 REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
 REMOTE_DARKBEAST_9B_MODEL = "darkBeastMar0326Latest_dbkleinv2BFS.safetensors"
-LOCAL_MIRACLEIN_9B_MODEL = "miracleinNSFWGeneration_20FP8.safetensors"
-LOCAL_PORNMASTER_9B_MODEL = REMOTE_PORNMASTER_9B_MODEL
+LOCAL_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
+LOCAL_PORNMASTER_9B_MODEL = "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
 LOCAL_DARKBEAST_9B_MODEL = REMOTE_DARKBEAST_9B_MODEL
-LOCAL_PENDING_KLEIN_MODELS = {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}
+LOCAL_PENDING_KLEIN_MODELS = {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL, "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors", REGULAR_9B_MODEL, KV_9B_MODEL}
 REMOTE_9B_CLIP = "qwen_3_8b.safetensors"
 REMOTE_9B_CLIP_CANDIDATES = (REMOTE_9B_CLIP, "qwen_3_8b_fp8mixed.safetensors")
 REMOTE_9B_VAE = "flux2-vae.safetensors"
@@ -180,7 +180,7 @@ def build_generation_profiles(
         runnable = ready and model_name in SUPPORTED_CREATE_MODELS and model_name not in LOCAL_PENDING_KLEIN_MODELS
         note = compatibility_note(model_name)
         if ready and not runnable:
-            if model_name in {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}:
+            if model_name in LOCAL_PENDING_KLEIN_MODELS:
                 note = "Installed · editable workflow available · AMD/KFD render pending"
             else:
                 note += " · Create workflow not yet validated"
@@ -192,7 +192,7 @@ def build_generation_profiles(
             "triggers": {name: lora_triggers.get(name, []) for name in compatible},
             "ready": ready,
             "runnable": runnable,
-            "sourceRequired": model_name == QWEN_MODEL,
+            "sourceRequired": model_family(model_name) == "qwen_image",
             "maxLoras": 3 if model_name == REGULAR_9B_MODEL else (1 if model_name == FOUR_B_MODEL else 0),
             "experimentalLoras": model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL},
         })
@@ -1421,7 +1421,7 @@ class GenerationBridge(QObject):
             self._set_status("The selected source image is unavailable.")
             return
         if model_name in ({QWEN_MODEL} | REMOTE_SOURCE_MODELS) and source is None:
-            self._set_status("This RunPod workflow requires a source image.")
+            self._set_status("This workflow requires a source image.")
             return
         if source is not None and model_name not in ({QWEN_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS):
             self._set_status(
@@ -1700,6 +1700,8 @@ class GenerationBridge(QObject):
         loras: list[str], strengths: list[float], width: int, height: int, stamp: str,
     ) -> Path:
         prompt = workflow_lab.workflow_to_prompt(FOUR_B_SOURCE_WORKFLOW, info)
+        prompt["1"]["inputs"]["unet_name"] = FOUR_B_MODEL
+        prompt["2"]["inputs"]["clip_name"] = TEXT_ENCODER_4B
         selected = compatible_selection(FOUR_B_MODEL, loras)
         if len(selected) > 1:
             raise workflow_lab.ComfyError("Klein 4B remains isolated to one experimental LoRA.")

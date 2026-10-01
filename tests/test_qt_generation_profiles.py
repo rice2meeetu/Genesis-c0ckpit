@@ -35,8 +35,8 @@ class QtGenerationProfileTests(unittest.TestCase):
             "None", "Flux Klein - NSFW v2.safetensors", "Klein_Anatomy_Revamped.safetensors",
         ])
         self.assertEqual(profiles[1]["loras"], ["None"])
-        self.assertTrue(profiles[0]["runnable"])
-        self.assertTrue(profiles[1]["runnable"])
+        self.assertFalse(profiles[0]["runnable"])  # local 9B render verification pending
+        self.assertFalse(profiles[1]["runnable"])  # local 9B render verification pending
 
     def test_phroot_is_runnable_but_explicitly_requires_source(self):
         report = {"profiles": [{

@@ -92,6 +92,9 @@ SDXL_LORAS = {
 
 KNOWN_MODELS = {
     "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf": "qwen_image",
+    "Qwen-Rapid-NSFW-v23_Q2_K.gguf": "qwen_image",
+    "aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors": "flux2_klein_4b",
+    "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors": "aisha_9b",
     "biglust17_v17.safetensors": "sdxl",
     "juggernautXL_ragnarokBy.safetensors": "sdxl",
     "lustifySDXLNSFW_endgameDMD2.safetensors": "sdxl",

@@ -272,8 +272,8 @@
       "widgets_values": [
         402112896603662,
         "randomize",
-        12,
-        1.0,
+        8,
+        1.5,
         "euler",
         "simple",
         1
@@ -281,7 +281,7 @@
     },
     {
       "id": 126,
-      "type": "UNETLoader",
+      "type": "UnetLoaderGGUF",
       "pos": [
         -1988.964244342865,
         -77.64565639079451
@@ -306,11 +306,10 @@
       "properties": {
         "cnr_id": "comfy-core",
         "ver": "0.8.2",
-        "Node name for S&R": "UNETLoader"
+        "Node name for S&R": "UnetLoaderGGUF"
       },
       "widgets_values": [
-        "pornmasterFlux2Klein_v3-fp8.safetensors",
-        "default"
+        "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
       ]
     },
     {

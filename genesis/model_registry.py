@@ -36,8 +36,8 @@ WORKFLOW_ROOTS = (
 
 MODEL_PROFILES = (
     {
-        "name": "Aisha 9B FP8",
-        "model": ("aisha",),
+        "name": "Aisha 9B standard BF16 · GPU test pending",
+        "model": ("aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors",),
         "lora": (),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_8b", "qwen3_8b"),
@@ -61,7 +61,7 @@ MODEL_PROFILES = (
     },
     {
         "name": "FLUX.2 Klein 4B",
-        "model": ("klein-4b", "klein_4b", "klein 4b"),
+        "model": ("klein-4b", "klein_4b", "klein 4b", "aisha_nsfw_beta_v1_4b_distilled_bf16"),
         # 4B baseline generation does not require an adapter. Experimental
         # adapters are surfaced separately by model_compatibility.py.
         "lora": (),
@@ -71,13 +71,13 @@ MODEL_PROFILES = (
     },
     {
         "name": "Miraclein 9B v3 FP8 · GPU test pending",
-        "model": ("miracleinNSFWGeneration_20FP8.safetensors",),
+        "model": ("Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",),
         "lora": (), "vae": ("flux2-vae",), "encoder": ("qwen_3_8b",),
         "workflow": ("GENESIS_MIRACLEIN_9B_T2I",),
     },
     {
-        "name": "PornMaster Klein 9B v3 FP8 · GPU test pending",
-        "model": ("pornmasterFlux2Klein_v3-fp8.safetensors",),
+        "name": "PornMaster Klein 9B v4 Turbo Q8 · GPU test pending",
+        "model": ("PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf",),
         "lora": (), "vae": ("flux2-vae",), "encoder": ("qwen_3_8b",),
         "workflow": ("GENESIS_PORNMASTER_9B_T2I",),
     },

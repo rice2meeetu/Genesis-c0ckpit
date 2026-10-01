@@ -309,7 +309,7 @@
         "Node name for S&R": "UNETLoader"
       },
       "widgets_values": [
-        "miracleinNSFWGeneration_20FP8.safetensors",
+        "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",
         "default"
       ]
     },
