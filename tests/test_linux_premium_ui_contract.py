@@ -171,3 +171,22 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
     assert 'objectName: "generationResultPreview"' in qml
     assert 'Layout.preferredHeight: 180' in qml
     assert 'appRoot.compactNavigation ? 96 : 148' in qml
+
+
+def test_premium_visual_assets_are_wired_into_home_and_navigation():
+    qml = source()
+    assert 'glassButtonSource: "../assets/ui/glass-button-pill.png"' in qml
+    assert 'genesis-cockpit-banner-lunacy-latest.png' in qml
+    assert 'fillMode: Image.PreserveAspectFit' in qml
+    for asset in (
+        'image-swap_2026-08-22_22-36-37.jpg',
+        't.png',
+        'e7a0662e0c0a4c7e878c6d28827e813f.jpg',
+        'r.png',
+        'Untitled-1.png',
+        '1248519.small.jpg',
+    ):
+        assert asset in qml
+        assert (ROOT / 'genesis' / 'assets' / 'home_buttons' / asset).is_file()
+    assert (ROOT / 'genesis' / 'assets' / 'ui' / 'glass-button-pill.png').is_file()
+    assert (ROOT / 'genesis' / 'assets' / 'lunacy_banner' / 'genesis-cockpit-banner-lunacy-latest.png').is_file()

@@ -26,6 +26,7 @@ ApplicationWindow {
     readonly property color textMain: "#fff4e3"
     readonly property color textDim: "#b9b4aa"
     readonly property color success: "#62d27a"
+    readonly property url glassButtonSource: "../assets/ui/glass-button-pill.png"
 
     onClosing: function(close) { close.accepted = canvasBridge.confirmClose() && skeletonBridge.confirmClose() }
 
@@ -388,6 +389,16 @@ ApplicationWindow {
             transform: Translate { y: button.down ? 2 : 0 }
         }
         background: Item {
+            // Supplied glass-button artwork provides the luminous rounded silhouette;
+            // the overlays below keep the existing GENESIS state colors and focus cues.
+            BorderImage {
+                anchors.fill: parent
+                source: appRoot.glassButtonSource
+                border.left: 28; border.right: 28; border.top: 20; border.bottom: 20
+                horizontalTileMode: BorderImage.Stretch
+                verticalTileMode: BorderImage.Stretch
+                opacity: button.enabled ? (button.down ? 0.62 : (button.hovered || button.active || button.premium ? 0.94 : 0.78)) : 0.22
+            }
             // Deep lower lip gives the control its chunky machined 3D profile.
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
@@ -458,10 +469,19 @@ ApplicationWindow {
             elide: Text.ElideRight
         }
         background: Rectangle {
-            radius: 2
-            color: nav.active ? "#49361c" : (nav.hovered ? "#303238" : "transparent")
-            border.color: nav.active ? appRoot.gold : "transparent"
-            border.width: 1
+            radius: 10
+            color: "transparent"
+            border.color: nav.active ? appRoot.gold : (nav.hovered ? appRoot.brightGold : "transparent")
+            border.width: nav.active || nav.hovered ? 1 : 0
+            BorderImage {
+                anchors.fill: parent
+                anchors.margins: 1
+                source: appRoot.glassButtonSource
+                border.left: 28; border.right: 28; border.top: 20; border.bottom: 20
+                horizontalTileMode: BorderImage.Stretch
+                verticalTileMode: BorderImage.Stretch
+                opacity: nav.active ? 0.9 : (nav.hovered ? 0.72 : 0.42)
+            }
             Rectangle {
                 visible: nav.active
                 anchors.left: parent.left
@@ -617,16 +637,26 @@ ApplicationWindow {
         Panel {
             Layout.fillWidth: true
             objectName: "mainPageBanner"
-            Layout.preferredHeight: 80
+            Layout.preferredHeight: 180
             visible: appRoot.pageIndex !== 8
             clip: true
 
             Image {
                 anchors.fill: parent
-                source: "../assets/lunacy_banner/genesis-cockpit-banner-lunacy-final.png"
-                fillMode: Image.PreserveAspectCrop
-                verticalAlignment: Image.AlignTop
-                opacity: 0.42
+                source: "../assets/lunacy_banner/genesis-cockpit-banner-lunacy-latest.png"
+                fillMode: Image.PreserveAspectFit
+                verticalAlignment: Image.AlignVCenter
+                opacity: 1.0
+                visible: !privacyMode
+            }
+            Rectangle {
+                anchors.fill: parent
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: "#12000000" }
+                    GradientStop { position: 0.58; color: "#32000000" }
+                    GradientStop { position: 1.0; color: "#b8080808" }
+                }
                 visible: !privacyMode
             }
             Item {
@@ -1929,12 +1959,12 @@ ApplicationWindow {
                             Repeater {
                                 objectName: "homeCardRepeater"
                                 model: [
-                                    {title: "Image Generation", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
-                                    {title: "GENESIS Mungbean", icon: "✧", detail: "Open the Grok-style image and video studio", page: 13},
-                                    {title: "Canvas", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
-                                    {title: "Media Tools", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
-                                    {title: "Camera Hub", icon: "●", detail: "Open your cameras and live views", page: 5},
-                                    {title: "System Tools", icon: "⚙", detail: "Check services, models and storage", page: 7}
+                                    {title: "Image Generation", artwork: "../assets/home_buttons/image-swap_2026-08-22_22-36-37.jpg", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
+                                    {title: "GENESIS Mungbean", artwork: "../assets/home_buttons/t.png", icon: "✧", detail: "Open the Grok-style image and video studio", page: 13},
+                                    {title: "Canvas", artwork: "../assets/home_buttons/e7a0662e0c0a4c7e878c6d28827e813f.jpg", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
+                                    {title: "Media Tools", artwork: "../assets/home_buttons/r.png", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
+                                    {title: "Camera Hub", artwork: "../assets/home_buttons/Untitled-1.png", icon: "●", detail: "Open your cameras and live views", page: 5},
+                                    {title: "System Tools", artwork: "../assets/home_buttons/1248519.small.jpg", icon: "⚙", detail: "Check services, models and storage", page: 7}
                                 ]
                                 Button {
                                     required property var modelData
@@ -1950,6 +1980,27 @@ ApplicationWindow {
                                         color: parent.down ? "#342818" : parent.hovered ? "#231f18" : "#111111"
                                         border.color: parent.hovered || parent.activeFocus ? appRoot.gold : "#4b3e29"
                                         border.width: parent.activeFocus ? 2 : 1
+                                        clip: true
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 2
+                                            source: modelData.artwork
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                            sourceSize.width: 640
+                                            sourceSize.height: 420
+                                            smooth: true
+                                        }
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            anchors.margins: 1
+                                            gradient: Gradient {
+                                                orientation: Gradient.Vertical
+                                                GradientStop { position: 0.0; color: parent.parent.down ? "#55150f08" : "#66080808" }
+                                                GradientStop { position: 0.58; color: parent.parent.down ? "#99150f08" : "#aa080808" }
+                                                GradientStop { position: 1.0; color: parent.parent.down ? "#dd150f08" : "#e0080808" }
+                                            }
+                                        }
                                     }
                                     contentItem: ColumnLayout {
                                         spacing: 10
