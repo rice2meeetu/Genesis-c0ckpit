@@ -91,6 +91,7 @@ SDXL_LORAS = {
 }
 
 KNOWN_MODELS = {
+    "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf": "qwen_image",
     "biglust17_v17.safetensors": "sdxl",
     "juggernautXL_ragnarokBy.safetensors": "sdxl",
     "lustifySDXLNSFW_endgameDMD2.safetensors": "sdxl",

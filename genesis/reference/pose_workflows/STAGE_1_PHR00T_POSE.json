@@ -1,10 +1,10 @@
 {
-  "last_node_id": 30,
+  "last_node_id": 32,
   "last_link_id": 13,
   "nodes": [
     {
       "id": 1,
-      "type": "CheckpointLoaderSimple",
+      "type": "UnetLoaderGGUF",
       "pos": [
         50,
         200
@@ -24,32 +24,15 @@
             1
           ],
           "slot_index": 0
-        },
-        {
-          "name": "CLIP",
-          "type": "CLIP",
-          "links": [
-            2
-          ],
-          "slot_index": 1
-        },
-        {
-          "name": "VAE",
-          "type": "VAE",
-          "links": [
-            3,
-            11
-          ],
-          "slot_index": 2
         }
       ],
       "properties": {
-        "Node name for S&R": "CheckpointLoaderSimple"
+        "Node name for S&R": "UnetLoaderGGUF"
       },
       "widgets_values": [
-        "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+        "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf"
       ],
-      "title": "STAGE 1 \u2014 Phr00t v19"
+      "title": "Phr00t v19 GGUF Q4 model"
     },
     {
       "id": 2,
@@ -436,6 +419,70 @@
       ],
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 31,
+      "type": "CLIPLoaderGGUF",
+      "pos": [
+        50,
+        1150
+      ],
+      "size": [
+        350,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoaderGGUF"
+      },
+      "widgets_values": [
+        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+        "qwen_image"
+      ]
+    },
+    {
+      "id": 32,
+      "type": "VAELoader",
+      "pos": [
+        50,
+        1350
+      ],
+      "size": [
+        350,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
     }
   ],
   "links": [
@@ -449,16 +496,16 @@
     ],
     [
       2,
-      1,
-      1,
+      31,
+      0,
       4,
       0,
       "CLIP"
     ],
     [
       3,
-      1,
-      2,
+      32,
+      0,
       4,
       1,
       "VAE"
@@ -521,8 +568,8 @@
     ],
     [
       11,
-      1,
-      2,
+      32,
+      0,
       8,
       1,
       "VAE"

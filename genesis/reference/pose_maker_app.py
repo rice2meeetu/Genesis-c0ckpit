@@ -62,7 +62,7 @@ COMFY_STARTED_BY_GENESIS = False
 class RunCancelled(RuntimeError):
     pass
 
-PREFERRED_STAGE1 = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+PREFERRED_STAGE1 = "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf"
 STAGE1_SDXL_CONTROLNET = "OpenPoseXL2.safetensors"
 PREFERRED_STAGE2 = [
     "lustifySDXLNSFW_endgame.safetensors",
@@ -618,6 +618,9 @@ def available_checkpoints():
 
 def pick_checkpoint(preferred):
     choices = available_checkpoints()
+    gguf = _schema("UnetLoaderGGUF").get("required", {}).get("unet_name")
+    if isinstance(gguf, (list, tuple)) and gguf and isinstance(gguf[0], list):
+        choices += [x for x in gguf[0] if "qwen-rapid" in str(x).lower()]
     if isinstance(preferred, str):
         preferred = [preferred]
     for p in preferred:
@@ -881,6 +884,9 @@ def stage1_pose_models() -> list[str]:
         low = name.lower()
         if "qwen" in low or "rapid" in low or _is_sdxl_stage1_model(name):
             models.append(name)
+    gguf = _schema("UnetLoaderGGUF").get("required", {}).get("unet_name")
+    if isinstance(gguf, (list, tuple)) and gguf and isinstance(gguf[0], list):
+        models += [x for x in gguf[0] if "qwen-rapid" in str(x).lower()]
     return models or [PREFERRED_STAGE1]
 
 
@@ -961,7 +967,14 @@ def run_stage1(source, pose, pose_prompt, negative_prompt, pose_mode, pose_sourc
 
     source_name = upload_image(source, "source")
     prompt = {}
-    prompt["1"] = make_node("CheckpointLoaderSimple", {"ckpt_name": ckpt})
+    clip_link, vae_link = ["1", 1], ["1", 2]
+    if ckpt.lower().endswith(".gguf"):
+        prompt["1"] = make_node("UnetLoaderGGUF", {"unet_name": ckpt})
+        prompt["31"] = make_node("CLIPLoaderGGUF", {"clip_name": "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf", "type": "qwen_image"})
+        prompt["32"] = make_node("VAELoader", {"vae_name": "qwen_image_vae.safetensors"})
+        clip_link, vae_link = ["31", 0], ["32", 0]
+    else:
+        prompt["1"] = make_node("CheckpointLoaderSimple", {"ckpt_name": ckpt})
     prompt["2"] = make_node("LoadImage", {"image": source_name})
 
     mode = (pose_mode or POSE_MODES[0]).upper()
@@ -995,7 +1008,7 @@ def run_stage1(source, pose, pose_prompt, negative_prompt, pose_mode, pose_sourc
                 )
 
     qwen_inputs = {
-        "clip": ["1", 1], "vae": ["1", 2], "image1": ["2", 0],
+        "clip": clip_link, "vae": vae_link, "image1": ["2", 0],
         "prompt": _compose_stage1_prompt(
             pose_prompt, negative_prompt, bool(strict_identity_lock), strength_profile,
             prompt_strength, pose_strength, identity_strength, negative_strength,
@@ -1012,7 +1025,7 @@ def run_stage1(source, pose, pose_prompt, negative_prompt, pose_mode, pose_sourc
         "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
         "sampler_name": str(sampler), "scheduler": str(scheduler), "denoise": 1.0,
     })
-    prompt["8"] = make_node("VAEDecode", {"samples": ["7", 0], "vae": ["1", 2]})
+    prompt["8"] = make_node("VAEDecode", {"samples": ["7", 0], "vae": vae_link})
     prompt["9"] = make_node("SaveImage", {"images": ["8", 0], "filename_prefix": "GENESIS_STAGE1_PHR00T"})
     _, outputs = queue_and_wait(prompt, progress_cb, "Stage 1 · Phr00t")
     image = fetch_output_image(outputs, "9")

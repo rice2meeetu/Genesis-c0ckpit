@@ -97,7 +97,7 @@ MODEL_PROFILES = (
     },
     {
         "name": "Phr00t / QwenRapid AIO",
-        "model": ("phroot", "phr00t", "qwen-rapid", "qwenrapid"),
+        "model": ("Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf",),
         "lora": (),
         "vae": (),
         "encoder": (),
