@@ -20,8 +20,9 @@ try:
         QTabWidget, QCheckBox, QSpinBox, QListWidget,
         QListWidgetItem, QTreeWidget, QTreeWidgetItem,
         QTableWidget, QTableWidgetItem, QHeaderView,
-        QTextEdit, QFileDialog, QTimer
+        QTextEdit, QTimer
     )
+    from genesis.qt_media_picker import FilePicker as QFileDialog
     from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QTimer
     from PyQt6.QtGui import QPixmap, QIcon
 except ImportError:

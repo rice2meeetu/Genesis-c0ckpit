@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from PyQt6.QtCore import QObject, pyqtProperty, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QFileDialog
+from genesis.qt_media_picker import FilePicker as QFileDialog
 
 from genesis.media_functions import (
     OperationResult,
@@ -195,9 +195,9 @@ class MediaBridge(QObject):
             return
         if kind == "background remover":
             self._start("Removing background", lambda: remove_background(source, target))
-        elif kind == "upscale" and scale in (2, 4):
+        elif kind == "upscale" and scale in (2, 4, 8):
             self._start_upscale(f"AI upscaling {scale}×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=True, require_ai=True))
-        elif kind == "standard resize" and scale in (2, 4):
+        elif kind == "standard resize" and scale in (2, 4, 8):
             self._start(f"Standard resize {scale}×", lambda: upscale_enhance(source, target, scale=scale, prefer_ai=False))
         else:
             self._set_status("Unsupported Canvas image operation")

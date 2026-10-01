@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QTimer, Qt, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from genesis.qt_media_picker import FilePicker as QFileDialog
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineUrlRequestInterceptor
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 

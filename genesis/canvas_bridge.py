@@ -4,7 +4,8 @@ import os
 import uuid
 
 from PyQt6.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QMessageBox
+from genesis.qt_media_picker import FilePicker as QFileDialog
 
 from genesis.canvas_document import CanvasDocument
 from genesis.qt_media_picker import choose_image
@@ -48,7 +49,7 @@ class CanvasBridge(QObject):
     def processSelected(self, kind, scale):
         if self.busy or not self.selected or not self.media_tools:
             return
-        if kind not in {"background remover", "upscale", "standard resize"} or scale not in (2, 4):
+        if kind not in {"background remover", "upscale", "standard resize"} or scale not in (2, 4, 8):
             self._message("Unsupported image operation")
             return
         source = Path(self.selected["path"])

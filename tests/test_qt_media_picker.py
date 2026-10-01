@@ -15,7 +15,7 @@ def fixture_image(path, color="red"):
     assert image.save(str(path))
 
 
-def test_grid_default_and_view_survives_cancel(tmp_path):
+def test_grid_default_after_cancel(tmp_path):
     settings = QSettings(str(tmp_path / "picker.ini"), QSettings.Format.IniFormat)
     dialog = ImagePicker(folder=tmp_path, settings=settings)
     assert dialog.view_choice.currentText() == "Thumbnail Grid"
@@ -23,8 +23,8 @@ def test_grid_default_and_view_survives_cancel(tmp_path):
     dialog.view_choice.setCurrentText("List")
     dialog.reject()
     second = ImagePicker(folder=tmp_path, settings=settings)
-    assert second.view_choice.currentText() == "List"
-    assert second.findChild(QListView, "listView").viewMode() == QListView.ViewMode.ListMode
+    assert second.view_choice.currentText() == "Thumbnail Grid"
+    assert second.findChild(QListView, "listView").viewMode() == QListView.ViewMode.IconMode
     second.reject()
 
 
@@ -72,3 +72,37 @@ def test_batch_picker_keeps_thumbnails_and_multiple_selection(tmp_path):
     assert view.viewMode() == QListView.ViewMode.IconMode
     assert view.selectionMode() == QAbstractItemView.SelectionMode.ExtendedSelection
     dialog.reject()
+
+
+def test_picker_opens_maximized_with_thumbnail_grid(tmp_path):
+    from PyQt6.QtCore import Qt
+    dialog = ImagePicker(folder=tmp_path, settings=QSettings(str(tmp_path / "max.ini"), QSettings.Format.IniFormat))
+    assert dialog.windowState() & Qt.WindowState.WindowMaximized
+    dialog.reject()
+
+
+def test_save_picker_preserves_filename_filter_and_cancel(tmp_path, monkeypatch):
+    from genesis.qt_media_picker import FilePicker
+    from PyQt6.QtWidgets import QFileDialog
+    seen = []
+    def cancel(dialog):
+        seen.append(dialog)
+        assert dialog.acceptMode() == QFileDialog.AcceptMode.AcceptSave
+        assert dialog.fileMode() == QFileDialog.FileMode.AnyFile
+        assert dialog.selectedFiles()[0] == str(tmp_path / "composition.png")
+        assert dialog.defaultSuffix() == "png"
+        return QFileDialog.DialogCode.Rejected
+    monkeypatch.setattr(FilePicker, "exec", cancel)
+    assert FilePicker.getSaveFileName(None, "Export", str(tmp_path / "composition.png"), "PNG (*.png)") == ("", "")
+    assert not (tmp_path / "composition.png").exists()
+
+
+def test_folder_picker_keeps_directory_selection(tmp_path, monkeypatch):
+    from genesis.qt_media_picker import FilePicker
+    from PyQt6.QtWidgets import QFileDialog
+    def accept(dialog):
+        assert dialog.fileMode() == QFileDialog.FileMode.Directory
+        assert dialog.testOption(QFileDialog.Option.ShowDirsOnly)
+        return QFileDialog.DialogCode.Accepted
+    monkeypatch.setattr(FilePicker, "exec", accept)
+    assert FilePicker.getExistingDirectory(None, "Folder", str(tmp_path)) == str(tmp_path)

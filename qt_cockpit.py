@@ -20,7 +20,8 @@ from pathlib import Path
 from PyQt6.QtCore import QObject, QSettings, QTimer, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 from PyQt6.QtQml import QQmlApplicationEngine
-from PyQt6.QtWidgets import QApplication, QFileDialog
+from PyQt6.QtWidgets import QApplication
+from genesis.qt_media_picker import FilePicker as QFileDialog
 
 from genesis.model_compatibility import compatibility_note, compatible_loras, lora_trigger, model_family
 from genesis.model_registry import MODEL_ROOTS, readiness_report

@@ -1,6 +1,7 @@
 """CPU-only image picker with bounded thumbnails and a read-only preview."""
 from collections import OrderedDict
 from pathlib import Path
+import re
 
 from PyQt6.QtCore import QSettings, QSize, Qt
 from PyQt6.QtGui import QIcon, QImageReader, QPixmap
@@ -76,8 +77,7 @@ class ImagePicker(QFileDialog):
         """)
         self.view_choice = QComboBox(self)
         self.view_choice.addItems(["Thumbnail Grid", "List"])
-        saved = self.settings.value("view", "Thumbnail Grid")
-        self.view_choice.setCurrentText(saved if saved in ("Thumbnail Grid", "List") else "Thumbnail Grid")
+        self.view_choice.setCurrentText("Thumbnail Grid")
         self.view_choice.currentTextChanged.connect(self.change_view)
         layout = self.layout()
         layout.addWidget(self.view_choice, layout.rowCount(), 0, 1, 2)
@@ -108,6 +108,7 @@ class ImagePicker(QFileDialog):
         self.directoryEntered.connect(self.clear_preview)
         self.finished.connect(self.save_preferences)
         self.change_view(self.view_choice.currentText())
+        self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
 
     def change_view(self, mode):
         # Touch only the file view, never QFileDialog's places sidebar.
@@ -171,3 +172,47 @@ def choose_images(title="GENESIS · Select images", folder=None):
     if dialog.exec() == QFileDialog.DialogCode.Accepted:
         return [path for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
     return []
+
+
+class FilePicker(ImagePicker):
+    @classmethod
+    def _select(cls, parent, caption, directory, name_filter, mode, accept_mode, options, initial_filter=""):
+        initial = Path(directory).expanduser() if directory else Path.home()
+        folder = initial if initial.is_dir() else initial.parent
+        dialog = cls(parent=parent, title=caption, folder=folder)
+        dialog.setOptions(options | QFileDialog.Option.DontUseNativeDialog)
+        dialog.setFileMode(mode)
+        dialog.setAcceptMode(accept_mode)
+        dialog.setNameFilter(name_filter or "All files (*)")
+        if initial_filter:
+            dialog.selectNameFilter(initial_filter)
+        if not initial.is_dir() and directory:
+            dialog.selectFile(initial.name)
+        if accept_mode == QFileDialog.AcceptMode.AcceptSave:
+            selected = dialog.selectedNameFilter()
+            suffix = re.search(r"\*\.([a-zA-Z0-9]+)", selected)
+            if suffix:
+                dialog.setDefaultSuffix(suffix.group(1))
+        dialog.change_view("Thumbnail Grid")
+        if dialog.exec() == QFileDialog.DialogCode.Accepted:
+            return dialog.selectedFiles(), dialog.selectedNameFilter()
+        return [], ""
+
+    @classmethod
+    def getOpenFileName(cls, parent=None, caption="", directory="", filter="", initialFilter="", options=QFileDialog.Option(0)):
+        files, selected = cls._select(parent, caption, directory, filter, cls.FileMode.ExistingFile, cls.AcceptMode.AcceptOpen, options, initialFilter)
+        return (files[0] if files else ""), selected
+
+    @classmethod
+    def getOpenFileNames(cls, parent=None, caption="", directory="", filter="", initialFilter="", options=QFileDialog.Option(0)):
+        return cls._select(parent, caption, directory, filter, cls.FileMode.ExistingFiles, cls.AcceptMode.AcceptOpen, options, initialFilter)
+
+    @classmethod
+    def getSaveFileName(cls, parent=None, caption="", directory="", filter="", initialFilter="", options=QFileDialog.Option(0)):
+        files, selected = cls._select(parent, caption, directory, filter, cls.FileMode.AnyFile, cls.AcceptMode.AcceptSave, options, initialFilter)
+        return (files[0] if files else ""), selected
+
+    @classmethod
+    def getExistingDirectory(cls, parent=None, caption="", directory="", options=QFileDialog.Option.ShowDirsOnly):
+        files, _ = cls._select(parent, caption, directory, "", cls.FileMode.Directory, cls.AcceptMode.AcceptOpen, options)
+        return files[0] if files else ""

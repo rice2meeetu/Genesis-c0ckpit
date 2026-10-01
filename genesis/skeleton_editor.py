@@ -7,8 +7,9 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, QPointF, QRectF, Qt, QSaveFile, QIODevice, QUrl, QProcess, QProcessEnvironment, QTimer, pyqtSlot
 from PyQt6.QtGui import QColor, QImage, QImageReader, QPainter, QPen, QShortcut, QKeySequence
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFileDialog,
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
     QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from genesis.qt_media_picker import FilePicker as QFileDialog
 from genesis.pose_document import (PARTS, BODY18, BODY25, HAND, add_hands,
     merged_document, new_document, standing_person, validate_document)
 

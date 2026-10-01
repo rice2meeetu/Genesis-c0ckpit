@@ -34,8 +34,8 @@ def verify():
         QApplication.processEvents()
         assert home.property("visible")
         home_repeater = window.findChild(QObject, "homeCardRepeater")
-        assert home_repeater.property("count") == 5
-        for index, page in enumerate([0, 8, 3, 5, 7]):
+        assert home_repeater.property("count") == 6
+        for index, page in enumerate([0, 13, 8, 3, 5, 7]):
             value, _ = QQmlExpression(engines[0].rootContext(), home_repeater, f"itemAt({index})").evaluate()
             card = value.toQObject() if hasattr(value, "toQObject") else value
             assert card is not None

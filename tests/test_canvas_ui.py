@@ -61,6 +61,7 @@ def verify():
         QTest.mouseMove(window,start+QPoint(30,15),delay=30)
         QTest.qWait(30)
         assert layer.property('width') > width_before, 'Resize must preview before release'
+        assert not layer.findChild(QObject, 'layerPreview').property('smooth')
         assert bridge.selected['width'] == 80, 'Preview must not mutate document'
         assert len(bridge.document._undo) == history_before
         QTest.mouseRelease(window,Qt.MouseButton.LeftButton,pos=start+QPoint(30,15))

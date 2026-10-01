@@ -113,3 +113,13 @@ def test_standard_resize_roundtrip_uses_worker_and_adds_result(tmp_path, monkeyp
     assert len(CanvasDocument.load_project(project).layers) == 2
     assert bridge.selected['width'] == 30
     bridge.undo(); assert len(bridge.layers) == 1 and bridge.layers[0]['visible']
+
+
+def test_canvas_eight_times_upscale_keeps_working_asset_and_no_save_prompt(tmp_path, monkeypatch):
+    source = tmp_path / 'source.png'; Image.new('RGB', (30, 20)).save(source)
+    bridge = CanvasBridge(); tools = FakeTools(); bridge.attach_media_tools(tools); bridge.addImage(str(source))
+    monkeypatch.setenv('XDG_DATA_HOME', str(tmp_path / 'data'))
+    monkeypatch.setattr('genesis.canvas_bridge.QFileDialog.getSaveFileName', lambda *args: (_ for _ in ()).throw(AssertionError('Unexpected save dialog')))
+    bridge.processSelected('upscale', 8)
+    assert tools.args[0] == source and tools.args[2:] == ('upscale', 8)
+    assert tools.args[1].parent == tmp_path / 'data/genesis/canvas-assets'

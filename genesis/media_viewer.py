@@ -21,8 +21,9 @@ try:
     from PyQt6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QGridLayout, QLabel, QPushButton, QScrollArea, QFrame,
-        QSplitter, QFileDialog, QMessageBox, QStatusBar, QProgressBar
+        QSplitter, QMessageBox, QStatusBar, QProgressBar
     )
+    from genesis.qt_media_picker import FilePicker as QFileDialog
     from PyQt6.QtCore import Qt, QSize, pyqtSignal, QThread
     from PyQt6.QtGui import QPixmap, QIcon
 except ImportError:

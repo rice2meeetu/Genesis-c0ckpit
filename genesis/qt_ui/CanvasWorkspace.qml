@@ -95,7 +95,7 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 10
             Rectangle {
                 visible: canvasWorkspace.panelsVisible
-                Layout.preferredWidth: canvasWorkspace.compact ? 175 : 205; Layout.fillHeight: true
+                Layout.preferredWidth: canvasWorkspace.compact ? 150 : 175; Layout.fillHeight: true
                 color: "#141414"; radius: 8; border.color: "#343434"
                 ColumnLayout {
                     anchors.fill: parent; anchors.margins: 12; spacing: 10
@@ -196,7 +196,7 @@ Item {
                                     visible: modelData.visible
                                     rotation: modelData.rotation || 0
                                     transformOrigin: Item.Center
-                                    Image { anchors.fill: parent; source: layerItem.modelData.source; opacity: layerItem.modelData.opacity; fillMode: Image.Stretch; asynchronous: true; autoTransform: true; sourceSize.width: 1600; sourceSize.height: 1600 }
+                                    Image { objectName: "layerPreview"; smooth: layerItem.resizeFactor === 1; anchors.fill: parent; source: layerItem.modelData.source; opacity: layerItem.modelData.opacity; fillMode: Image.Stretch; asynchronous: true; autoTransform: true; sourceSize.width: 1600; sourceSize.height: 1600 }
                                     Rectangle { anchors.fill: parent; color: "transparent"; border.color: "#e5bd75"; border.width: 1; visible: canvasWorkspace.selection.id === layerItem.modelData.id }
                                     MouseArea {
                                         anchors.fill: parent; preventStealing: true; cursorShape: canvasWorkspace.resizeMode ? Qt.ArrowCursor : Qt.SizeAllCursor
@@ -275,7 +275,7 @@ Item {
             }
             Rectangle {
                 visible: canvasWorkspace.panelsVisible
-                Layout.preferredWidth: canvasWorkspace.compact ? 200 : 240; Layout.fillHeight: true
+                Layout.preferredWidth: canvasWorkspace.compact ? 180 : 210; Layout.fillHeight: true
                 color: "#141414"; radius: 8; border.color: "#343434"
                 ScrollView {
                     anchors.fill: parent; anchors.margins: 14; clip: true; contentWidth: availableWidth
@@ -295,6 +295,7 @@ Item {
                         Action { Layout.fillWidth: true; text: "Remove background"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("background remover", 2) }
                         Action { Layout.fillWidth: true; text: "AI upscale 2×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("upscale", 2) }
                         Action { Layout.fillWidth: true; text: "AI upscale 4×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("upscale", 4) }
+                        Action { Layout.fillWidth: true; text: "8× output · 4× AI"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("upscale", 8) }
                         Action { Layout.fillWidth: true; text: "Standard resize 2×"; enabled: !!canvasWorkspace.selection.id && !canvasBridge.busy; onClicked: canvasBridge.processSelected("standard resize", 2) }
                         Label { Layout.fillWidth: true; text: "Results stay in Canvas; choose a destination when saving or exporting. The original remains as a hidden layer. AI upscale uses the selected backend."; color: "#aaa7a1"; font.pixelSize: 11; wrapMode: Text.Wrap }
                         Caption { text: "POSITION / PX" }

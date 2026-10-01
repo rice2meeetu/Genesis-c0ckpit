@@ -616,7 +616,8 @@ ApplicationWindow {
 
         Panel {
             Layout.fillWidth: true
-            Layout.preferredHeight: appRoot.compactNavigation ? 112 : 146
+            objectName: "mainPageBanner"
+            Layout.preferredHeight: 80
             visible: appRoot.pageIndex !== 8
             clip: true
 
@@ -687,11 +688,11 @@ ApplicationWindow {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: appRoot.compactNavigation ? 170 : 190
-                    spacing: 8
+                    spacing: 4
 
                     Rectangle {
                         width: parent.width
-                        height: 34
+                        height: 24
                         radius: 2
                         color: "#080808"
                         border.color: runtimeStatus.comfyOnline ? appRoot.success : appRoot.gold
@@ -708,6 +709,7 @@ ApplicationWindow {
 
                     GButton {
                         width: parent.width
+                        height: 28
                         text: privacyMode ? "Privacy On" : "Privacy Mode"
                         active: privacyMode
                         onClicked: privacyMode = !privacyMode
@@ -1928,6 +1930,7 @@ ApplicationWindow {
                                 objectName: "homeCardRepeater"
                                 model: [
                                     {title: "Image Generation", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
+                                    {title: "GENESIS Mungbean", icon: "✧", detail: "Open the Grok-style image and video studio", page: 13},
                                     {title: "Canvas", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
                                     {title: "Media Tools", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
                                     {title: "Camera Hub", icon: "●", detail: "Open your cameras and live views", page: 5},
