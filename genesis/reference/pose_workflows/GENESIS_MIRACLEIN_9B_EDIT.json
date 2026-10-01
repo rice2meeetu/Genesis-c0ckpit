@@ -463,11 +463,11 @@
       },
       "widgets_values": [
         "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",
-        "default"
+        "fp8_e4m3fn"
       ],
       "widgets_values_named": {
-        "unet_name": "miracleinNSFWGeneration_20FP8.safetensors",
-        "weight_dtype": "default"
+        "unet_name": "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",
+        "weight_dtype": "fp8_e4m3fn"
       },
       "title": "FLUX.2 Klein 9B"
     },
