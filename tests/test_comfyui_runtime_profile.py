@@ -17,9 +17,14 @@ class ComfyRuntimeProfileTests(unittest.TestCase):
         cls.flags = cls.command[2:]
 
     def test_keeps_benchmarked_memory_flags(self):
-        for flag in ("--lowvram", "--force-fp16", "--cache-none"):
+        for flag in ("--lowvram", "--cache-none"):
             self.assertIn(flag, self.flags)
         self.assertEqual(self.flags[self.flags.index("--preview-method") + 1], "none")
+
+    def test_qwen_gguf_uses_bf16_to_avoid_black_output(self):
+        self.assertIn("--bf16-unet", self.flags)
+        self.assertNotIn("--force-fp16", self.flags)
+        self.assertNotIn("--fp16-unet", self.flags)
 
     def test_async_offload_is_explicitly_disabled(self):
         self.assertIn("--disable-async-offload", self.flags)
@@ -36,6 +41,8 @@ class ComfyRuntimeProfileTests(unittest.TestCase):
     def test_pose_maker_uses_same_mmap_workaround(self):
         root = Path(__file__).resolve().parents[1]
         source = (root / "genesis/reference/pose_maker_app.py").read_text(encoding="utf-8")
+        self.assertIn("--bf16-unet", source)
+        self.assertNotIn("--force-fp16", source)
         self.assertIn("--disable-mmap", source)
         self.assertIn("--disable-pinned-memory", source)
         self.assertIn("--disable-dynamic-vram", source)
