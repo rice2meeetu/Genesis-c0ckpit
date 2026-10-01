@@ -415,14 +415,11 @@ def start_comfyui() -> str:
 
     if not COMFY_DIR.exists():
         raise RuntimeError(f"ComfyUI folder not found: {COMFY_DIR}")
-    if not CONDA_SH.exists():
-        raise RuntimeError(f"Conda startup script not found: {CONDA_SH}")
-
-    cmd = (
-        f'source "{CONDA_SH}" && '
-        f'conda activate "{COMFY_ENV}" && '
-        'exec python main.py --lowvram --bf16-unet --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --disable-mmap --listen 127.0.0.1 --port 8188'
-    )
+    python = COMFY_DIR / ".venv" / "bin" / "python"
+    if not python.is_file():
+        raise RuntimeError(f"ComfyUI Python not found: {python}")
+    import shlex
+    cmd = shlex.quote(str(python)) + ' main.py --lowvram --bf16-unet --preview-method none --cache-none --disable-async-offload --disable-pinned-memory --disable-dynamic-vram --disable-mmap --listen 127.0.0.1 --port 8188'
 
     log_fh = open(COMFY_MANAGED_LOG, "a", buffering=1)
     log_fh.write(

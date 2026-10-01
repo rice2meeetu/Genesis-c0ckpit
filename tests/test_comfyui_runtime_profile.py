@@ -49,7 +49,7 @@ class ComfyRuntimeProfileTests(unittest.TestCase):
 
     def test_runtime_and_local_endpoint_are_preserved(self):
         self.assertEqual(self.command[:2], [
-            "%h/miniforge3/envs/comfyui-reactor-rocm/bin/python",
+            "%h/AI/ComfyUI/.venv/bin/python",
             "%h/AI/ComfyUI/main.py",
         ])
         self.assertEqual(self.flags[self.flags.index("--listen") + 1], "127.0.0.1")
