@@ -103,6 +103,9 @@ KNOWN_MODELS = {
     "flux-2-klein-9b.safetensors": "flux2_klein_9b_base",
     "flux-2-klein-base-9b-Q4_K_M.gguf": "flux2_klein_9b_base",
     "flux-2-klein-9b-kv-fp8.safetensors": "flux2_klein_9b_kv",
+    "miracleinNSFWGeneration_20FP8.safetensors": "flux2_klein_9b_base",
+    "pornmasterFlux2Klein_v3-fp8.safetensors": "flux2_klein_9b_base",
+    "darkBeast_DBKleinv2BFS.safetensors": "flux2_klein_9b_base",
     "flux1-dev-kontext_fp8_scaled.safetensors": "flux1",
     "fluxedUpFluxNSFW_40DevFp8.safetensors": "flux1",
 }

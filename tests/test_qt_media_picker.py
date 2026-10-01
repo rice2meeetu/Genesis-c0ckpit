@@ -61,3 +61,14 @@ def test_thumbnails_refresh_after_file_change(tmp_path):
     fixture_image(path, "blue")
     blue = provider.icon(QFileInfo(str(path))).pixmap(100, 100).toImage()
     assert red.pixelColor(20, 20) != blue.pixelColor(20, 20)
+
+
+def test_batch_picker_keeps_thumbnails_and_multiple_selection(tmp_path):
+    from PyQt6.QtWidgets import QFileDialog, QAbstractItemView
+    settings = QSettings(str(tmp_path / "batch.ini"), QSettings.Format.IniFormat)
+    dialog = ImagePicker(folder=tmp_path, settings=settings, multiple=True)
+    assert dialog.fileMode() == QFileDialog.FileMode.ExistingFiles
+    view = dialog.findChild(QListView, "listView")
+    assert view.viewMode() == QListView.ViewMode.IconMode
+    assert view.selectionMode() == QAbstractItemView.SelectionMode.ExtendedSelection
+    dialog.reject()

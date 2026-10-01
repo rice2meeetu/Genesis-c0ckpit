@@ -28,6 +28,20 @@ launcher.QQmlApplicationEngine = make_engine
 def verify():
     try:
         window = engines[0].rootObjects()[0]
+        home = window.findChild(QObject, "homeWorkspace")
+        assert home is not None
+        window.setProperty("pageIndex", 14)
+        QApplication.processEvents()
+        assert home.property("visible")
+        home_repeater = window.findChild(QObject, "homeCardRepeater")
+        assert home_repeater.property("count") == 5
+        for index, page in enumerate([0, 8, 3, 5, 7]):
+            value, _ = QQmlExpression(engines[0].rootContext(), home_repeater, f"itemAt({index})").evaluate()
+            card = value.toQObject() if hasattr(value, "toQObject") else value
+            assert card is not None
+            QQmlExpression(engines[0].rootContext(), card, "clicked()").evaluate()
+            assert window.property("pageIndex") == page
+            window.setProperty("pageIndex", 14)
         assert not window.property("selectedPoseSource").toString()
         expression = QQmlExpression(engines[0].rootContext(), window,
             "applyPose({name:'Standing', source:'file:///test-pose.png', prompt:'Standing upright'})")

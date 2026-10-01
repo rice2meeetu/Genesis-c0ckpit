@@ -55,11 +55,20 @@ def verify():
         point,_=QQmlExpression(engine.rootContext(),handle,'mapToItem(null, width/2, height/2)').evaluate()
         if hasattr(point,'toVariant'): point=point.toVariant()
         start=QPoint(round(point['x']),round(point['y'])) if isinstance(point,dict) else QPoint(round(point.x()),round(point.y()))
+        history_before = len(bridge.document._undo)
+        width_before = layer.property('width')
         QTest.mousePress(window,Qt.MouseButton.LeftButton,pos=start)
         QTest.mouseMove(window,start+QPoint(30,15),delay=30)
+        QTest.qWait(30)
+        assert layer.property('width') > width_before, 'Resize must preview before release'
+        assert bridge.selected['width'] == 80, 'Preview must not mutate document'
+        assert len(bridge.document._undo) == history_before
         QTest.mouseRelease(window,Qt.MouseButton.LeftButton,pos=start+QPoint(30,15))
         QTest.qWait(50)
         assert bridge.selected['width'] > 80, bridge.selected
+        assert len(bridge.document._undo) == history_before + 1
+        bridge.undo()
+        assert bridge.selected['width'] == 80
         print('CANVAS_UI_OK')
         QApplication.instance().exit(0)
     except Exception:

@@ -32,6 +32,9 @@ class BackendBridge(QObject):
         self._local_status = {'ready': False, 'comfyOnline': False, 'remote': False}
         self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
         self._running = False
+        # RunPod is deliberately opt-in per app session. A saved endpoint is
+        # configuration only; it must never cause background remote polling.
+        self._connected = False
         self._local_safe = False
         self._revision = 0
         self._received.connect(self._accept)
@@ -51,6 +54,9 @@ class BackendBridge(QObject):
 
     @pyqtProperty(bool, notify=changed)
     def checking(self): return self._running
+
+    @pyqtProperty(bool, notify=changed)
+    def connected(self): return self._connected
 
     @pyqtSlot(str)
     def setMode(self, mode):
@@ -76,10 +82,40 @@ class BackendBridge(QObject):
         self._remote = []
         self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
         self._publish()
+        if self._connected:
+            self.refresh()
+
+    @pyqtSlot()
+    def connectRemote(self):
+        if self.generation.busy or self._connected:
+            return
+        if not self._endpoint:
+            self._message = 'RunPod endpoint is not configured.'
+            self.changed.emit()
+            return
+        self._connected = True
+        self._revision += 1
+        self._remote = []
+        self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
+        self._message = 'Connecting to RunPod…'
+        self.timer.start()
+        self.changed.emit()
         self.refresh()
 
+    @pyqtSlot()
+    def disconnectRemote(self):
+        if not self._connected:
+            return
+        self._connected = False
+        self.timer.stop()
+        self._revision += 1
+        self._remote = []
+        self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
+        self._message = 'RunPod disconnected · no background polling'
+        self._publish()
+
     def start(self):
-        self.timer.start()
+        # Probe local state once. RunPod remains untouched until Connect.
         self.refresh()
 
     @pyqtSlot()
@@ -88,7 +124,8 @@ class BackendBridge(QObject):
             return
         self._running = True
         self.changed.emit()
-        threading.Thread(target=self._probe, args=(self._revision, self._endpoint), daemon=True).start()
+        endpoint = self._endpoint if self._connected else ''
+        threading.Thread(target=self._probe, args=(self._revision, endpoint), daemon=True).start()
 
     def _probe(self, revision, endpoint):
         import qt_cockpit as cockpit
@@ -137,7 +174,7 @@ class BackendBridge(QObject):
             raise ValueError('Unsupported routed operation: ' + operation)
         if self._mode != 'RUNPOD' and self._local_safe and self._local_status.get('ready'):
             return Route('LOCAL', '')
-        if self._mode != 'LOCAL' and self._endpoint and self._remote_status.get('ready'):
+        if self._mode != 'LOCAL' and self._connected and self._endpoint and self._remote_status.get('ready'):
             return Route('RUNPOD', self._endpoint)
         raise ValueError(f'{self._mode}: no ready safe backend for {operation}. Refresh backends in Create.')
 
@@ -170,7 +207,7 @@ class BackendBridge(QObject):
             rows.append(row)
         self.profilesReady.emit(rows)
         local = ('ready' if self._local_safe else 'safety blocked') if self._local_status.get('ready') else 'offline'
-        remote = ('ready' if self._remote_status.get('ready') else 'offline') if self._endpoint else 'not configured'
+        remote = ('ready' if self._remote_status.get('ready') else 'offline') if self._connected else ('disconnected' if self._endpoint else 'not configured')
         self._message = f'Local {local} · RunPod {remote}'
         status = dict(self._remote_status if self._mode == 'RUNPOD' else self._local_status)
         status['routingSummary'] = self._message

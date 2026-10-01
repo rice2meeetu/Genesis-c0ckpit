@@ -401,9 +401,8 @@ class MediaBridge(QObject):
                 self._start(f"Standard resize {scale:g}×",
                     lambda: upscale_enhance(source, target, scale=scale, prefer_ai=False))
     def _choose_images(self, title: str) -> list[Path]:
-        values, _ = QFileDialog.getOpenFileNames(
-            None, title, str(Path.home()), "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"
-        )
+        from genesis.qt_media_picker import choose_images
+        values = choose_images(title)
         return [Path(value) for value in values]
 
     @pyqtSlot()

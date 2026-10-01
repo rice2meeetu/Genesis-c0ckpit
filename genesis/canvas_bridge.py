@@ -1,5 +1,7 @@
 """Qt adapter for Canvas composition and explicitly requested image processing."""
 from pathlib import Path
+import os
+import uuid
 
 from PyQt6.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
@@ -15,6 +17,8 @@ class CanvasBridge(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.document = CanvasDocument()
+        self.document.set_size(3840, 2160)
+        self.document._undo.clear()
         self._status = "Add a background, then stack images or transparent cutouts."
         self._dirty = False
         self._project_path = ""
@@ -49,12 +53,14 @@ class CanvasBridge(QObject):
             return
         source = Path(self.selected["path"])
         suffix = "cutout" if kind == "background remover" else f"{scale}x"
-        target, _ = QFileDialog.getSaveFileName(None, "Save processed layer", str(source.with_name(source.stem + "_" + suffix + ".png")), "PNG (*.png)")
-        if not target:
-            return
-        target = Path(target).with_suffix(".png").resolve()
-        if any(target == Path(path) or (target.exists() and target.samefile(path)) for path in self.document._source_paths if Path(path).exists()):
-            self._message("Choose a new file; Canvas source images must stay unchanged.")
+        # Persistent working assets keep saved Canvas projects reopenable.
+        # Only project saving and final export ask the user for a destination.
+        try:
+            asset_root = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "genesis/canvas-assets"
+            asset_root.mkdir(parents=True, exist_ok=True)
+            target = asset_root / f"{uuid.uuid4().hex}_{suffix}.png"
+        except OSError as exc:
+            self._message(f"Cannot prepare Canvas result: {exc}")
             return
         self._pending_image = (self.document, self.selected["id"])
         self.media_tools.process_canvas_image(source, target, kind, scale)

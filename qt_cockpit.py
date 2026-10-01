@@ -61,10 +61,14 @@ REMOTE_PHR00T_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_PHR00T_V19_MODEL}
 REMOTE_PHR00T_CLIP = "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
 REMOTE_PHR00T_VAE = "qwen_image_vae.safetensors"
 REMOTE_KLEIN_9B_MODEL = "flux-2-klein-9b.safetensors"
-REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"
+REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
 REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
-REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v2.0 FP8 - Klein9B -,euler,cfg1.1.safetensors"
-REMOTE_DARKBEAST_9B_MODEL = "DarkBeast-Klein9b-V2-BFS-FP8-ComfyUI.safetensors"
+REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
+REMOTE_DARKBEAST_9B_MODEL = "darkBeastMar0326Latest_dbkleinv2BFS.safetensors"
+LOCAL_MIRACLEIN_9B_MODEL = "miracleinNSFWGeneration_20FP8.safetensors"
+LOCAL_PORNMASTER_9B_MODEL = REMOTE_PORNMASTER_9B_MODEL
+LOCAL_DARKBEAST_9B_MODEL = REMOTE_DARKBEAST_9B_MODEL
+LOCAL_PENDING_KLEIN_MODELS = {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}
 REMOTE_9B_CLIP = "qwen_3_8b.safetensors"
 REMOTE_9B_CLIP_CANDIDATES = (REMOTE_9B_CLIP, "qwen_3_8b_fp8mixed.safetensors")
 REMOTE_9B_VAE = "flux2-vae.safetensors"
@@ -173,10 +177,13 @@ def build_generation_profiles(
         model_name = Path(model_path).name
         compatible = compatible_loras(model_name, installed_loras)
         ready = bool(profile.get("ready"))
-        runnable = ready and model_name in SUPPORTED_CREATE_MODELS
+        runnable = ready and model_name in SUPPORTED_CREATE_MODELS and model_name not in LOCAL_PENDING_KLEIN_MODELS
         note = compatibility_note(model_name)
         if ready and not runnable:
-            note += " · Create workflow not yet validated"
+            if model_name in {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL, LOCAL_DARKBEAST_9B_MODEL}:
+                note = "Installed · editable workflow available · AMD/KFD render pending"
+            else:
+                note += " · Create workflow not yet validated"
         profiles.append({
             "label": str(profile.get("name") or model_name),
             "model": model_name,
@@ -264,7 +271,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
         REMOTE_KLEIN_9B_MODEL: "RunPod · FLUX.2 Klein 9B",
         REMOTE_AISHA_9B_MODEL: "RunPod · Aisha 9B v9.7",
         REMOTE_PORNMASTER_9B_MODEL: "RunPod · PornMaster FLUX.2 Klein v3 FP8",
-        REMOTE_MIRACLEIN_9B_MODEL: "RunPod · Miraclein FLUX.2 Klein 2.0 FP8",
+        REMOTE_MIRACLEIN_9B_MODEL: "RunPod · Miraclein FLUX.2 Klein v3 FP8",
         REMOTE_DARKBEAST_9B_MODEL: "RunPod · DarkBeast FLUX.2 Klein",
         FOUR_B_MODEL: "RunPod · FLUX.2 Klein 4B",
         REGULAR_9B_MODEL: "RunPod · FLUX.2 Klein 9B Base",
@@ -284,6 +291,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "defaultCfg": 1.0, "defaultDenoise": 1.0,
             "defaultSampler": "euler", "defaultScheduler": "beta",
         }
+    defaults[REMOTE_MIRACLEIN_9B_MODEL].update(defaultSteps=12, defaultCfg=1.1)
     rows: list[dict] = []
     for model_name in models:
         compatible = compatible_loras(model_name, loras)
@@ -731,6 +739,47 @@ class LayoutSettingsBridge(QObject):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._settings = QSettings("GENESIS", "c0ckpit")
+
+    backgroundChanged = pyqtSignal()
+
+    @pyqtProperty(str, notify=backgroundChanged)
+    def backgroundUrl(self):
+        path = str(self._settings.value("appearance/background", ""))
+        return QUrl.fromLocalFile(path).toString() if path and Path(path).is_file() else ""
+
+    @pyqtProperty(float, notify=backgroundChanged)
+    def backgroundOpacity(self):
+        try:
+            return max(0.0, min(1.0, float(self._settings.value("appearance/backgroundOpacity", 0.24))))
+        except (TypeError, ValueError):
+            return 0.24
+
+    @pyqtSlot()
+    def chooseBackground(self):
+        from genesis.qt_media_picker import choose_image
+        from PyQt6.QtGui import QImageReader
+        path = choose_image("GENESIS · Choose workspace background")
+        if not path or not QImageReader(path).canRead():
+            return
+        self._settings.setValue("appearance/background", str(Path(path).resolve()))
+        self._settings.sync()
+        self.backgroundChanged.emit()
+
+    @pyqtSlot(float)
+    def setBackgroundOpacity(self, value):
+        import math
+        if not math.isfinite(value):
+            return
+        self._settings.setValue("appearance/backgroundOpacity", max(0.0, min(1.0, value)))
+        self._settings.sync()
+        self.backgroundChanged.emit()
+
+    @pyqtSlot()
+    def resetBackground(self):
+        self._settings.remove("appearance/background")
+        self._settings.remove("appearance/backgroundOpacity")
+        self._settings.sync()
+        self.backgroundChanged.emit()
 
     @pyqtSlot(result="QVariant")
     def loadCreateLayout(self):
@@ -1386,6 +1435,9 @@ class GenerationBridge(QObject):
             route = self.backend_router.resolve(model_name) if self.backend_router else None
         except ValueError as exc:
             self._set_status(str(exc))
+            return
+        if model_name in LOCAL_PENDING_KLEIN_MODELS and (route is None or route.destination != "RUNPOD"):
+            self._set_status("Local Klein model is installed; AMD/KFD render verification is pending.")
             return
         if use_upscale and not (UPSCALE_WORKFLOW.is_file() if route and route.destination == "RUNPOD" else self.upscaleAvailable):
             self._set_status("Upscale is blocked: its checkpoint, VAE, or 4x-UltraSharp asset is missing.")

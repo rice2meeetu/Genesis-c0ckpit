@@ -13,38 +13,39 @@ ApplicationWindow {
     color: "#040404"
     font.family: "Noto Sans"
 
-    readonly property color gold: "#d2a34e"
-    readonly property color brightGold: "#e7c36f"
-    readonly property color blue: "#bc9458"
-    readonly property color blueBright: "#e0bc7c"
-    readonly property color blueDeep: "#302719"
-    readonly property color bg: "#050505"
-    readonly property color panel: "#090909"
-    readonly property color raised: "#080808"
-    readonly property color raised2: "#0b0b0b"
-    readonly property color line: "#262626"
-    readonly property color textMain: "#e8e8e5"
-    readonly property color textDim: "#918e87"
+    readonly property color gold: "#e8b654"
+    readonly property color brightGold: "#ffda87"
+    readonly property color blue: "#d6ac63"
+    readonly property color blueBright: "#ffe0a0"
+    readonly property color blueDeep: "#49371f"
+    readonly property color bg: "#101215"
+    readonly property color panel: "#191c21"
+    readonly property color raised: "#23272d"
+    readonly property color raised2: "#20242a"
+    readonly property color line: "#41454c"
+    readonly property color textMain: "#fff4e3"
+    readonly property color textDim: "#b9b4aa"
     readonly property color success: "#62d27a"
 
-    onClosing: function(close) { close.accepted = canvasBridge.confirmClose() }
+    onClosing: function(close) { close.accepted = canvasBridge.confirmClose() && skeletonBridge.confirmClose() }
 
-    property int pageIndex: 0
+    property int pageIndex: 14
     property bool feefeeOpen: false
     property int lastWorkspacePage: 0
     onPageIndexChanged: if (pageIndex !== 11) lastWorkspacePage = pageIndex
-    palette.window: "#090909"
+    palette.window: "#191c21"
     palette.base: "#070707"
     palette.button: "#111111"
     palette.text: "#e9e6df"
     palette.buttonText: "#e9e6df"
     palette.windowText: "#e9e6df"
-    palette.highlight: "#5c4726"
+    palette.highlight: "#8a642b"
     palette.highlightedText: "#fff3d8"
-    palette.placeholderText: "#969087"
+    palette.placeholderText: "#b9b4aa"
     property bool privacyMode: false
     readonly property bool compactNavigation: height < 850
     property var navItems: [
+        {icon:"⌂", label:"Home", page:14},
         {icon:"▣", label:"Image Generation", page:0},
         {icon:"✧", label:"Grok Imagine", page:13},
         {icon:"✦", label:"Media Tools", page:3},
@@ -55,6 +56,7 @@ ApplicationWindow {
 
     // Primary navigation shortcuts mirror the visible sidebar. Internal generation tabs
     // intentionally have no global number shortcuts.
+    Shortcut { sequence: "Alt+Home"; onActivated: appRoot.pageIndex = 14 }
     Shortcut { sequence: "Alt+1"; onActivated: appRoot.pageIndex = 0 }
     Shortcut { sequence: "Alt+2"; onActivated: appRoot.pageIndex = 3 }
     Shortcut { sequence: "Alt+3"; onActivated: appRoot.pageIndex = 5 }
@@ -346,9 +348,9 @@ ApplicationWindow {
         border.width: 1
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0; color: "#101010" }
-            GradientStop { position: 0.11; color: "#070707" }
-            GradientStop { position: 1.0; color: "#090909" }
+            GradientStop { position: 0.0; color: "#2c3037" }
+            GradientStop { position: 0.11; color: "#202329" }
+            GradientStop { position: 1.0; color: "#191c21" }
         }
         Rectangle {
             anchors.left: parent.left
@@ -392,7 +394,7 @@ ApplicationWindow {
                 anchors.bottom: parent.bottom
                 height: parent.height - 3
                 radius: 2
-                color: !button.enabled ? "#0b0b0b" : "#0a0805"
+                color: !button.enabled ? "#20242a" : "#0a0805"
                 border.color: "#171009"
                 border.width: 1
             }
@@ -407,9 +409,9 @@ ApplicationWindow {
                     GradientStop { position: 0.16; color: !button.enabled ? "#111111" : "#151108" }
                     GradientStop { position: 0.50; color: !button.enabled ? "#0f0f0f" : (button.premium || button.active ? "#21180b" : "#11100d") }
                     GradientStop { position: 0.84; color: !button.enabled ? "#080808" : "#0d0c0a" }
-                    GradientStop { position: 1.00; color: !button.enabled ? "#0b0b0b" : "#080808" }
+                    GradientStop { position: 1.00; color: !button.enabled ? "#20242a" : "#080808" }
                 }
-                border.color: !button.enabled ? "#303030" : (button.hovered ? appRoot.brightGold : (button.premium || button.active ? appRoot.gold : "#66512b"))
+                border.color: !button.enabled ? "#303030" : (button.hovered ? appRoot.brightGold : (button.premium || button.active ? appRoot.gold : "#a17b3b"))
                 border.width: button.activeFocus || button.hovered || button.active || button.premium ? 2 : 1
                 // Recessed centre panel, inspired by the rounded metallic reference.
                 Rectangle {
@@ -420,9 +422,9 @@ ApplicationWindow {
                         orientation: Gradient.Vertical
                         GradientStop { position: 0.0; color: !button.enabled ? "#111111" : (button.premium || button.active ? "#1d160b" : "#12110e") }
                         GradientStop { position: 0.55; color: !button.enabled ? "#0e0e0e" : (button.premium || button.active ? "#151006" : "#0d0d0c") }
-                        GradientStop { position: 1.0; color: !button.enabled ? "#0b0b0b" : "#090909" }
+                        GradientStop { position: 1.0; color: !button.enabled ? "#20242a" : "#191c21" }
                     }
-                    border.color: !button.enabled ? "#262626" : (button.premium || button.active ? "#7d6130" : "#3d3527")
+                    border.color: !button.enabled ? "#41454c" : (button.premium || button.active ? "#be924b" : "#6e6047")
                     border.width: 1
                 }
                 // Fine top highlight sells the polished metal edge without neon/glass styling.
@@ -431,7 +433,7 @@ ApplicationWindow {
                     anchors.leftMargin: 12; anchors.rightMargin: 12; anchors.topMargin: 2
                     height: 1
                     radius: 1
-                    color: button.enabled ? "#8f6f35" : "#303030"
+                    color: button.enabled ? "#d7ae61" : "#303030"
                     opacity: button.down ? 0.35 : 0.9
                 }
             }
@@ -457,7 +459,7 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 2
-            color: nav.active ? "#151108" : (nav.hovered ? "#10100f" : "transparent")
+            color: nav.active ? "#49361c" : (nav.hovered ? "#303238" : "transparent")
             border.color: nav.active ? appRoot.gold : "transparent"
             border.width: 1
             Rectangle {
@@ -483,7 +485,7 @@ ApplicationWindow {
         property int pageNumber: -1
         property url artwork: ""
         anchors.fill: parent
-        source: appRoot.pageIndex === pageNumber && !appRoot.privacyMode ? artwork : ""
+        source: appRoot.pageIndex === pageNumber && !appRoot.privacyMode && !genesisLayout.backgroundUrl.length ? artwork : ""
         sourceSize.width: 1600
         sourceSize.height: 1000
         fillMode: Image.PreserveAspectCrop
@@ -596,9 +598,13 @@ ApplicationWindow {
         }
         Image {
             anchors.fill: parent
-            source: "../assets/lunacy_banner/cockpit_background_soft.jpg"
+            objectName: "workspaceBackground"
+            source: appRoot.privacyMode ? "" : (genesisLayout.backgroundUrl.length ? genesisLayout.backgroundUrl : "../assets/lunacy_banner/cockpit_background_soft.jpg")
             fillMode: Image.PreserveAspectCrop
-            opacity: 0.10
+            sourceSize.width: 2048
+            sourceSize.height: 1440
+            asynchronous: true
+            opacity: genesisLayout.backgroundUrl.length ? genesisLayout.backgroundOpacity : 0.10
         }
     }
 
@@ -611,6 +617,7 @@ ApplicationWindow {
         Panel {
             Layout.fillWidth: true
             Layout.preferredHeight: appRoot.compactNavigation ? 112 : 146
+            visible: appRoot.pageIndex !== 8
             clip: true
 
             Image {
@@ -716,6 +723,7 @@ ApplicationWindow {
 
             Panel {
                 Layout.preferredWidth: appRoot.width < 1300 ? 190 : 245
+                visible: appRoot.pageIndex !== 8
                 Layout.fillHeight: true
                 ColumnLayout {
                     anchors.fill: parent
@@ -841,7 +849,7 @@ ApplicationWindow {
                                         placeholderText: "Search 70 Grok + curated presets…"
                                         color: appRoot.textMain
                                         onTextChanged: appRoot.presetSearch = text
-                                        background: Rectangle { color: "#101010"; border.color: appRoot.line; radius: 2 }
+                                        background: Rectangle { color: "#14171c"; border.color: appRoot.line; radius: 2 }
                                     }
                                     GridView {
                                         id: quickPresetGrid
@@ -857,7 +865,7 @@ ApplicationWindow {
                                             width: quickPresetGrid.cellWidth - 7
                                             height: quickPresetGrid.cellHeight - 7
                                             radius: 2
-                                            color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? "#18130a" : "#0b0b0b"
+                                            color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? "#18130a" : "#20242a"
                                             border.color: appRoot.selectedPresetName === String(modelData.label || modelData.name || "") ? appRoot.gold : appRoot.line
                                             Column {
                                                 anchors.fill: parent
@@ -931,7 +939,7 @@ ApplicationWindow {
                                         color: appRoot.textMain
                                         wrapMode: TextEdit.Wrap
                                         onTextChanged: if (activeFocus) appRoot.generationPrompt = text
-                                        background: Rectangle { color: "#101010"; border.color: appRoot.line; radius: 2 }
+                                        background: Rectangle { color: "#14171c"; border.color: appRoot.line; radius: 2 }
                                     }
                                     TextField {
                                         Layout.fillWidth: true
@@ -939,7 +947,7 @@ ApplicationWindow {
                                         placeholderText: "Negative prompt (optional)"
                                         color: appRoot.textMain
                                         onTextChanged: if (activeFocus) appRoot.generationNegativePrompt = text
-                                        background: Rectangle { color: "#101010"; border.color: appRoot.line; radius: 2 }
+                                        background: Rectangle { color: "#14171c"; border.color: appRoot.line; radius: 2 }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -1071,7 +1079,30 @@ ApplicationWindow {
                                         columnSpacing: 6
                                         rowSpacing: 6
                                         GButton { text: "Save endpoint"; enabled: !genesisBridge.busy; onClicked: backendBridge.setEndpoint(runpodEndpoint.text) }
-                                        GButton { text: backendBridge.checking ? "Checking…" : "Refresh"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
+                                        GButton {
+                                            text: backendBridge.connected ? "Connected" : "Connect RunPod"
+                                            enabled: !genesisBridge.busy && !backendBridge.checking && !backendBridge.connected
+                                            onClicked: backendBridge.connectRemote()
+                                        }
+                                        GButton {
+                                            text: "Disconnect"
+                                            enabled: !genesisBridge.busy && backendBridge.connected
+                                            onClicked: backendBridge.disconnectRemote()
+                                        }
+                                        GButton {
+                                            text: backendBridge.checking ? "Checking…" : "Refresh"
+                                            enabled: backendBridge.connected && !backendBridge.checking
+                                            onClicked: backendBridge.refresh()
+                                        }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: backendBridge.connected
+                                            ? "RunPod connection active. Disconnect stops GENESIS remote polling."
+                                            : "RunPod disconnected by default. GENESIS will not contact the saved endpoint until Connect RunPod is pressed."
+                                        color: backendBridge.connected ? appRoot.gold : appRoot.textDim
+                                        font.pixelSize: 10
+                                        wrapMode: Text.Wrap
                                     }
                                     Text {
                                         Layout.fillWidth: true
@@ -1217,9 +1248,9 @@ ApplicationWindow {
                                             model: [
                                                 {label:"Aisha 9B v9.7", file:"aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"},
                                                 {label:"Klein 9B", file:"flux-2-klein-9b.safetensors"},
-                                                {label:"Miracle v2 FP8", file:"Miraclein NSFW v2.0 FP8 - Klein9B -,euler,cfg1.1.safetensors"},
+                                                {label:"Miracle v2 FP8", file:"miracleinNSFWGeneration_20FP8.safetensors"},
                                                 {label:"PornMaster v3 FP8", file:"pornmasterFlux2Klein_v3-fp8.safetensors"},
-                                                {label:"DarkBeast V2 BFS FP8", file:"DarkBeast-Klein9b-V2-BFS-FP8-ComfyUI.safetensors"}
+                                                {label:"DarkBeast V2 BFS FP8", file:"darkBeast_DBKleinv2BFS.safetensors"}
                                             ]
                                             textRole: "label"
                                             onActivated: genesisBridge.setStageTwoModel(model[currentIndex].file)
@@ -1273,7 +1304,7 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#101010"; border.color: appRoot.line; radius: 2 } }
+                            TextField { Layout.preferredWidth: 280; placeholderText: "Search poses…"; color: appRoot.textMain; onTextChanged: appRoot.poseSearch = text; background: Rectangle { color: "#14171c"; border.color: appRoot.line; radius: 2 } }
                             Repeater {
                                 model: ["All", "Standing", "Sitting", "Lying", "Kneeling", "All Fours"]
                                 GButton { text: modelData; active: appRoot.poseCategory === modelData; onClicked: appRoot.poseCategory = modelData }
@@ -1304,6 +1335,7 @@ ApplicationWindow {
                                         Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
                                     }
                                     SectionLabel { text: "SELECTED POSE" }
+                                    GButton { objectName: "openSkeletonEditor"; Layout.fillWidth: true; text: "Edit Skeleton"; onClicked: skeletonBridge.openEditor(String(appRoot.selectedPoseSource)) }
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Layout.preferredHeight: 160
@@ -1380,23 +1412,46 @@ ApplicationWindow {
                             GButton { Layout.preferredWidth: implicitWidth; text: "Canvas"; onClicked: appRoot.pageIndex = 8 }
                             GButton { Layout.preferredWidth: implicitWidth; text: "Results"; onClicked: { appRoot.viewerSource = genesisBridge.previewUrl; appRoot.pageIndex = 4 } }
                         }
-                        GridLayout {
+                        ColumnLayout {
+                            objectName: "workflowGraphWorkspace"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            columns: 2
-                            rowSpacing: 10
-                            columnSpacing: 10
-                            Repeater {
-                                model: [
-                                    {title:"Stage 1 · Phr00t / Qwen", body:"Source-aware pose and identity generation. Best choice when you load a source image."},
-                                    {title:"Stage 2 · Aisha 9B / Klein 9B", body:"RunPod refinement using the preserved Stage 1 output; choose Aisha 9B v9.7 or FLUX.2 Klein 9B."},
-                                    {title:"Stage 3 · selectable identity lock", body:"Verified ReActor Inswapper stays active. ReSwapper, HyperSwap and PuLID remain pending until RunPod verification passes."},
-                                    {title:"Final Upscale", body:"Optional finishing pass when the required local assets are available."}
-                                ]
-                                Panel {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    ColumnLayout { anchors.fill: parent; anchors.margins: 18; Text { text: modelData.title; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true } Text { Layout.fillWidth: true; text: modelData.body; color: appRoot.textDim; font.pixelSize: 13; wrapMode: Text.Wrap } Item { Layout.fillHeight: true } GButton { text: "Open workflow folder"; onClicked: moduleBridge.triggerAction("workflow") } }
+                            spacing: 10
+                            Text { Layout.fillWidth: true; text: "COMFYUI NODE GRAPH IN GENESIS"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                            Text { Layout.fillWidth: true; text: workflowGraphBridge.status; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                GButton { text: "New graph"; onClicked: { workflowGraphBridge.openGraph(""); workflowGraphBridge.newGraph() } }
+                                GButton { text: "Load JSON graph"; onClicked: { workflowGraphBridge.openGraph(""); workflowGraphBridge.chooseGraph() } }
+                            }
+                            ScrollView {
+                                id: workflowScroll
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                contentWidth: availableWidth
+                                clip: true
+                                GridLayout {
+                                    id: workflowGrid
+                                    width: workflowScroll.availableWidth
+                                    columns: width >= 850 ? 2 : 1
+                                    rowSpacing: 10
+                                    columnSpacing: 10
+                                    Repeater {
+                                        model: workflowGraphBridge.workflows
+                                        Panel {
+                                            Layout.fillWidth: true
+                                            Layout.preferredWidth: (workflowGrid.width - (workflowGrid.columns - 1) * workflowGrid.columnSpacing) / workflowGrid.columns
+                                            Layout.preferredHeight: 146
+                                            ColumnLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 14
+                                                Text { text: modelData.name; color: appRoot.brightGold; font.pixelSize: 17; font.bold: true }
+                                                Text { Layout.fillWidth: true; text: modelData.file; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideMiddle }
+                                                Item { Layout.fillHeight: true }
+                                                GButton { text: "Edit node graph"; active: true; onClicked: workflowGraphBridge.openGraph(modelData.file) }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1727,6 +1782,7 @@ ApplicationWindow {
                 }
 
                 CanvasWorkspace {
+                    onHomeRequested: appRoot.pageIndex = 14
                     sourceUrl: appRoot.editSource
                 }
 
@@ -1780,6 +1836,22 @@ ApplicationWindow {
 
                 Item {
                     ColumnLayout { anchors.fill:parent; spacing:10
+                        Panel {
+                            Layout.fillWidth: true; Layout.preferredHeight: 180
+                            ColumnLayout {
+                                anchors.fill: parent; anchors.margins: 18; spacing: 12
+                                Text { text: "WORKSPACE BACKGROUND"; color: appRoot.brightGold; font.pixelSize: 18; font.bold: true }
+                                Text { Layout.fillWidth: true; text: "Choose your own image for the workspace. Your choice is remembered; Privacy Mode hides it."; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 12 }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    GButton { objectName: "chooseBackgroundButton"; text: "Choose image…"; onClicked: genesisLayout.chooseBackground() }
+                                    GButton { text: "Reset"; onClicked: genesisLayout.resetBackground() }
+                                    Text { text: "Opacity"; color: appRoot.textDim }
+                                    Slider { Layout.fillWidth: true; from: 0; to: 1; value: genesisLayout.backgroundOpacity; onMoved: genesisLayout.setBackgroundOpacity(value) }
+                                    Text { text: Math.round(genesisLayout.backgroundOpacity * 100) + "%"; color: appRoot.textDim }
+                                }
+                            }
+                        }
                         Panel { Layout.fillWidth:true; Layout.fillHeight:true; ColumnLayout { anchors.fill:parent; anchors.margins:16; spacing:10; RowLayout { Layout.fillWidth:true; Text { Layout.fillWidth:true; text:"GENESIS LINUX"; color:appRoot.brightGold; font.pixelSize:18; font.bold:true } Text { text:moduleBridge.status; color:appRoot.textDim; font.pixelSize:11; elide:Text.ElideRight; Layout.maximumWidth:360 } } RowLayout { GButton { text:"Refresh Health"; onClicked:moduleBridge.triggerAction("refresh") } GButton { text:"Open Settings Folder"; onClicked:moduleBridge.triggerAction("settings") } } Item { Layout.fillHeight:true } Text { text:"Workspace state is preserved while moving between Create, Pose Library and the generation tools."; color:appRoot.textDim; font.pixelSize:11; wrapMode:Text.Wrap; Layout.fillWidth:true } } }
                     }
                 }
@@ -1831,6 +1903,64 @@ ApplicationWindow {
                     }
                 }
                 // GENESIS_GROK_PAGE_INSERT
+
+                Item {
+                    objectName: "homeWorkspace"
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        spacing: 18
+                        RowLayout {
+                            Layout.fillWidth: true
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Text { text: "HOME"; color: appRoot.brightGold; font.pixelSize: 30; font.bold: true; font.letterSpacing: 3 }
+                                Text { text: "Your creative workspace"; color: appRoot.textDim; font.pixelSize: 14 }
+                            }
+                            GButton { text: "Settings"; onClicked: appRoot.pageIndex = 10 }
+                        }
+                        GridLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            columns: width < 1000 ? 2 : 3
+                            rowSpacing: 14; columnSpacing: 14
+                            Repeater {
+                                objectName: "homeCardRepeater"
+                                model: [
+                                    {title: "Image Generation", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
+                                    {title: "Canvas", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
+                                    {title: "Media Tools", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
+                                    {title: "Camera Hub", icon: "●", detail: "Open your cameras and live views", page: 5},
+                                    {title: "System Tools", icon: "⚙", detail: "Check services, models and storage", page: 7}
+                                ]
+                                Button {
+                                    required property var modelData
+                                    objectName: "homeCard_" + modelData.page
+                                    Layout.fillWidth: true; Layout.fillHeight: true
+                                    Layout.minimumWidth: 220; Layout.minimumHeight: 120
+                                    Layout.preferredWidth: 300; Layout.preferredHeight: 210
+                                    padding: 22
+                                    Accessible.name: modelData.title
+                                    onClicked: appRoot.pageIndex = modelData.page
+                                    background: Rectangle {
+                                        radius: 2
+                                        color: parent.down ? "#342818" : parent.hovered ? "#231f18" : "#111111"
+                                        border.color: parent.hovered || parent.activeFocus ? appRoot.gold : "#4b3e29"
+                                        border.width: parent.activeFocus ? 2 : 1
+                                    }
+                                    contentItem: ColumnLayout {
+                                        spacing: 10
+                                        Text { text: modelData.icon; color: appRoot.gold; font.pixelSize: 30 }
+                                        Text { Layout.fillWidth: true; text: modelData.title; color: appRoot.brightGold; font.pixelSize: 21; font.bold: true; wrapMode: Text.Wrap }
+                                        Text { Layout.fillWidth: true; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                                        Item { Layout.fillHeight: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
             }
         }
     }

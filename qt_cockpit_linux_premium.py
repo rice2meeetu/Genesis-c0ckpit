@@ -13,6 +13,11 @@ import argparse
 import json
 import os
 import sys
+
+# Keep embedded ComfyUI graph editing on software rendering.
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "") + " --disable-gpu --disable-gpu-compositing"
+).strip()
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QLockFile, QTimer, QUrl
@@ -23,6 +28,8 @@ from PyQt6.QtWidgets import QApplication
 from genesis.assistant_bridge import AssistantBridge
 from genesis.media_bridge import MediaBridge
 from genesis.canvas_bridge import CanvasBridge
+from genesis.skeleton_editor import SkeletonEditorBridge
+from genesis.workflow_graph_editor import WorkflowGraphBridge
 from genesis.backend_bridge import BackendBridge
 from qt_cockpit import (
     ASSET_ROOT,
@@ -55,6 +62,7 @@ PAGE_INDEXES = {
     "ai": 11,
     "face-swap": 12,
     "grok": 13,
+    "home": 14,
 }
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
@@ -132,7 +140,7 @@ AI_PAGE_QML = r'''
 
 
 
-FEEFEE_OVERLAY_QML = '\n    Item {\n        id: feefeeDock\n        parent: genesisScene\n        objectName: "feefeeDock"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 20; anchors.bottomMargin: 22\n        width: 96; height: 96; z: 100\n        visible: appRoot.pageIndex !== 11\n        Rectangle {\n            anchors.fill: parent; radius: 48\n            color: "#15130f"; border.color: "#c59b58"; border.width: 2\n            Image { anchors.fill: parent; anchors.margins: 7; source: "../assets/feefee-avatar-reference.jpg"; sourceClipRect: Qt.rect(164,0,514,514); fillMode: Image.PreserveAspectFit }\n        }\n        MouseArea {\n            anchors.fill: parent; cursorShape: Qt.PointingHandCursor\n            onClicked: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        }\n        Accessible.name: "Open FeeFee chat"\n        Keys.onReturnPressed: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        activeFocusOnTab: true\n        Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: -15; text: "FeeFee"; color: "#e3c68f"; font.pixelSize: 11 }\n    }\n    FeeFeeChat {\n        id: feefeeQuickChat\n        parent: genesisScene\n        objectName: "feefeeQuickChat"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 128; anchors.bottomMargin: 22\n        width: Math.min(460, appRoot.width - 160)\n        height: Math.min(590, appRoot.height - 130)\n        z: 101\n        compact: true; bridge: assistantBridge\n        visible: appRoot.feefeeOpen && appRoot.pageIndex !== 11\n        onExpandRequested: { appRoot.feefeeOpen = false; appRoot.pageIndex = 11 }\n        onCollapseRequested: appRoot.feefeeOpen = false\n    }\n'
+FEEFEE_OVERLAY_QML = '\n    Item {\n        id: feefeeDock\n        parent: genesisScene\n        objectName: "feefeeDock"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 20; anchors.bottomMargin: 22\n        width: 96; height: 96; z: 100\n        visible: appRoot.pageIndex !== 11 && appRoot.pageIndex !== 8\n        Rectangle {\n            anchors.fill: parent; radius: 48\n            color: "#15130f"; border.color: "#c59b58"; border.width: 2\n            Image { anchors.fill: parent; anchors.margins: 7; source: "../assets/feefee-avatar-reference.jpg"; sourceClipRect: Qt.rect(164,0,514,514); fillMode: Image.PreserveAspectFit }\n        }\n        MouseArea {\n            anchors.fill: parent; cursorShape: Qt.PointingHandCursor\n            onClicked: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        }\n        Accessible.name: "Open FeeFee chat"\n        Keys.onReturnPressed: appRoot.feefeeOpen = !appRoot.feefeeOpen\n        activeFocusOnTab: true\n        Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: -15; text: "FeeFee"; color: "#e3c68f"; font.pixelSize: 11 }\n    }\n    FeeFeeChat {\n        id: feefeeQuickChat\n        parent: genesisScene\n        objectName: "feefeeQuickChat"\n        anchors.left: parent.left; anchors.bottom: parent.bottom\n        anchors.leftMargin: 128; anchors.bottomMargin: 22\n        width: Math.min(460, appRoot.width - 160)\n        height: Math.min(590, appRoot.height - 130)\n        z: 101\n        compact: true; bridge: assistantBridge\n        visible: appRoot.feefeeOpen && appRoot.pageIndex !== 11\n        onExpandRequested: { appRoot.feefeeOpen = false; appRoot.pageIndex = 11 }\n        onCollapseRequested: appRoot.feefeeOpen = false\n    }\n'
 
 def compose_premium_qml(source: str) -> str:
     """Inject the dedicated GENESIS AI nav entry and page into the premium shell."""
@@ -161,7 +169,7 @@ def main() -> int:
     parser.add_argument("--review-image", help="Local image for CPU-only screenshot review")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
-    parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="create")
+    parser.add_argument("--page", choices=tuple(PAGE_INDEXES), default="home")
     args, qt_args = parser.parse_known_args()
 
     runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
@@ -206,6 +214,10 @@ def main() -> int:
     context.setContextProperty("assistantBridge", assistant_bridge)
     context.setContextProperty("mediaBridge", media_bridge)
     context.setContextProperty("canvasBridge", canvas_bridge)
+    skeleton_bridge = SkeletonEditorBridge(app)
+    context.setContextProperty("skeletonBridge", skeleton_bridge)
+    workflow_graph_bridge = WorkflowGraphBridge(app)
+    context.setContextProperty("workflowGraphBridge", workflow_graph_bridge)
 
     qml_path = UI_ROOT / "MainPremiumLinux.qml"
     qml_source = compose_premium_qml(qml_path.read_text(encoding="utf-8"))

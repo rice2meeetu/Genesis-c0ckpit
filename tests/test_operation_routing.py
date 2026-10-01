@@ -24,6 +24,7 @@ def test_operation_destination_respects_mode_and_safety(operation):
     bridge = BackendBridge(cockpit.GenerationBridge())
     bridge._endpoint = 'https://remote.example'
     bridge._remote_status = {'ready': True}
+    bridge._connected = True
     bridge._local_status = {'ready': True}
     bridge._local_safe = True
     bridge._mode = 'RUNPOD'
@@ -36,6 +37,16 @@ def test_operation_destination_respects_mode_and_safety(operation):
     assert bridge.resolve_operation(operation).destination == 'RUNPOD'
     bridge._remote_status = {'ready': False}
     with pytest.raises(ValueError): bridge.resolve_operation(operation)
+
+
+def test_remote_ready_is_not_routable_until_explicit_connect():
+    bridge = BackendBridge(cockpit.GenerationBridge())
+    bridge._mode = 'RUNPOD'
+    bridge._endpoint = 'https://remote.example'
+    bridge._remote_status = {'ready': True}
+    bridge._connected = False
+    with pytest.raises(ValueError):
+        bridge.resolve_operation('upscale')
 
 
 @pytest.mark.parametrize('operation', ['face_swap', 'edit', 'inpaint'])

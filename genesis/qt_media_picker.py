@@ -48,7 +48,7 @@ class ThumbnailProvider(QFileIconProvider):
 
 
 class ImagePicker(QFileDialog):
-    def __init__(self, parent=None, title="GENESIS · Select image", folder=None, settings=None):
+    def __init__(self, parent=None, title="GENESIS · Select image", folder=None, settings=None, multiple=False):
         self.settings = settings if settings is not None else QSettings("GENESIS", "MediaPicker")
         initial = folder or self.settings.value("folder", str(Path.home()))
         if not Path(initial).is_dir():
@@ -56,7 +56,7 @@ class ImagePicker(QFileDialog):
         super().__init__(parent, title, str(initial))
         self.setOption(QFileDialog.Option.DontUseNativeDialog, True)
         self.setOption(QFileDialog.Option.ReadOnly, True)
-        self.setFileMode(QFileDialog.FileMode.ExistingFile)
+        self.setFileMode(QFileDialog.FileMode.ExistingFiles if multiple else QFileDialog.FileMode.ExistingFile)
         self.setNameFilter(IMAGE_FILTER)
         self.setViewMode(QFileDialog.ViewMode.List)
         self.resize(1380, 860)
@@ -164,3 +164,10 @@ def choose_image(title="GENESIS · Select image", folder=None):
         if files and Path(files[0]).is_file():
             return files[0]
     return ""
+
+
+def choose_images(title="GENESIS · Select images", folder=None):
+    dialog = ImagePicker(title=title, folder=folder, multiple=True)
+    if dialog.exec() == QFileDialog.DialogCode.Accepted:
+        return [path for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
+    return []
