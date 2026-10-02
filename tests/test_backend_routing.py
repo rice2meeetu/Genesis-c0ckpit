@@ -5,7 +5,7 @@ from genesis.backend_routing import Route, choose_route, normalize_endpoint, rem
 
 
 def test_endpoint_accepts_pod_id_and_rejects_embedded_credentials():
-    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-3000.proxy.runpod.net'
+    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-8188.proxy.runpod.net'
     with pytest.raises(ValueError): normalize_endpoint('https://user:secret@pod.example')
     with pytest.raises(ValueError): normalize_endpoint('http://pod.example')
 
@@ -44,3 +44,16 @@ def test_route_is_job_scoped(monkeypatch):
     with use_route(Route('RUNPOD', 'https://new.example')):
         assert remote_url() == 'https://new.example'
     assert remote_url() == 'https://legacy.example'
+
+
+@pytest.mark.parametrize('endpoint', ['http://127.0.0.1:18189',
+    'http://localhost:8189', 'https://pod-8189.proxy.runpod.net'])
+def test_marty_endpoint_is_blocked(endpoint):
+    with pytest.raises(ValueError, match='Marty'):
+        normalize_endpoint(endpoint)
+
+
+def test_new_runpod_environment_takes_precedence(monkeypatch):
+    monkeypatch.setenv('GENESIS_RUNPOD_URL', 'https://paul-8188.proxy.runpod.net')
+    monkeypatch.setenv('GENESIS_COMFY_URL', 'http://127.0.0.1:18189')
+    assert remote_url() == 'https://paul-8188.proxy.runpod.net'

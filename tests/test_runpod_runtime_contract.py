@@ -146,3 +146,53 @@ def test_runpod_pipeline_hands_results_forward_and_keeps_original_identity(monke
     assert third.args[2:4] == (qt_cockpit.STAGE_3_WORKFLOW, stage2)
     assert third.kwargs["secondary_image"] == source
     assert bridge.status.startswith("Complete")
+
+
+def test_v19_workflow_uses_aio_checkpoint_outputs():
+    import json
+    graph = json.loads(qt_cockpit.REMOTE_PHR00T_V19_WORKFLOW.read_text())
+    nodes = {str(node['id']): node for node in graph['nodes']}
+    info = {node['type']: {'input': {'required': {}}} for node in nodes.values()}
+    info['CheckpointLoaderSimple'] = {'input': {'required': {
+        'ckpt_name': [[qt_cockpit.REMOTE_PHR00T_V19_MODEL]]}}}
+    prompt = qt_cockpit.workflow_lab.workflow_to_prompt(graph, info)
+    assert prompt['1']['class_type'] == 'CheckpointLoaderSimple'
+    assert prompt['1']['inputs']['ckpt_name'] == qt_cockpit.REMOTE_PHR00T_V19_MODEL
+    assert prompt['4']['inputs']['clip'] == ['1', 1]
+    assert prompt['4']['inputs']['vae'] == ['1', 2]
+    assert prompt['8']['inputs']['vae'] == ['1', 2]
+    assert not any('GGUF' in node['class_type'] for node in prompt.values())
+
+
+def test_remote_v19_routes_to_its_dedicated_workflow(monkeypatch, tmp_path):
+    monkeypatch.setenv('GENESIS_COMFY_URL', URL)
+    bridge = qt_cockpit.GenerationBridge()
+    bridge._output_dir = tmp_path
+    monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (Mock(base_url=URL), {}))
+    monkeypatch.setattr(qt_cockpit, 'load_remote_catalog', lambda client: {})
+    validate = Mock()
+    monkeypatch.setattr(qt_cockpit, 'validate_remote_workflow_assets', validate)
+    run = Mock(return_value=tmp_path / 'result.png')
+    monkeypatch.setattr(bridge, '_run_reference_stage', run)
+    bridge._run_generate('a mug', '', 512, 512, qt_cockpit.REMOTE_PHR00T_V19_MODEL,
+                         'None', 'None', 'None', 0.0, 0.0, 0.0,
+                         tmp_path / 'source.png', None, False, False, False)
+    assert validate.call_args.args[0] == qt_cockpit.REMOTE_PHR00T_V19_WORKFLOW
+    assert run.call_args.args[2] == qt_cockpit.REMOTE_PHR00T_V19_WORKFLOW
+
+
+def test_remote_qwen_encoder_uses_active_catalog_filename_and_required_type(monkeypatch):
+    monkeypatch.setattr(qt_cockpit.workflow_lab, 'workflow_to_prompt', lambda *args: {
+        '2': {'class_type': 'CLIPLoaderGGUF', 'inputs': {'clip_name': 'old-Q4.gguf'}}})
+    info = {'CLIPLoaderGGUF': {'input': {'required': {
+        'clip_name': [[qt_cockpit.REMOTE_PHR00T_CLIP]], 'type': [['qwen_image']]}}}}
+    prompt = qt_cockpit.remote_workflow_prompt(qt_cockpit.REMOTE_PHR00T_WORKFLOW, info)
+    assert prompt['2']['inputs'] == {'clip_name': qt_cockpit.REMOTE_PHR00T_CLIP, 'type': 'qwen_image'}
+
+
+def test_live_cache_profile_aliases_are_available_in_genesis():
+    names = [qt_cockpit.REMOTE_PHR00T_V19_GGUF_MODEL,
+             qt_cockpit.REMOTE_AISHA_BF16_MODEL, qt_cockpit.REMOTE_MIRACLEIN_V2_MODEL]
+    info = {'UnetLoaderGGUF': {'input': {'required': {'unet_name': [names]}}}}
+    profiles = qt_cockpit.build_remote_generation_profiles(info)
+    assert all(profile['runnable'] and profile['sourceRequired'] for profile in profiles)

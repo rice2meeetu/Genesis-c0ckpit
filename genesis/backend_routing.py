@@ -19,8 +19,8 @@ class Route:
 def remote_url():
     route = _active.get()
     if route is not None:
-        return route.url if route.destination == 'RUNPOD' else ''
-    return os.environ.get('GENESIS_COMFY_URL', '').strip()
+        return normalize_endpoint(route.url) if route.destination == 'RUNPOD' else ''
+    return normalize_endpoint(os.environ.get('GENESIS_RUNPOD_URL', os.environ.get('GENESIS_COMFY_URL', '')))
 
 
 def local_start_allowed():
@@ -42,7 +42,7 @@ def normalize_endpoint(value):
     if not value:
         return ''
     if re.fullmatch(r'[a-z0-9]{10,32}', value):
-        value = f'https://{value}-3000.proxy.runpod.net'
+        value = f'https://{value}-8188.proxy.runpod.net'
     parsed = urlsplit(value)
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError('Use a ComfyUI endpoint without credentials, query parameters or fragments.')
@@ -54,6 +54,8 @@ def normalize_endpoint(value):
         parsed.port
     except ValueError as exc:
         raise ValueError('The endpoint port is invalid.') from exc
+    if parsed.port in {8189, 18189} or re.search(r'-8189\.proxy\.runpod\.net$', parsed.hostname):
+        raise ValueError('8189 belongs to Marty; configure Paul’s ComfyUI on 8188.')
     return value
 
 
