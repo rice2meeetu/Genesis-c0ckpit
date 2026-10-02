@@ -58,11 +58,14 @@ TEXT_ENCODER_9B = "qwen_3_8b_fp8mixed.safetensors"
 # MARTY RunPod models verified from the live ComfyUI catalog.
 REMOTE_PHR00T_MODEL = "Qwen-Rapid-NSFW-v23_Q8_0.gguf"
 REMOTE_PHR00T_V19_MODEL = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
-REMOTE_PHR00T_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_PHR00T_V19_MODEL}
+REMOTE_PHR00T_V19_GGUF_MODEL = "Qwen-Rapid-AIO-NSFW-v19_Q8_0.gguf"
+REMOTE_PHR00T_MODELS = {REMOTE_PHR00T_MODEL, REMOTE_PHR00T_V19_MODEL, REMOTE_PHR00T_V19_GGUF_MODEL}
 REMOTE_PHR00T_CLIP = "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
 REMOTE_PHR00T_VAE = "qwen_image_vae.safetensors"
 REMOTE_KLEIN_9B_MODEL = "flux-2-klein-9b.safetensors"
 REMOTE_AISHA_9B_MODEL = "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
+REMOTE_AISHA_BF16_MODEL = "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"
+REMOTE_MIRACLEIN_V2_MODEL = "miracleinNSFWGeneration_20FP8.safetensors"
 REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
 REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
 REMOTE_DARKBEAST_9B_MODEL = "darkBeastMar0326Latest_dbkleinv2BFS.safetensors"
@@ -76,6 +79,8 @@ REMOTE_9B_VAE = "flux2-vae.safetensors"
 REMOTE_KLEIN9B_SOURCE_MODELS = {
     REMOTE_KLEIN_9B_MODEL,
     REMOTE_AISHA_9B_MODEL,
+    REMOTE_AISHA_BF16_MODEL,
+    REMOTE_MIRACLEIN_V2_MODEL,
     REMOTE_PORNMASTER_9B_MODEL,
     REMOTE_MIRACLEIN_9B_MODEL,
     REMOTE_DARKBEAST_9B_MODEL,
@@ -89,6 +94,7 @@ SUPPORTED_CREATE_MODELS = {
 OUTPUT_DIR = Path.home() / "GENESIS-Exports"
 REFERENCE_WORKFLOW_ROOT = PROJECT_ROOT / "genesis" / "reference" / "pose_workflows"
 REMOTE_PHR00T_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "PHR00T_QWEN_RAPID_V23.json"
+REMOTE_PHR00T_V19_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "PHR00T_QWEN_RAPID_V19_AIO.json"
 REMOTE_KLEIN9B_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "KLEIN9B_REMOTE.json"
 STAGE_1_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_1_PHR00T_POSE.json"
 STAGE_2_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_2_LUSTIFY_REFINE.json"
@@ -292,7 +298,8 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "defaultCfg": 1.0, "defaultDenoise": 1.0,
             "defaultSampler": "euler", "defaultScheduler": "beta",
         }
-    defaults[REMOTE_MIRACLEIN_9B_MODEL].update(defaultSteps=12, defaultCfg=1.1)
+    for miracle in (REMOTE_MIRACLEIN_9B_MODEL, REMOTE_MIRACLEIN_V2_MODEL):
+        defaults[miracle].update(defaultSteps=12, defaultCfg=1.1)
     rows: list[dict] = []
     for model_name in models:
         compatible = compatible_loras(model_name, loras)
@@ -375,8 +382,22 @@ def _reconcile_remote_klein_clip(prompt: dict, info: dict) -> None:
                 node["inputs"]["clip_name"] = selected
 
 
-def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=None):
+def remote_workflow_prompt(workflow: Path, info: dict) -> dict:
     prompt = workflow_lab.workflow_to_prompt(workflow, info)
+    if workflow in {REMOTE_PHR00T_WORKFLOW, STAGE_1_WORKFLOW}:
+        available = _remote_choice_values(info, ("CLIPLoaderGGUF",), "clip_name")
+        for node in prompt.values():
+            if node.get("class_type") == "CLIPLoaderGGUF":
+                if "type" in info.get("CLIPLoaderGGUF", {}).get("input", {}).get("required", {}):
+                    node["inputs"]["type"] = "qwen_image"
+                current = node["inputs"].get("clip_name")
+                if current not in available and REMOTE_PHR00T_CLIP in available:
+                    node["inputs"]["clip_name"] = REMOTE_PHR00T_CLIP
+    return prompt
+
+
+def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=None):
+    prompt = remote_workflow_prompt(workflow, info)
     controls = workflow_lab.discover_workflow_controls(prompt)
     if model_override and controls.get("model"):
         node_id, field = controls["model"]
@@ -1586,6 +1607,8 @@ class GenerationBridge(QObject):
                 if model_name == REMOTE_PHR00T_MODEL:
                     validate_remote_workflow_assets(REMOTE_PHR00T_WORKFLOW, info, model_name)
                 elif model_name == REMOTE_PHR00T_V19_MODEL:
+                    validate_remote_workflow_assets(REMOTE_PHR00T_V19_WORKFLOW, info, model_name)
+                elif model_name == REMOTE_PHR00T_V19_GGUF_MODEL:
                     validate_remote_workflow_assets(STAGE_1_WORKFLOW, info, model_name)
                 elif model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
                     validate_remote_workflow_assets(REMOTE_KLEIN9B_WORKFLOW, info, model_name)
@@ -1617,9 +1640,16 @@ class GenerationBridge(QObject):
                 )
             elif source is not None and model_name == REMOTE_PHR00T_V19_MODEL:
                 current = self._run_reference_stage(
-                    client, info, STAGE_1_WORKFLOW, source,
+                    client, info, REMOTE_PHR00T_V19_WORKFLOW, source,
                     adapt_prompt(prompt_text, model_name, source_image=True),
                     stamp, "Phr00t-v19", secondary_image=pose,
+                    controls=generation_controls, model_override=model_name,
+                )
+            elif source is not None and model_name == REMOTE_PHR00T_V19_GGUF_MODEL:
+                current = self._run_reference_stage(
+                    client, info, STAGE_1_WORKFLOW, source,
+                    adapt_prompt(prompt_text, model_name, source_image=True),
+                    stamp, "Phr00t-v19-GGUF", secondary_image=pose,
                     controls=generation_controls, model_override=model_name,
                 )
             elif source is not None and model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
@@ -1789,7 +1819,7 @@ class GenerationBridge(QObject):
     ) -> Path:
         if not workflow.is_file():
             raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
-        prompt = workflow_lab.workflow_to_prompt(workflow, info)
+        prompt = remote_workflow_prompt(workflow, info) if remote_url() else workflow_lab.workflow_to_prompt(workflow, info)
         if workflow == REMOTE_KLEIN9B_WORKFLOW:
             _reconcile_remote_klein_clip(prompt, info)
         if remote_url() and workflow == STAGE_3_WORKFLOW:
