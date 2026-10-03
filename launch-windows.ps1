@@ -25,10 +25,9 @@ $env:XDG_RUNTIME_DIR = $runtimeDir
 
 # PyQt's native Windows Qt Quick Controls style can fail to resolve its
 # platform implementation DLL on some Python/Qt wheels. GENESIS supplies its
-# own QML appearance, so use the portable Basic control implementation.
-if (-not $env:QT_QUICK_CONTROLS_STYLE) {
-    $env:QT_QUICK_CONTROLS_STYLE = 'Basic'
-}
+# own QML appearance, so force the portable Basic control implementation.
+$env:QT_QUICK_CONTROLS_STYLE = 'Basic'
+$env:QT_QUICK_CONTROLS_FALLBACK_STYLE = 'Basic'
 
 if (-not $env:GENESIS_BACKEND_MODE) {
     $env:GENESIS_BACKEND_MODE = 'RUNPOD'
