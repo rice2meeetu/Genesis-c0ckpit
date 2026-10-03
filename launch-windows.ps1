@@ -23,6 +23,13 @@ $runtimeDir = Join-Path $env:TEMP 'GENESIS-runtime'
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 $env:XDG_RUNTIME_DIR = $runtimeDir
 
+# PyQt's native Windows Qt Quick Controls style can fail to resolve its
+# platform implementation DLL on some Python/Qt wheels. GENESIS supplies its
+# own QML appearance, so use the portable Basic control implementation.
+if (-not $env:QT_QUICK_CONTROLS_STYLE) {
+    $env:QT_QUICK_CONTROLS_STYLE = 'Basic'
+}
+
 if (-not $env:GENESIS_BACKEND_MODE) {
     $env:GENESIS_BACKEND_MODE = 'RUNPOD'
 }
