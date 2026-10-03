@@ -209,7 +209,7 @@ class BackendBridge(QObject):
             {p['model'] for p in self._local if p.get('runnable')},
             {p['model'] for p in self._remote if p.get('runnable')},
             self._local_status.get('ready', False), self._remote_status.get('ready', False),
-            self._endpoint, local_safe=model in {cockpit.FOUR_B_MODEL, cockpit.QWEN_MODEL, cockpit.REMOTE_PHR00T_V23_Q2_MODEL} and self._local_safe)
+            self._endpoint, local_safe=model in {cockpit.FOUR_B_MODEL, cockpit.QWEN_MODEL, cockpit.REMOTE_PHR00T_V23_Q2_MODEL, cockpit.LOCAL_AISHA_9B_MODEL, cockpit.LOCAL_MIRACLEIN_9B_MODEL, cockpit.LOCAL_PORNMASTER_9B_MODEL} and self._local_safe)
 
     @pyqtSlot()
     def _publish(self):
