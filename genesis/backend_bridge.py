@@ -216,10 +216,11 @@ class BackendBridge(QObject):
         if self.generation.busy:
             return
         # Match the published catalog to the selected routing mode.
-        # LOCAL shows only genuinely runnable local profiles. AUTO shows both local
-        # and configured remote profiles. RUNPOD shows the configured remote catalog.
+        # LOCAL shows every installed/validated local profile, including profiles
+        # intentionally execution-blocked by the local GPU safety policy. AUTO shows
+        # both local and configured remote profiles. RUNPOD shows the remote catalog.
         sources = (
-            [row for row in self._local if row.get('runnable')] if self._mode == 'LOCAL'
+            [row for row in self._local if row.get('ready')] if self._mode == 'LOCAL'
             else self._remote if self._mode == 'RUNPOD'
             else self._local + self._remote
         )
@@ -268,16 +269,14 @@ class BackendBridge(QObject):
                     and source.get('ready')
                 )
                 installed = bool(source.get('ready'))
-                destination = ('RUNPOD' if route_ready else ('INSTALLED · RUNPOD REQUIRED' if installed else ('RUNPOD OFFLINE' if source.get('remote') and self._endpoint else 'UNAVAILABLE')))
-                note = source.get('note') if not installed else str(exc)
-                if installed and not route_ready and self._mode == 'LOCAL':
-                    note = 'Installed locally · this profile is not enabled for local GPU execution. Use RunPod.'
+                if self._mode == 'LOCAL' and installed and not source.get('remote'):
+                    destination = 'LOCAL INSTALLED · GPU BLOCKED'
+                    note = 'Installed locally · workflow validated · execution disabled by the local GPU safety policy.'
+                else:
+                    destination = ('RUNPOD' if route_ready else ('INSTALLED · RUNPOD REQUIRED' if installed else ('RUNPOD OFFLINE' if source.get('remote') and self._endpoint else 'UNAVAILABLE')))
+                    note = source.get('note') if not installed else str(exc)
                 row = dict(source, runnable=False, routeReady=route_ready,
                            destination=destination, note=note)
-            # LOCAL mode must contain only models that resolve to LOCAL. Do not
-            # leak RunPod-required/offline placeholders into the local picker.
-            if self._mode == 'LOCAL' and row.get('destination') != 'LOCAL':
-                continue
             row['label'] = row['label'].removeprefix('RunPod · ')
             if not row['label'].endswith(' · ' + row['destination']):
                 row['label'] += ' · ' + row['destination']
