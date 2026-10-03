@@ -110,6 +110,11 @@ class ImagePicker(QFileDialog):
         self.change_view(self.view_choice.currentText())
         self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
 
+    def selectedFiles(self):
+        # QFileDialog exposes slash-normalized paths on Windows. Convert them at
+        # the dialog boundary so every GENESIS caller receives native paths.
+        return [str(Path(path)) for path in super().selectedFiles()]
+
     def change_view(self, mode):
         # Touch only the file view, never QFileDialog's places sidebar.
         self.setViewMode(QFileDialog.ViewMode.List)
@@ -163,14 +168,14 @@ def choose_image(title="GENESIS · Select image", folder=None):
     if dialog.exec() == QFileDialog.DialogCode.Accepted:
         files = dialog.selectedFiles()
         if files and Path(files[0]).is_file():
-            return str(Path(files[0]))
+            return files[0]
     return ""
 
 
 def choose_images(title="GENESIS · Select images", folder=None):
     dialog = ImagePicker(title=title, folder=folder, multiple=True)
     if dialog.exec() == QFileDialog.DialogCode.Accepted:
-        return [str(Path(path)) for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
+        return [path for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
     return []
 
 
@@ -195,7 +200,7 @@ class FilePicker(ImagePicker):
                 dialog.setDefaultSuffix(suffix.group(1))
         dialog.change_view("Thumbnail Grid")
         if dialog.exec() == QFileDialog.DialogCode.Accepted:
-            return [str(Path(path)) for path in dialog.selectedFiles()], dialog.selectedNameFilter()
+            return dialog.selectedFiles(), dialog.selectedNameFilter()
         return [], ""
 
     @classmethod
