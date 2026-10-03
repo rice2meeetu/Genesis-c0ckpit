@@ -56,13 +56,13 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert 'text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()' in qml
     assert 'text: "Stage 2 · refine"' in qml
     assert 'text: "Stage 3 · identity lock"' in qml
-    assert 'model: ["Single model", "3-stage · Phr00t → Refine → Identity"]' in qml
+    assert 'model: ["Single model", "3-stage · Selected model → Refine → Identity"]' in qml
     assert "appRoot.useStageTwo = fullPipeline" in qml
     assert "appRoot.useStageThree = fullPipeline" in qml
-    assert '"ReActor · Inswapper ✓"' in qml
-    assert '"ReActor · ReSwapper ✓"' in qml
-    assert '"ReActor · HyperSwap ✓"' in qml
-    assert '"PuLID FLUX.2 · pending"' in qml
+    assert '"ReActor · Inswapper"' in qml
+    assert '"ReActor · ReSwapper"' in qml
+    assert '"ReActor · HyperSwap"' in qml
+    assert 'objectName: "stageModelPopup"' in qml
     assert "genesisBridge.setStageThreeEngine" in qml
     assert 'text: "Final upscale"' in qml
     assert "genesisBridge.queueGenerateAdvanced(" in qml
@@ -170,23 +170,23 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
     assert 'appRoot.width < 1300 ? 280 : 360' in qml
     assert 'objectName: "generationResultPreview"' in qml
     assert 'Layout.preferredHeight: 180' in qml
-    assert 'appRoot.compactNavigation ? 96 : 148' in qml
+    assert 'Layout.preferredHeight: 164' in qml
 
 
 def test_premium_visual_assets_are_wired_into_home_and_navigation():
     qml = source()
     assert 'glassButtonSource: "../assets/ui/glass-button-pill.png"' in qml
-    assert 'genesis-cockpit-banner-lunacy-latest.png' in qml
+    assert 'genesis-banner-wide-lunacy.png' in qml
     assert 'fillMode: Image.PreserveAspectFit' in qml
     for asset in (
-        'image-swap_2026-08-22_22-36-37.jpg',
-        't.png',
-        'e7a0662e0c0a4c7e878c6d28827e813f.jpg',
-        'r.png',
-        'Untitled-1.png',
-        '1248519.small.jpg',
+        'panel-06-duplicate-lab.jpg',
+        'panel-03-face-studio.jpg',
+        'genesis-cockpit-banner-left-poster.jpg',
+        'panel-05-photo-organiser.jpg',
+        'panel-08-camera-hub.png',
+        'genesis-cockpit-banner-right-poster.jpg',
     ):
         assert asset in qml
         assert (ROOT / 'genesis' / 'assets' / 'home_buttons' / asset).is_file()
     assert (ROOT / 'genesis' / 'assets' / 'ui' / 'glass-button-pill.png').is_file()
-    assert (ROOT / 'genesis' / 'assets' / 'lunacy_banner' / 'genesis-cockpit-banner-lunacy-latest.png').is_file()
+    assert (ROOT / 'genesis' / 'assets' / 'lunacy_banner' / 'genesis-banner-wide-lunacy.png').is_file()

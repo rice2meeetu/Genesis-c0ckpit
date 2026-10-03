@@ -429,7 +429,7 @@
         2.0
       ],
       "widgets_values_named": {
-        "cfg": 1.0
+        "cfg": 2.0
       }
     },
     {
@@ -465,8 +465,7 @@
         "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
       ],
       "widgets_values_named": {
-        "unet_name": "pornmasterFlux2Klein_v3-fp8.safetensors",
-        "weight_dtype": "default"
+        "unet_name": "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
       },
       "title": "FLUX.2 Klein 9B"
     },
@@ -802,7 +801,7 @@
         1024
       ],
       "widgets_values_named": {
-        "steps": 12,
+        "steps": 4,
         "width": 1024,
         "height": 1024
       }

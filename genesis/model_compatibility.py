@@ -101,6 +101,8 @@ KNOWN_MODELS = {
     "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors": "sdxl",
     "Qwen-Rapid-AIO-NSFW-v19.safetensors": "qwen_image",
     "Qwen-Rapid-NSFW-v23_Q8_0.gguf": "qwen_image",
+    "Qwen-Rapid-AIO-NSFW-v23.safetensors": "qwen_image",
+    "qwen_image_2.1_bf16.safetensors": "qwen_image_2_1",
     "aisha_nsfw_beta_v8_fp8.safetensors": "aisha_9b",
     "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors": "aisha_9b",
     "flux-2-klein-4b.safetensors": "flux2_klein_4b",
@@ -209,4 +211,5 @@ def compatibility_note(model: str | None) -> str:
         "flux1": "FLUX.1 · only FLUX.1 LoRAs",
         "sdxl": "SDXL · only SDXL LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
+        "qwen_image_2_1": "Qwen Image 2.1 · LoRAs disabled until a 2.1-specific adapter is verified",
     }.get(family, "Unknown model family · workflow defaults only")
