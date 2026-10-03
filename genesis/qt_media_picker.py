@@ -163,14 +163,14 @@ def choose_image(title="GENESIS · Select image", folder=None):
     if dialog.exec() == QFileDialog.DialogCode.Accepted:
         files = dialog.selectedFiles()
         if files and Path(files[0]).is_file():
-            return files[0]
+            return str(Path(files[0]))
     return ""
 
 
 def choose_images(title="GENESIS · Select images", folder=None):
     dialog = ImagePicker(title=title, folder=folder, multiple=True)
     if dialog.exec() == QFileDialog.DialogCode.Accepted:
-        return [path for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
+        return [str(Path(path)) for path in dialog.selectedFiles() if Path(path).is_file() and Path(path).suffix.lower() in EXTENSIONS]
     return []
 
 
@@ -195,7 +195,7 @@ class FilePicker(ImagePicker):
                 dialog.setDefaultSuffix(suffix.group(1))
         dialog.change_view("Thumbnail Grid")
         if dialog.exec() == QFileDialog.DialogCode.Accepted:
-            return dialog.selectedFiles(), dialog.selectedNameFilter()
+            return [str(Path(path)) for path in dialog.selectedFiles()], dialog.selectedNameFilter()
         return [], ""
 
     @classmethod
