@@ -26,12 +26,14 @@ from genesis.qt_media_picker import FilePicker as QFileDialog
 from genesis.model_compatibility import compatibility_note, compatible_loras, is_compatible, lora_trigger, model_family
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.asset_inventory import unavailable_local_assets
+from genesis.pose_preset_payload import preset_payload, source_metadata, pose_preset_references
 from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import (adapt_prompt, compatible_selection, refcontrol_prompt,
                                          REFCONTROL_DEFAULT_STRENGTH, REFCONTROL_LORA,
-                                         normalize_identity_instruction)
+                                         normalize_identity_instruction, uses_refcontrol)
 from genesis import integrations, workflow_lab
-from genesis.character_library import add_reference, character_items, preferred_reference, save_character
+from genesis.finishing import finishing_plan, run_finishing, REFINE_INSTRUCTION
+from genesis.character_library import add_reference, character_items, preferred_reference, save_character, update_reference, get_character
 from genesis.media_bridge import MediaBridge
 from genesis.backend_routing import remote_url, local_start_allowed, use_route
 # GENESIS_COMFY_URL remains supported through backend_routing for older launchers.
@@ -103,6 +105,7 @@ REMOTE_KLEIN9B_SOURCE_MODELS = {
 }
 KLEIN9B_REFERENCE_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | {REGULAR_9B_MODEL, LOCAL_AISHA_9B_MODEL}
 REMOTE_SOURCE_MODELS = {*REMOTE_PHR00T_MODELS, *KLEIN9B_REFERENCE_MODELS}
+REFINEMENT_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | REMOTE_SDXL_MODELS
 SOURCE_EDIT_MODELS = {QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_SDXL_MODELS
 
 SUPPORTED_CREATE_MODELS = {
@@ -124,7 +127,6 @@ QWEN21_REFERENCE_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "QWEN_IMAGE_2_1_REFERENCE.
 LOCAL_AISHA_9B_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_AISHA_9B_T2I.json"
 REMOTE_KLEIN_REFERENCE_WORKFLOWS = {REMOTE_KLEIN9B_WORKFLOW, REMOTE_PORNMASTER_V4_WORKFLOW, REMOTE_MIRACLEIN_EDIT_WORKFLOW, REMOTE_DARKBEAST_IDENTITY_WORKFLOW}
 STAGE_1_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_1_PHR00T_POSE.json"
-STAGE_2_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_2_LUSTIFY_REFINE.json"
 REMOTE_SDXL_T2I_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_SDXL_SHARED_T2I.json"
 REMOTE_SDXL_POSE_CONTROLNET = "OpenPoseXL2.safetensors"
 STAGE_3_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_3_REACTOR_ROCM.json"
@@ -230,6 +232,7 @@ def load_curated_pose_presets() -> list[dict]:
                 if not isinstance(row, dict) or not row.get("prompt"):
                     continue
                 presets.append({
+                    "sourceMetadata": source_metadata(row),
                     "id": "full70:" + str(row.get("id", "")),
                     "label": str(row.get("name", "Preset")),
                     "prompt": normalize_identity_instruction(str(row["prompt"])),
@@ -250,6 +253,7 @@ def load_curated_pose_presets() -> list[dict]:
             rows = payload.get("sexual_act_presets", [])
             curated = [
                 {
+                    "sourceMetadata": source_metadata(row),
                     "id": "curated18:" + str(row.get("id", "")),
                     "label": str(row.get("name", "Preset")) + " · Curated 18",
                     "prompt": normalize_identity_instruction(str(row.get("prompt", ""))),
@@ -314,6 +318,7 @@ def build_generation_profiles(
             "runnable": runnable,
             "stageOneEligible": model_name in SUPPORTED_CREATE_MODELS,
             "sourceSupported": model_name in SOURCE_EDIT_MODELS,
+            "stageTwoEligible": model_name in REFINEMENT_MODELS,
             "sourceRequired": model_family(model_name) == "qwen_image" or model_name == REMOTE_PHR00T_V23_Q2_MODEL,
             "maxLoras": model_lora_limit(model_name) if compatible else 0,
             "experimentalLoras": model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL},
@@ -376,8 +381,7 @@ def _remote_choice_values(info: dict, node_types: tuple[str, ...], input_name: s
     values: set[str] = set()
     for node_type in node_types:
         spec = (info.get(node_type, {}).get("input", {}).get("required", {}) or {}).get(input_name)
-        if isinstance(spec, (list, tuple)) and spec and isinstance(spec[0], (list, tuple)):
-            values.update(str(value) for value in spec[0] if value)
+        values.update(str(value) for value in workflow_lab._choice_values(spec) if value)
     return sorted(values, key=str.casefold)
 
 
@@ -532,7 +536,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "sourceSupported": model_name in SOURCE_EDIT_MODELS,
             "sourceRequired": model_name in (REMOTE_PHR00T_MODELS | {REMOTE_AISHA_BF16_MODEL, REMOTE_MIRACLEIN_V2_MODEL}) or model_name == QWEN_MODEL,
             "stageTwoConfigured": model_name in REMOTE_KLEIN9B_SOURCE_MODELS,
-            "stageTwoEligible": model_name in REMOTE_KLEIN9B_SOURCE_MODELS and runnable,
+            "stageTwoEligible": model_name in REFINEMENT_MODELS and runnable,
             "maxLoras": model_lora_limit(model_name) if compatible else 0,
             "experimentalLoras": model_name in {REMOTE_KLEIN_9B_MODEL, REGULAR_9B_MODEL, FOUR_B_MODEL},
             "poseReady": model_name in REMOTE_SDXL_MODELS and REMOTE_SDXL_POSE_CONTROLNET in pose_models,
@@ -616,8 +620,11 @@ def remote_workflow_prompt(workflow: Path, info: dict) -> dict:
             if node.get("class_type") == "CLIPLoaderGGUF":
                 if "type" in info.get("CLIPLoaderGGUF", {}).get("input", {}).get("required", {}):
                     node["inputs"]["type"] = "qwen_image"
-                if node["inputs"].get("clip_name") not in available and REMOTE_PHR00T_GGUF_CLIP in available:
-                    node["inputs"]["clip_name"] = REMOTE_PHR00T_GGUF_CLIP
+                if node["inputs"].get("clip_name") not in available:
+                    # GGUF loader supports the same Qwen 2.5 VL 7B encoder in safetensors too.
+                    selected = next((name for name in (REMOTE_PHR00T_GGUF_CLIP, REMOTE_PHR00T_CLIP) if name in available), None)
+                    if selected:
+                        node["inputs"]["clip_name"] = selected
     return prompt
 
 
@@ -638,12 +645,13 @@ def validate_operation_prompt(prompt, info, label):
     validation = workflow_lab.validate_prompt(prompt, info)
     problems = validation["missing_nodes"] + validation["missing_inputs"]
     asset_fields = {"ckpt_name", "unet_name", "clip_name", "vae_name", "lora_name",
-                    "swap_model", "face_restore_model"}
+                    "swap_model", "face_restore_model", "model_name"}
     for node in prompt.values():
         specs = info.get(node["class_type"], {}).get("input", {}).get("required", {})
         for field, value in node.get("inputs", {}).items():
             spec = specs.get(field, [])
-            if field in asset_fields and spec and isinstance(spec[0], list) and value not in spec[0]:
+            choices = workflow_lab._choice_values(spec)
+            if field in asset_fields and choices and value not in choices:
                 problems.append(f"{field}: {value}")
     if problems:
         raise workflow_lab.ComfyError(
@@ -945,6 +953,7 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
                 "source": QUrl.fromLocalFile(str(source)).toString(),
                 "thumbnail": QUrl.fromLocalFile(str(_pose_thumbnail_for(source))).toString(),
                 "poseId": pose_id,
+                "sourceMetadata": source_metadata(item, source),
                 "prompt": record.prompt if record else "",
                 "negativePrompt": record.negative_prompt if record else "",
                 "promptSource": record.source if record else "AUTO_FALLBACK",
@@ -969,6 +978,7 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
                     "promptSource": str(item.get("promptSource", "AUTO_FALLBACK")),
                     "promptTemplateId": str(item.get("promptTemplateId", "")),
                     "promptMapped": bool(item.get("promptMapped", False)),
+                    "sourceMetadata": item.get("sourceMetadata", {}),
                 })
     return result
 
@@ -1161,6 +1171,10 @@ class ModuleBridge(QObject):
         self._status = "Ready · choose a module action"
         self.backend_router = None
         self._grok_sessions = {}
+
+    @pyqtSlot("QVariantMap", str, result="QVariantMap")
+    def posePresetPayload(self, row, model):
+        return preset_payload(row, model)
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self) -> str:
@@ -1360,6 +1374,13 @@ class GenerationBridge(QObject):
         self._busy = False
         self._progress = -1.0
         self._preview = ""
+        self._character_a = ""
+        self._original_master = None
+        self._finish_results = []
+        self._finish_info = {}
+        self._upscale_model = ""
+        self._finish_route = None
+        self._finish_width, self._finish_height = 1024, 1024
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
         self._stage_three_engine = "reactor_inswapper"
         self._cancel_requested = False
@@ -1510,6 +1531,186 @@ class GenerationBridge(QObject):
         self._set_status(f"Character anchor added · {row['name']} · {role or 'anchor'}")
         return True
 
+    def _identity_master(self, master_url=""):
+        if self._character_a:
+            value = preferred_reference(self._character_a)
+            return Path(value) if value else None
+        row = next((r for r in self._finish_results if r['source'] == self._preview), None)
+        if row and row.get('identitySource'):
+            return Path(QUrl(row['identitySource']).toLocalFile())
+        return self._original_master
+
+    @pyqtSlot(str)
+    def selectCharacterA(self, character_id):
+        self._character_a = character_id
+        self.charactersChanged.emit()
+
+    @pyqtSlot(str, str, str, str, result=bool)
+    def updateCharacterReference(self, character_id, old_path, new_url, role):
+        try:
+            new_path = QUrl(new_url).toLocalFile() if new_url else ''
+            update_reference(character_id, old_path, new_path, role=role)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return False
+        self.charactersChanged.emit()
+        return True
+
+    @pyqtProperty('QVariantList', notify=previewChanged)
+    def finishingResults(self):
+        return list(self._finish_results)
+
+    @pyqtSlot(str)
+    def selectFinishingResult(self, url):
+        if not self._busy and any(r['source'] == url for r in self._finish_results):
+            self._set_preview(url)
+
+    @pyqtSlot()
+    def rejectFinishingResult(self):
+        if self._busy:
+            return
+        row = next((r for r in self._finish_results if r['source'] == self._preview), None)
+        if row and row.get('inputSource'):
+            self._set_preview(row['inputSource'])
+            self._set_status('Rejected refinement · previous result selected; both files remain saved.')
+
+    @pyqtSlot()
+    def keepResult(self):
+        if self._preview and Path(QUrl(self._preview).toLocalFile()).is_file():
+            self._set_status('Kept · the selected result is already saved in your output folder.')
+
+    @pyqtSlot(str, str, int, result='QVariantMap')
+    def finishingAvailability(self, model, master_url, scale):
+        result = dict(refine=False, identity=False, upscale=False, reason='Generate a result first.')
+        if not self._preview or not self._finish_info:
+            return result
+        if self._finish_route and self._finish_route.destination == "RUNPOD" and self.backend_router:
+            if not self.backend_router._connected or not self.backend_router._remote_status.get("ready") or self.backend_router._endpoint != self._finish_route.url:
+                result['reason'] = 'Reconnect the generation backend before finishing.'
+                return result
+        info = self._finish_info
+        def available(workflow, override=None):
+            try:
+                validate_remote_workflow_assets(workflow, info, override)
+                return True
+            except (ValueError, OSError, workflow_lab.ComfyError):
+                return False
+        result['refine'] = model in REFINEMENT_MODELS and available(remote_reference_workflow(model), model)
+        engine = self._stage_three_engine
+        swaps = {'reactor_inswapper': 'inswapper_128.onnx', 'reactor_reswapper': 'reswapper_256.onnx', 'reactor_hyperswap': 'hyperswap_1a_256.onnx'}
+        choices = _remote_choice_values(info, ('ReActorFaceSwap',), 'swap_model')
+        master = self._identity_master(master_url)
+        try:
+            graph = remote_workflow_prompt(STAGE_3_WORKFLOW, info)
+            for node in graph.values():
+                if node['class_type'] == 'ReActorFaceSwap':
+                    node['inputs'].update(swap_model=swaps.get(engine, ''), face_restore_model='codeformer-v0.1.0.pth', codeformer_weight=0.4)
+            validate_operation_prompt(graph, info, 'Identity')
+            result['identity'] = bool(master and master.is_file() and swaps.get(engine) in choices)
+        except (ValueError, OSError, workflow_lab.ComfyError):
+            pass
+        choices = _remote_choice_values(info, ('UpscaleModelLoader',), 'model_name')
+        self._upscale_model = next((name for name in ('4x-UltraSharp.safetensors', '4x-UltraSharp.pth') if name in choices), '')
+        result['upscale'] = scale in (2, 4) and all(n in info for n in ('LoadImage', 'UpscaleModelLoader', 'ImageUpscaleWithModel', 'ImageScaleBy', 'SaveImage')) and bool(self._upscale_model)
+        notes = []
+        if not result['refine']:
+            notes.append('Refine: selected compatible model or required nodes/assets unavailable.')
+        if not result['identity']:
+            if 'ReActorFaceSwap' not in info:
+                notes.append('Face Lock: ReActor node is missing on this backend.')
+            elif not master or not master.is_file():
+                notes.append('Face Lock: select Character A’s untouched master reference.')
+            else:
+                notes.append('Face Lock: required swap/restoration weights are unavailable.')
+        if not result['upscale']:
+            notes.append('Upscale: required nodes or 4× UltraSharp weights are missing on this backend.')
+        result['reason'] = ' '.join(notes) or 'Finishing actions are ready.'
+        return result
+
+    @pyqtSlot(bool, bool, int, str, str, str, float)
+    def queueFinish(self, refine, identity, scale, master_url, model, lora, strength):
+        if self._busy:
+            return
+        try:
+            plan = finishing_plan(refine, identity, scale)
+            if not plan:
+                raise ValueError('Choose a finishing action.')
+            capabilities = self.finishingAvailability(model, master_url, scale or 2)
+            if any(not capabilities[stage] for stage in plan):
+                raise ValueError(capabilities['reason'])
+            compatible_selection(model, [lora] if refine else [])
+            if refine and uses_refcontrol(model, [lora]):
+                raise ValueError('RefControl needs a separate pose; choose a detail adapter for finishing.')
+            if not 0 <= strength <= 1:
+                raise ValueError('LoRA strength must be between 0 and 1.')
+            selected = Path(QUrl(self._preview).toLocalFile())
+            master = self._identity_master(master_url)
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
+        self._set_busy(True)
+        self._cancel_requested = False
+        threading.Thread(target=self._run_finish, args=(selected, master, plan, scale, model, lora, strength), daemon=True).start()
+
+    def _record_finish(self, stage, path):
+        url = QUrl.fromLocalFile(str(path)).toString()
+        if not any(r['source'] == url for r in self._finish_results):
+            self._finish_results.append({'label': stage, 'source': url, 'inputSource': self._preview,
+                                         'identitySource': QUrl.fromLocalFile(str(self._original_master)).toString() if self._original_master else ''})
+        self._set_preview(url)
+
+    def _refine_result(self, client, info, current, model, stamp, lora='None', strength=0.65, include_realism=True):
+        text = adapt_prompt(REFINE_INSTRUCTION, model, source_image=True, include_realism=include_realism)
+        if model in REMOTE_SDXL_MODELS:
+            graph = build_create_prompt(info, text, self._finish_width, self._finish_height, model, [lora], [strength])
+            uploaded = client.upload_image(current)
+            graph['finish_source'] = {'class_type': 'LoadImage', 'inputs': {'image': '/'.join(v for v in (uploaded.get('subfolder'), uploaded.get('name')) if v)}}
+            graph['finish_encode'] = {'class_type': 'VAEEncode', 'inputs': {'pixels': ['finish_source', 0], 'vae': ['1', 2]}}
+            graph['5']['inputs'].update(latent_image=['finish_encode', 0], denoise=0.3)
+            validate_operation_prompt(graph, info, 'Refine')
+            return self._submit_and_save(client, graph, stamp, 'Refine')
+        return self._run_reference_stage(client, info, remote_reference_workflow(model), current, text, stamp, 'Refine',
+            model_override=model, controls={**remote_reference_controls(model), "width": self._finish_width, "height": self._finish_height}, loras=[lora], lora_strengths=[strength])
+
+    def _run_finish(self, selected, master, plan, scale, model, lora, strength):
+        try:
+            self._original_master = master
+            with use_route(self._finish_route):
+                client, _ = self._connect_comfyui()
+                info = client.object_info()
+                self._finish_info = info
+                # Validate every requested stage against fresh backend metadata before submitting.
+                capabilities = self.finishingAvailability(model, QUrl.fromLocalFile(str(master)).toString() if master else '', scale or 2)
+                if any(not capabilities[stage] for stage in plan):
+                    raise ValueError(capabilities['reason'])
+                if 'refine' in plan and lora != 'None':
+                    available_loras = _remote_choice_values(info, ('LoraLoader', 'LoraLoaderModelOnly'), 'lora_name')
+                    if lora not in available_loras:
+                        raise ValueError('The selected refinement LoRA is unavailable on this backend.')
+                stamp = str(time.time_ns())
+                def execute(stage, current, identity_source):
+                    self._check_cancelled()
+                    if stage == 'refine':
+                        return self._refine_result(client, info, current, model, stamp, lora, strength)
+                    if stage == 'identity':
+                        return self._run_reference_stage(client, info, STAGE_3_WORKFLOW, current, '', stamp, 'FaceLock', secondary_image=identity_source)
+                    uploaded = client.upload_image(current)
+                    graph = {
+                        '1': {'class_type': 'LoadImage', 'inputs': {'image': '/'.join(v for v in (uploaded.get('subfolder'), uploaded.get('name')) if v)}},
+                        '2': {'class_type': 'UpscaleModelLoader', 'inputs': {'model_name': self._upscale_model}},
+                        '3': {'class_type': 'ImageUpscaleWithModel', 'inputs': {'upscale_model': ['2', 0], 'image': ['1', 0]}},
+                        '4': {'class_type': 'ImageScaleBy', 'inputs': {'image': ['3', 0], 'upscale_method': 'lanczos', 'scale_by': scale / 4}},
+                        '5': {'class_type': 'SaveImage', 'inputs': {'images': ['4', 0], 'filename_prefix': 'GENESIS-Finish'}}}
+                    validate_operation_prompt(graph, info, 'Upscale')
+                    return self._submit_and_save(client, graph, stamp, 'Upscale')
+                run_finishing(selected, master, plan, execute, self._record_finish)
+                self._set_status('Finishing complete · every intermediate is saved.')
+        except Exception as exc:
+            self._set_status('Finishing stopped · ' + str(exc))
+        finally:
+            self._cancel_requested = False
+            self._set_busy(False)
+
     @pyqtSlot(result=str)
     def chooseSourceImage(self) -> str:
         from genesis.qt_media_picker import choose_image
@@ -1609,6 +1810,8 @@ class GenerationBridge(QObject):
         self, target: Path, source: Path, ff_python: Path, ff_entry: Path, ff_config: Path
     ) -> None:
         try:
+            self._finish_info = info
+            self._finish_width, self._finish_height = width, height
             self._output_dir.mkdir(parents=True, exist_ok=True)
             stamp = time.strftime("%Y%m%d-%H%M%S")
             suffix = target.suffix.lower() if target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"} else ".png"
@@ -1644,7 +1847,7 @@ class GenerationBridge(QObject):
 
     @pyqtSlot(str)
     def setStageTwoModel(self, model_name: str) -> None:
-        if model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
+        if model_name in REFINEMENT_MODELS:
             self._stage_two_model = model_name
 
     @pyqtSlot(str)
@@ -1816,6 +2019,7 @@ class GenerationBridge(QObject):
         fallback_controls.update(seed=-1, width=int(width), height=int(height))
         generation_controls = getattr(self, "_next_generation_controls", None) or fallback_controls
         generation_controls["stage2_model"] = self._stage_two_model
+        generation_controls["negative_prompt"] = negative_prompt
         self._next_generation_controls = None
         self._cancel_requested = False
         self._set_progress(-1.0)
@@ -1891,6 +2095,7 @@ class GenerationBridge(QObject):
         ).start()
 
     def _run_routed_generate(self, route, *args):
+        self._finish_route = route
         if route is None:
             return self._run_generate(*args)
         with use_route(route):
@@ -1941,7 +2146,7 @@ class GenerationBridge(QObject):
                     validate_remote_workflow_assets(QWEN21_REFERENCE_WORKFLOW, info, model_name)
                 if use_stage_two:
                     stage_two_model = (generation_controls or {}).get("stage2_model", REMOTE_AISHA_9B_MODEL)
-                    if stage_two_model not in REMOTE_KLEIN9B_SOURCE_MODELS:
+                    if stage_two_model not in REFINEMENT_MODELS:
                         raise workflow_lab.ComfyError("Select a verified FLUX.2 Klein 9B family model for RunPod Stage 2.")
                     validate_remote_workflow_assets(remote_reference_workflow(stage_two_model), info, stage_two_model)
                 for enabled, workflow in ((use_stage_three, STAGE_3_WORKFLOW),
@@ -1955,8 +2160,12 @@ class GenerationBridge(QObject):
                     validate_remote_workflow_assets(STAGE_1_WORKFLOW, info, model_name)
                 if model_name == QWEN21_MODEL and (source is not None or pose is not None):
                     validate_remote_workflow_assets(QWEN21_REFERENCE_WORKFLOW, info, model_name)
-                for enabled, workflow in ((use_stage_two, STAGE_2_WORKFLOW),
-                                          (use_stage_three, STAGE_3_WORKFLOW),
+                if use_stage_two:
+                    stage_two_model = (generation_controls or {}).get("stage2_model", self._stage_two_model)
+                    if stage_two_model not in REFINEMENT_MODELS:
+                        raise workflow_lab.ComfyError("Choose an installed refinement model.")
+                    validate_remote_workflow_assets(remote_reference_workflow(stage_two_model), info, stage_two_model)
+                for enabled, workflow in ((use_stage_three, STAGE_3_WORKFLOW),
                                           (use_upscale, UPSCALE_WORKFLOW)):
                     if enabled:
                         validate_remote_workflow_assets(workflow, info)
@@ -2069,39 +2278,26 @@ class GenerationBridge(QObject):
                 # negative conditioning. Qwen 2.1 keeps the text for CFG > 1.
                 current = self._submit_and_save(client, prompt, stamp, "QwenImage21" if model_name == QWEN21_MODEL else "Klein")
 
+            self._original_master = source
+            self._record_finish("Generated", current)
             self._check_cancelled()
             if use_stage_two:
-                if remote_url():
-                    refine_controls = {
-                        **remote_reference_controls(stage_two_model),
-                        "width": width, "height": height,
-                        "seed": (generation_controls or {}).get("seed", -1),
-                    }
-                    current = self._run_reference_stage(
-                        client, info, remote_reference_workflow(stage_two_model), current,
-                        adapt_prompt(prompt_text, stage_two_model, source_image=True, include_realism=False),
-                        stamp, "Stage2-Aisha9B" if stage_two_model == REMOTE_AISHA_9B_MODEL else "Stage2-Klein9B",
-                        controls=refine_controls, model_override=stage_two_model,
-                    )
-                else:
-                    current = self._run_reference_stage(
-                        client, info, STAGE_2_WORKFLOW, current,
-                        adapt_prompt(prompt_text, "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors", source_image=True, include_realism=False),
-                        stamp, "Stage2",
-                    )
+                current = self._refine_result(client, info, current, stage_two_model, stamp, include_realism=False)
+                self._record_finish("Refine", current)
             self._check_cancelled()
             if use_stage_three:
-                self._set_status("Stage 2 complete · preparing Stage 3 identity lock…")
+                self._set_status("Preparing Stage 3 identity lock…")
                 current = self._run_reference_stage(
                     client, info, STAGE_3_WORKFLOW, current, "", stamp, "Stage3",
                     secondary_image=source,
                 )
+                self._record_finish("Face Lock", current)
             self._check_cancelled()
             if use_upscale:
                 current = self._run_reference_stage(
                     client, info, UPSCALE_WORKFLOW, current, "", stamp, "Upscale"
                 )
-            self._set_preview(QUrl.fromLocalFile(str(current)).toString())
+            self._record_finish("Generated", current)
             self._set_progress(1.0)
             self._set_status(f"Complete · {current.name}")
         except Exception as exc:
@@ -2317,6 +2513,24 @@ class GenerationBridge(QObject):
                                 if refs.get(field) == [node_id, 0]:
                                     refs.pop(field)
                 prompt.pop(node_id)
+        if stage in {"Phr00t-v23", "Phr00t-v23-GGUF", "Phr00t-v19", "Phr00t-v19-GGUF", "Stage1"} and self._character_a:
+            character = get_character(self._character_a) or {}
+            if input_image.resolve() == Path(character.get("primary_image", "")).resolve():
+                encode = next((n for n in prompt.values() if n.get("class_type") == "TextEncodeQwenImageEditPlus"), None)
+                optional = info.get("TextEncodeQwenImageEditPlus", {}).get("input", {}).get("optional", {})
+                if encode:
+                    field = "image3" if "image2" in encode["inputs"] else "image2"
+                    for ref in character.get("references", []):
+                        if Path(ref).resolve() == input_image.resolve() or not Path(ref).is_file():
+                            continue
+                        if field not in optional:
+                            break
+                        uploaded = client.upload_image(Path(ref))
+                        node_id = "__character_a_" + field
+                        prompt[node_id] = {"class_type": "LoadImage", "inputs": {"image": "/".join(v for v in (uploaded.get("subfolder"), uploaded.get("name")) if v)}}
+                        encode["inputs"][field] = [node_id, 0]
+                        prompt_text += " Use " + field + " as another untouched identity view of the same Character A."
+                        field = "image3" if field == "image2" else "image4"
         workflow_controls = workflow_lab.discover_workflow_controls(prompt)
         if model_override:
             target = workflow_controls.get("model")
@@ -2343,6 +2557,9 @@ class GenerationBridge(QObject):
             if target:
                 prompt[str(target[0])]["inputs"][target[1]] = prompt_text
         if controls:
+            negative_target = workflow_controls.get("negative")
+            if negative_target and "negative_prompt" in controls and model_family(model_override or "") != "qwen_image":
+                prompt[str(negative_target[0])]["inputs"][negative_target[1]] = controls["negative_prompt"]
             for name in ("width", "height", "steps", "cfg", "denoise", "sampler", "scheduler"):
                 target = workflow_controls.get(name)
                 if target and name in controls and not isinstance(prompt[str(target[0])]["inputs"].get(target[1]), list):
@@ -2502,7 +2719,7 @@ def main() -> int:
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
     context.setContextProperty("poseItems", load_pose_items())
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
-    context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
+    context.setContextProperty("curatedPosePresets", load_curated_pose_presets() + pose_preset_references(load_pose_items(limit=10000)))
     context.setContextProperty("generationProfiles", load_generation_profiles())
     context.setContextProperty("runtimeStatus", load_runtime_status())
     generation_bridge = GenerationBridge(app)

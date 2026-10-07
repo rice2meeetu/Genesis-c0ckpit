@@ -123,6 +123,7 @@ def adapt_prompt(prompt: str, model: str, *, source_image: bool = False,
     triggers or unsupported negative syntax are injected.
     """
     text = normalize_identity_instruction(prompt)
+    text = re.sub(re.escape(REFCONTROL_TRIGGER) + r"[.\s]*", "", text, flags=re.I).strip()
     if not text:
         return ""
     family = model_family(model)
@@ -194,7 +195,7 @@ def build_pipeline_plan(state: GenerationState, workflow_root: str | Path = "") 
     ]
     previous = "stage1.output"
     if state.use_stage2:
-        stages.append(PipelineStage(2, "Lustify refine", str(root / "STAGE_2_LUSTIFY_REFINE.json"), previous))
+        stages.append(PipelineStage(2, "Selected model refine", "validated-selected-refinement", previous))
         previous = "stage2.output"
     if state.use_stage3:
         stages.append(PipelineStage(3, "ReActor face lock", str(root / "STAGE_3_REACTOR_ROCM.json"), previous))

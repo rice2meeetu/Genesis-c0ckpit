@@ -123,6 +123,9 @@ def _choice_values(spec: Any) -> list:
         values = spec[0]
         if isinstance(values, (list, tuple)):
             return list(values)
+        if values == "COMBO" and len(spec) > 1 and isinstance(spec[1], dict):
+            options = spec[1].get("options", [])
+            return list(options) if isinstance(options, (list, tuple)) else []
     return []
 
 

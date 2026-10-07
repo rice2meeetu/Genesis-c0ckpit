@@ -40,7 +40,7 @@ def test_runpod_selector_keeps_inactive_choices_but_refuses_generation():
     generation = cockpit.GenerationBridge()
     bridge = BackendBridge(generation)
     bridge._mode = 'RUNPOD'
-    bridge._endpoint = 'https://test-8188.proxy.runpod.net'
+    bridge._endpoint = 'https://test-8189.proxy.runpod.net'
     bridge._connected = True
     bridge._remote_status = {'ready': True}
     bridge._remote = cockpit.build_remote_generation_profiles({
@@ -68,7 +68,7 @@ def test_runpod_selector_keeps_inactive_choices_but_refuses_generation():
     (cockpit.REMOTE_MIRACLEIN_V2_MODEL, cockpit.REMOTE_KLEIN9B_WORKFLOW),
 ])
 def test_stage_one_choice_drives_workflow_and_passes_pose_and_result_forward(monkeypatch, tmp_path, model, workflow):
-    monkeypatch.setenv('GENESIS_COMFY_URL', 'https://test-8188.proxy.runpod.net')
+    monkeypatch.setenv('GENESIS_COMFY_URL', 'https://test-8189.proxy.runpod.net')
     bridge = cockpit.GenerationBridge()
     bridge._output_dir = tmp_path
     monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (Mock(), {}))

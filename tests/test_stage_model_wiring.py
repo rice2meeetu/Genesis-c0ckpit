@@ -26,7 +26,7 @@ def capture_reference(monkeypatch, tmp_path, catalog, workflow, model, pose=None
     captured = {}
     monkeypatch.setattr(bridge, '_submit_and_save',
                         lambda client, prompt, stamp, stage: captured.update(prompt) or tmp_path / 'out.png')
-    with use_route(Route('RUNPOD', 'https://test-8188.proxy.runpod.net')):
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
         bridge._run_reference_stage(client, catalog, workflow, tmp_path / 'source.png',
                                     'A ceramic vase beside a window', 'stamp', 'Stage1',
                                     secondary_image=pose, controls=controls, model_override=model)
@@ -118,7 +118,7 @@ def test_missing_pornmaster_asset_stops_before_upload(monkeypatch, tmp_path, cat
     bridge = cockpit.GenerationBridge()
     monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (client, {}))
     monkeypatch.setattr(cockpit, 'load_remote_catalog', lambda client: catalog)
-    with use_route(Route('RUNPOD', 'https://test-8188.proxy.runpod.net')):
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
         bridge._run_generate('A ceramic vase', '', 768, 1024, cockpit.LOCAL_PORNMASTER_9B_MODEL,
                              'None', 'None', 'None', 0, 0, 0, tmp_path / 'source.png', None,
                              False, False, False)
@@ -139,7 +139,7 @@ def test_refinement_uses_selected_model_settings_and_previous_output(monkeypatch
     monkeypatch.setattr(cockpit, 'validate_remote_workflow_assets', Mock())
     run = Mock(side_effect=[tmp_path / 'stage1.png', tmp_path / 'stage2.png'])
     monkeypatch.setattr(bridge, '_run_reference_stage', run)
-    with use_route(Route('RUNPOD', 'https://test-8188.proxy.runpod.net')):
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
         bridge._run_generate('A ceramic vase', '', 768, 1024, cockpit.REMOTE_PHR00T_MODEL,
                              'None', 'None', 'None', 0, 0, 0, tmp_path / 'source.png', None,
                              True, False, False, {'stage2_model': model, 'seed': 7})
@@ -155,7 +155,7 @@ def test_refinement_uses_selected_model_settings_and_previous_output(monkeypatch
 ])
 def test_startup_preserves_explicit_connect_behavior(monkeypatch, mode, opt_in, expected):
     monkeypatch.setenv('GENESIS_BACKEND_MODE', mode)
-    monkeypatch.setenv('GENESIS_RUNPOD_URL', 'https://test-8188.proxy.runpod.net')
+    monkeypatch.setenv('GENESIS_RUNPOD_URL', 'https://test-8189.proxy.runpod.net')
     monkeypatch.setenv('GENESIS_RUNPOD_AUTOCONNECT', opt_in)
     bridge = backend.BackendBridge(cockpit.GenerationBridge())
     connect, refresh = Mock(), Mock()
@@ -181,3 +181,9 @@ def test_miraclein_switch_preserves_connected_dimensions(monkeypatch, tmp_path, 
 @pytest.mark.parametrize('model', [cockpit.REMOTE_DONUTS_MODEL, cockpit.REMOTE_BIGLUSTY_DONUT_MODEL])
 def test_sdxl_models_map_to_shared_t2i_workflow(model):
     assert cockpit.remote_reference_workflow(model) == cockpit.REMOTE_SDXL_T2I_WORKFLOW
+
+
+
+
+
+

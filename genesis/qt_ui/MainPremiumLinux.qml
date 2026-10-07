@@ -105,6 +105,14 @@ ApplicationWindow {
     property real generationDenoise: 1.0
     property string generationSampler: "er_sde"
     property string generationScheduler: "beta"
+    onStageTwoModelChanged: finishLora = "None"
+    property string finishLora: "None"
+    property real finishLoraStrength: 0.65
+    property int finishScale: 2
+    readonly property var finishAvailability: {
+        var refresh = genesisBridge.previewUrl + genesisBridge.status + genesisBridge.busy + backendBridge.connected + backendBridge.endpoint
+        return genesisBridge.finishingAvailability(stageTwoModel, generationSource.toString(), finishScale)
+    }
     property bool useStageTwo: false
     property bool useStageThree: false
     property string stageTwoModel: "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
@@ -152,6 +160,15 @@ ApplicationWindow {
     property string selectedPoseName: "No pose selected"
     property string selectedPoseCategory: ""
     property string selectedPosePrompt: ""
+    property var selectedPresetPayload: null
+    property string presetAttribution: ""
+    property string presetSettingsNote: ""
+    readonly property string comparisonSource: {
+        var rows = genesisBridge.finishingResults
+        for (var i = 0; i < rows.length; ++i)
+            if (rows[i].source === genesisBridge.previewUrl) return rows[i].inputSource || ""
+        return ""
+    }
     property string selectedPresetName: "No preset selected"
     property string presetSearch: ""
     property string presetCategory: "All"
@@ -343,6 +360,7 @@ ApplicationWindow {
         generationDenoise = defaults.defaultDenoise !== undefined ? defaults.defaultDenoise : 1.0
         generationSampler = defaults.defaultSampler !== undefined ? defaults.defaultSampler : "euler"
         generationScheduler = defaults.defaultScheduler !== undefined ? defaults.defaultScheduler : "simple"
+        if (typeof selectedPresetPayload !== "undefined" && selectedPresetPayload) applyPresetPayload(selectedPresetPayload, profile)
     }
 
     readonly property var activeGenerationDefaults: generationSource.toString().length
@@ -383,14 +401,40 @@ ApplicationWindow {
         selectedPoseName = "No pose selected"
         selectedPoseCategory = ""
         selectedPosePrompt = ""
+        selectedPresetPayload = null
+        presetAttribution = ""
+        presetSettingsNote = ""
+    }
+
+    function applyPresetPayload(row, profile) {
+        if (!row || !profile) return
+        var payload = genesisBridge.posePresetPayload(row, profile.model)
+        generationPrompt = payload.prompt || ""
+        selectedPosePrompt = generationPrompt
+        generationNegativePrompt = payload.negativePrompt || ""
+        presetAttribution = String(payload.attribution || "") + " · prompt: " + String(payload.promptSource || "")
+        presetSettingsNote = payload.settingsNote || ""
+        var settings = payload.settings || ({})
+        if (settings.steps !== undefined) generationSteps = settings.steps
+        if (settings.cfg !== undefined) generationCfg = settings.cfg
+        if (settings.width !== undefined) generationWidth = settings.width
+        if (settings.height !== undefined) generationHeight = settings.height
+        if (settings.seed !== undefined) generationSeed = settings.seed
+        if (settings.denoise !== undefined) generationDenoise = settings.denoise
+        if (settings.sampler !== undefined) generationSampler = settings.sampler
+        // FLUX scheduler node has its own fixed schedule.
+        if (settings.scheduler !== undefined && !activeGenerationDefaults.schedulerFixed)
+            generationScheduler = settings.scheduler
     }
 
     function applyPreset(row) {
         if (!row) return
+        if (row.source) { applyPose(row); selectedPresetName = row.label || row.name; return }
         clearPose()
+        selectedPresetPayload = row
+        applyGenerationDefaults(selectedGenerationProfile)
         selectedPresetName = row.label || row.name || "Preset"
-        if (row.prompt && row.prompt.length)
-            generationPrompt = row.prompt
+
     }
 
     function applyPose(row) {
@@ -400,8 +444,8 @@ ApplicationWindow {
         selectedPoseThumbnail = row.thumbnail || row.source || ""
         selectedPoseName = row.name || "Pose"
         selectedPoseCategory = row.category || ""
-        selectedPosePrompt = row.prompt || ""
-        generationPrompt = row.prompt || ""
+        selectedPresetPayload = row
+        applyGenerationDefaults(selectedGenerationProfile)
     }
 
     function filteredPresets() {
@@ -463,6 +507,28 @@ ApplicationWindow {
             selectedLoraTwoStrength,
             selectedLoraThreeStrength
         )
+    }
+
+    Popup {
+        id: finishCompare
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 40, 1200)
+        height: Math.min(parent.height - 40, 800)
+        modal: true
+        ColumnLayout {
+            anchors.fill: parent
+            RowLayout {
+                Text { text: "Previous result · Selected finishing result"; color: appRoot.textMain; Layout.fillWidth: true }
+                GButton { text: "Close"; onClicked: finishCompare.close() }
+            }
+            RowLayout {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Image { Layout.fillWidth: true; Layout.fillHeight: true; fillMode: Image.PreserveAspectFit; source: appRoot.privacyMode ? "" : appRoot.comparisonSource }
+                Image { Layout.fillWidth: true; Layout.fillHeight: true; fillMode: Image.PreserveAspectFit; source: appRoot.privacyMode ? "" : genesisBridge.previewUrl }
+            }
+            Text { visible: appRoot.privacyMode; text: "Turn off private preview to view the saved results."; color: appRoot.textDim }
+        }
     }
 
     component Panel: Rectangle {
@@ -1155,6 +1221,13 @@ ApplicationWindow {
                                         }
                                     }
                                     SectionLabel { text: "PROMPT" }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: appRoot.presetAttribution.length > 0
+                                        textFormat: Text.PlainText
+                                        text: "Preset source: " + appRoot.presetAttribution + "\n" + appRoot.presetSettingsNote
+                                        color: appRoot.textDim; wrapMode: Text.WordWrap; font.pixelSize: 12
+                                    }
                                     TextArea {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
@@ -1255,6 +1328,25 @@ ApplicationWindow {
                                             GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
                                         }
                                     }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 6
+                                        GButton { text: "Keep / Save"; enabled: !genesisBridge.busy && genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.keepResult() }
+                                        GButton { text: "Refine / More Realism"; enabled: !genesisBridge.busy && appRoot.finishAvailability.refine; onClicked: genesisBridge.queueFinish(true, false, 0, appRoot.generationSource.toString(), appRoot.stageTwoModel, appRoot.finishLora, appRoot.finishLoraStrength) }
+                                        GButton { text: "Identity / Face Lock"; enabled: !genesisBridge.busy && appRoot.finishAvailability.identity; onClicked: genesisBridge.queueFinish(false, true, 0, appRoot.generationSource.toString(), appRoot.stageTwoModel, "None", 0) }
+                                        GButton { text: "Upscale " + appRoot.finishScale + "×"; enabled: !genesisBridge.busy && appRoot.finishAvailability.upscale; onClicked: genesisBridge.queueFinish(false, false, appRoot.finishScale, appRoot.generationSource.toString(), appRoot.stageTwoModel, "None", 0) }
+                                        GButton { text: "Full Finish"; enabled: !genesisBridge.busy && appRoot.finishAvailability.refine && appRoot.finishAvailability.identity && appRoot.finishAvailability.upscale; onClicked: genesisBridge.queueFinish(true, true, appRoot.finishScale, appRoot.generationSource.toString(), appRoot.stageTwoModel, appRoot.finishLora, appRoot.finishLoraStrength) }
+                                    }
+                                    GButton { text: "Compare with previous result"; enabled: appRoot.comparisonSource.length > 0; onClicked: finishCompare.open() }
+                                    GButton { text: "Reject finishing result / return to previous"; enabled: !genesisBridge.busy && genesisBridge.finishingResults.length > 1; onClicked: genesisBridge.rejectFinishingResult() }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        ComboBox { model: ["2×", "4×"]; onActivated: appRoot.finishScale = currentIndex === 0 ? 2 : 4 }
+                                        ComboBox { Layout.fillWidth: true; model: (appRoot.selectedStageTwoProfile.loras || ["None"]).filter(function(name) { return name !== "refcontrol_v2_poses.safetensors" }); currentIndex: Math.max(0, model.indexOf(appRoot.finishLora)); onActivated: appRoot.finishLora = currentText }
+                                        SpinBox { from: 0; to: 100; value: 65; editable: true; onValueModified: appRoot.finishLoraStrength = value / 100.0 }
+                                    }
+                                    Text { Layout.fillWidth: true; text: appRoot.finishAvailability.reason || ""; color: appRoot.textDim; wrapMode: Text.Wrap }
+                                    ComboBox { Layout.fillWidth: true; model: genesisBridge.finishingResults; textRole: "label"; onActivated: genesisBridge.selectFinishingResult(model[currentIndex].source) }
+                                    CharacterReferences { Layout.fillWidth: true; bridge: genesisBridge; privatePreview: appRoot.privacyMode; inputSource: appRoot.generationSource.toString(); onUseMaster: function(source) { appRoot.generationSource = source } }
                                     Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 9; elide: Text.ElideMiddle }
                                     RowLayout {
                                     Layout.fillWidth: true

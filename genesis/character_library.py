@@ -97,3 +97,37 @@ def character_items(path: Path = INDEX_PATH) -> list[dict]:
             "role": row.get("reference_roles", {}).get(ref, "primary" if ref == row.get("primary_image") else "anchor"),
         } for ref in row.get("references", []) if Path(ref).is_file()],
     } for row in load_characters(path)]
+
+
+REFERENCE_ANGLES = ("Primary/Front", "¾ Left", "¾ Right", "Profile", "Upper Body", "Full Body")
+
+def update_reference(character_id: str, old_image: str, new_image: str = "", *, role: str = "", path: Path = INDEX_PATH) -> dict:
+    """Replace/delete a library link only; never modify either image file."""
+    rows = load_characters(path)
+    row = next((r for r in rows if r["id"] == character_id), None)
+    if row is None:
+        raise ValueError("Saved character was not found.")
+    old = str(Path(old_image).expanduser().resolve())
+    refs = row.get("references", [])
+    if old not in refs:
+        raise ValueError("Reference was not found.")
+    new = str(Path(new_image).expanduser().resolve()) if new_image else ""
+    if new and not Path(new).is_file():
+        raise ValueError("Replacement reference does not exist.")
+    if old == row["primary_image"] and not new:
+        raise ValueError("Replace the primary reference before removing it.")
+    if new and new != old and new in refs:
+        raise ValueError("That reference is already stored.")
+    index = refs.index(old)
+    roles = row.setdefault("reference_roles", {})
+    previous_role = roles.pop(old, "Primary/Front" if old == row["primary_image"] else "anchor")
+    if new:
+        refs[index] = new
+        roles[new] = role.strip() or previous_role
+    else:
+        refs.pop(index)
+    if old == row["primary_image"]:
+        row["primary_image"] = new
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"version": 1, "characters": rows}, indent=2), encoding="utf-8")
+    return row

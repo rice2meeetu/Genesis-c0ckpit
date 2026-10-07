@@ -17,7 +17,7 @@ Denoise advice is graph-specific: lower denoise can retain source detail in SDXL
 
 ## Verification and changed files
 
-Local focused suite: **220 passed in 1.36s**. Compilation and `git diff --check` passed. Tests are offline and inspect text/graph routing only. Neither ComfyUI port was contacted or restarted.
+Earlier offline routing verification: **220 passed in 1.36s**. This historical checkpoint preceded the authorised private installation and live checks below.
 
 This follow-up changes `qt_cockpit.py`, `genesis/generation_pipeline.py`, `genesis/qt_ui/MainPremiumLinux.qml`, `tests/test_pose_identity_routing.py`, `tests/test_runpod_lora_wiring.py`, adds `tests/test_i2i_realism.py`, and updates only positive prompt text in these existing workflow files:
 
@@ -35,4 +35,32 @@ Original checkout remains dirty and uncommitted. The GitHub draft is built from 
 
 The draft preserves GENESIS_AISHA_9B_TEST.json exactly as it exists on GitHub main, including its editor layout and face-swap route. The required base-generation graph lives separately in GENESIS_AISHA_9B_T2I.json. Removed inherited font/control-size changes, unrelated FLUX.1 catalog changes and startup auto-connect changes. Base 9B graph defaults now match its profile even when no controls are supplied. Review snapshot: 213 tests passed in 1.36s. The original local working-tree diff and status were checked and stayed unchanged during review.
 
-The latest seven-section design update is recorded in the current Work chat. Character A multi-angle editing and independent finishing actions, modernized Stage 2 without Lustify, and execution checks remain follow-up requirements; this routing draft does not claim those features are implemented. No merge or deployment has occurred.
+## Character A and independent finishing
+
+Character Creator stores one active identity, with untouched Primary/Front, ¾ Left, ¾ Right, Profile, Upper Body and Full Body references, replace/delete, thumbnails and a zoomable preview. Extra Phr00t identity angles are sent only when the connected conditioning node actually supports extra inputs. Pose images remain composition references, not a second stored identity.
+
+Post-generation Keep/Save, Refine, Face Lock, Upscale 2×/4× and Full Finish operate on the selected saved result. Face Lock works without Refine and reads the untouched identity master. Every result retains its source/master association in history; comparison and rejection preserve files. Stage 2 uses installed compatible models, with Juggernaut/Lustify excluded. Face Lock and Upscale are gated by actual nodes and weights. Refine detail LoRAs stay family-gated; RefControl is not a finishing detail adapter.
+
+## Imported pose source priority
+
+Declared source metadata, original index prompt fields and same-name JSON sidecars take precedence over Grok fallback text. Exact model variants keep Phr00t v19/v23 distinct. Source text is not combined with Grok text. Pack settings and triggers require an explicitly matching model/family. Numeric settings are bounded and fixed FLUX scheduler behavior is retained. Phr00t keeps zeroed negative conditioning; SDXL retains its own negative conditioning. The executable RefControl route exclusively supplies its exact ordering trigger after input/compatibility checks.
+
+Attribution is carried to the UI. The current 486-row imported indexes contain only file/category/resolution metadata, so these rows do not claim unavailable tested source prompts/settings. The current source library is untouched. Imported preset sections reference the existing control paths once, including existing multi-person categories, without copying pose files.
+
+## User 8189 installation and verification
+
+The user explicitly authorised installation of missing Face Lock and Upscale components. New custom-node code, dependencies, CodeFormer/Inswapper and UltraSharp weights reside under a private `/workspace/genesis-8189` base/environment. Existing model paths are retained as references. OpenPoseXL2 was also missing and was installed for the existing SDXL pose route. Only the user ComfyUI process on 8189 is restarted; the pod is not stopped/recreated and 8188 is never addressed by generation or restart commands.
+
+The Phr00t GGUF route can use its already-installed matching Qwen 2.5 VL 7B safetensors encoder through the GGUF loader; it cannot fall back to Klein’s Qwen 3 encoder. The GGUF project documents support for both formats: https://github.com/city96/ComfyUI-GGUF . ReActor source: https://github.com/Gourieff/ComfyUI-ReActor . OpenPoseXL2 source: https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0 .
+
+A neutral geometric refinement executed successfully on 8189 (prompt `2d2c69db-9383-42a2-9c31-e23368cdcbb4`). No output was opened or evaluated. Neutral finishing integration checks and the final catalogue check are recorded in the task verification report. Tests validate graph execution and routing, not photographic/face quality.
+
+The saved public proxy address returned 403. With explicit user approval, the existing GENESIS public SSH key was registered, and a local tunnel forwards 18189 exclusively to remote 8189. An optional launcher helper maintains that route; it does nothing for other configured endpoints. The previous tunnel template’s 8188 target was corrected to 8189. No keys, credentials, pod addresses or machine-local connection file are published in this draft.
+
+The original checkout remains dirty and uncommitted. GitHub uses a separate tested snapshot; no merge occurs.
+
+## Final verification
+
+Final focused suites: original checkout **272 passed in 1.44s**; isolated review snapshot **272 passed in 1.42s**. Neutral live checks passed: SDXL Refine; independent Upscale 2× (128→256); independent Upscale 4× (128→512); and Face Lock→Upscale 2×, preserving input/master bytes and intermediate files. The neutral Face Lock input contains no face, so this confirms execution rather than facial similarity. Regression tests cover all seven finishing combinations. No explicit images were generated, opened or evaluated.
+
+The final user backend exposes **1,358 node classes, with none of the original 1,337 classes missing**, and six installed runnable source-image profiles: Aisha 9B, Miraclein 9B, two installed SDXL mixes, Phr00t v19 Q8 and Phr00t v23 Q8. Other configured variants remain filtered when absent; this does not claim every variant is installed or live-tested. Brother’s process identity was checked around each user-only restart and remained unchanged.

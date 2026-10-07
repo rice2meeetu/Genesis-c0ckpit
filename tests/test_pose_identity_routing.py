@@ -257,3 +257,22 @@ def test_source_picker_hides_models_without_source_edit_workflows():
         assert engine.evaluate('generationModel.length').toInt() == expected_count
         if source:
             assert engine.evaluate('generationModel[0].model').toString() == c.REMOTE_KLEIN_9B_MODEL
+
+
+def test_phr00t_extra_character_angle_keeps_pose_in_image2(monkeypatch,tmp_path,catalog):
+    primary=tmp_path/'primary.png';primary.write_bytes(b'original primary')
+    angle=tmp_path/'angle.png';angle.write_bytes(b'original angle')
+    pose=tmp_path/'pose.png';pose.write_bytes(b'control only')
+    bridge=c.GenerationBridge();bridge._character_a='character-a'
+    monkeypatch.setattr(c,'get_character',lambda _:dict(primary_image=str(primary),references=[str(primary),str(angle)]))
+    client=Mock();client.upload_image.side_effect=lambda p:{'name':p.name}
+    graph={};monkeypatch.setattr(bridge,'_submit_and_save',lambda _,g,*args:graph.update(g) or tmp_path/'result.png')
+    with use_route(Route('RUNPOD','https://offline-8189.proxy.runpod.net')):
+        bridge._run_reference_stage(client,catalog,c.STAGE_1_WORKFLOW,primary,'Neutral pose instruction','stamp','Phr00t-v19-GGUF',secondary_image=pose,model_override=c.REMOTE_PHR00T_V19_GGUF_MODEL)
+    assert graph['2']['inputs']['image']=='primary.png'
+    assert graph['3']['inputs']['image']=='pose.png'
+    assert graph['4']['inputs']['image2']==['3',0]
+    assert graph['4']['inputs']['image3']==['__character_a_image3',0]
+    assert graph['__character_a_image3']['inputs']['image']=='angle.png'
+    assert primary.read_bytes()==b'original primary' and angle.read_bytes()==b'original angle'
+
