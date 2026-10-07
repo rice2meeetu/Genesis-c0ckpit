@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
+import re
 
 from genesis.model_compatibility import is_compatible, model_family, lora_trigger
 
@@ -61,33 +62,94 @@ class PipelineStage:
     input_source: str
 
 
-def adapt_prompt(prompt: str, model: str, *, source_image: bool = False, pose_image: bool = False) -> str:
-    """Wrap user/preset text in a family-specific prompt structure.
+REALISM_COMPONENTS = (
+    ("natural realistic skin texture", r"(?:natural (?:realistic )?|realistic )skin texture"),
+    ("coherent anatomy", r"(?:coherent|realistic) anatomy"),
+    ("natural body proportions", r"(?:natural|realistic) (?:body )?proportions"),
+    ("fine hair and detail", r"fine hair(?: and detail| detail)?"),
+    ("natural photographic lighting", r"natural (?:photographic )?lighting"),
+    ("natural photographic sharpness", r"natural (?:photographic )?sharpness|sharp focus"),
+)
+IDENTITY_INSTRUCTION = (
+    "Preserve recognizable facial identity and distinguishing features. "
+    "Allow pose, viewpoint, expression and lighting to change naturally."
+)
 
-    The user's text is retained verbatim.  Adapters add structure only and do
-    not silently inject LoRA trigger words or unsupported negative syntax.
+
+def normalize_identity_instruction(prompt: str) -> str:
+    """Remove preset-wide rigid identity rules while preserving the pose text."""
+    text = prompt or ""
+    rules = (
+        r"Keep the exact same person, face, hair, body proportions and appearance from image1\.\s*",
+        r"Do not change facial features\.\s*",
+        r"Maintain pixel[- ]perfect fidelity to the original face\.\s*",
+    )
+    for rule in rules:
+        text = re.sub(rule, "", text, flags=re.I)
+    text = re.sub(r"pixel[- ]perfect (?:facial identity|face|fidelity)",
+                  "recognizable facial identity and distinguishing features", text, flags=re.I)
+    return " ".join(text.split())
+
+
+def realism_prompt(prompt: str, *, include_realism: bool = True) -> str:
+    """Add missing photographic qualities once; refinement inherits them."""
+    text = normalize_identity_instruction(prompt)
+    missing = []
+    for phrase, pattern in REALISM_COMPONENTS:
+        seen = False
+        def replace(match):
+            nonlocal seen
+            if not include_realism or seen:
+                return ""
+            seen = True
+            return phrase
+        text = re.sub(pattern, replace, text, flags=re.I)
+        if include_realism and not seen:
+            missing.append(phrase)
+    # Remove separators left by duplicate preset descriptors.
+    text = re.sub(r"(?:,\s*){2,}", ", ", text)
+    text = re.sub(r"\s+([,.])", r"\1", text).strip(" ,.")
+    if missing:
+        text += ". Realism: " + ", ".join(missing)
+    return text.rstrip(" .") + "." if text else ""
+
+
+def adapt_prompt(prompt: str, model: str, *, source_image: bool = False,
+                 pose_image: bool = False, include_realism: bool = True) -> str:
+    """Use model-specific syntax with a shared, deduplicated I2I realism baseline.
+
+    Pose instructions remain intact. Rigid library-wide identity wording is
+    replaced by recognizable identity preservation, and no appearance LoRA
+    triggers or unsupported negative syntax are injected.
     """
-    text = " ".join((prompt or "").split())
+    text = normalize_identity_instruction(prompt)
     if not text:
         return ""
     family = model_family(model)
     if family == "qwen_image_2_1":
         if source_image:
-            return (
-                "Use <image1> as the primary subject/reference and preserve its identity and important visual traits. "
-                "If <image2> is present, follow its pose, body arrangement, and composition while keeping <image1> as the subject reference. "
-                "Instruction: " + text
-            )
+            pose = ("Use <image2> only for pose and composition. " if pose_image else "")
+            result = ("Use <image1> as the original identity reference. " + IDENTITY_INSTRUCTION
+                      + " " + pose + "Instruction: " + text)
+            return realism_prompt(result, include_realism=include_realism)
         return "Create the requested image with coherent anatomy and composition. Instruction: " + text
     if family == "qwen_image":
         if source_image:
-            identity = "Preserve the same person and facial identity, recognizable facial features, skin tone, hair, and appearance from image1. "
+            identity = "Preserve the same person and facial identity, recognizable facial features and distinguishing features from image1. "
             pose = ("Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. "
                     if pose_image else "")
-            return (identity + pose + "Allow the body pose, body position, framing, and composition to change according to the instruction. "
-                    + "Edit instruction: " + text)
+            result = (identity + pose + "Allow the body pose, body position, framing, composition, viewpoint, expression and lighting to change naturally according to the instruction. "
+                      + "Edit instruction: " + text)
+            return realism_prompt(result, include_realism=include_realism)
         return "Create one coherent subject with stable identity. Instruction: " + text
     if family in {"flux2_klein_4b", "flux2_klein_9b_base", "flux2_klein_9b_kv", "aisha_9b"}:
+        if source_image:
+            result = ("Subject: " + text + " Identity: " + IDENTITY_INSTRUCTION
+                      + " Setting: preserve or infer a coherent environment."
+                      + " Composition: follow the selected pose/control independently of the original identity source."
+                      + " Lighting: follow the requested scene naturally."
+                      + " Texture: preserve distinguishing appearance details.")
+            return realism_prompt(result, include_realism=include_realism)
         return (
             "Subject: " + text
             + " Setting: preserve or infer a coherent environment."
@@ -96,6 +158,9 @@ def adapt_prompt(prompt: str, model: str, *, source_image: bool = False, pose_im
             + " Texture: photorealistic skin, hair, fabric, and fine detail."
         )
     if family == "sdxl":
+        if source_image:
+            return realism_prompt(text + ". " + IDENTITY_INSTRUCTION,
+                                  include_realism=include_realism)
         return text + ", photorealistic, coherent composition, realistic anatomy, detailed texture"
     return text
 

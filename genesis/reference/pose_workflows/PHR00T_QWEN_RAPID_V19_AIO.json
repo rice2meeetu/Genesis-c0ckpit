@@ -183,7 +183,7 @@
         "Node name for S&R": "TextEncodeQwenImageEditPlus"
       },
       "widgets_values": [
-        "Keep the same person and facial identity from image1. Change only the body pose and body position according to image2 and/or the instruction. Preserve recognizable facial features, skin tone, hair, and overall identity. Photorealistic, natural skin texture, realistic anatomy, sharp focus.",
+        "Preserve the same person and facial identity, recognizable facial features and distinguishing features from image1. Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. Allow the body pose, body position, framing, composition, viewpoint, expression and lighting to change naturally according to the instruction. Edit instruction: Follow the requested edit and the separate pose/control input when supplied. Realism: natural realistic skin texture, coherent anatomy, natural body proportions, fine hair and detail, natural photographic lighting, natural photographic sharpness.",
         896
       ],
       "title": "POSE INSTRUCTION \u2014 Native Qwen Encode"

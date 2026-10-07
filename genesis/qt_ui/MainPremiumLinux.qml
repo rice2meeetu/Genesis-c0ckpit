@@ -65,7 +65,7 @@ ApplicationWindow {
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
 
     property var generationModel: typeof generationProfiles !== "undefined"
-        ? generationProfiles.filter(function(row) { return row.runnable === true && row.selectable !== false }) : []
+        ? generationProfiles.filter(function(row) { return row.runnable === true && row.selectable !== false && (!generationSource.toString().length || row.sourceSupported !== false) }) : []
     property int selectedGenerationIndex: 0
     property bool modelDefaultsApplied: false
     property string selectedModelName: ""

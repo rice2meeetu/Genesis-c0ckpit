@@ -153,7 +153,7 @@ def test_section_selectors_hide_unusable_files_without_losing_runpod_models():
         dict(model='klein', runnable=True, selectable=True, stageOneEligible=True, stageTwoEligible=True, remote=True),
         dict(model='unsupported', runnable=False, selectable=True, remote=True),
     ]
-    engine.evaluate('var generationProfiles = ' + json.dumps(rows))
+    engine.evaluate('var generationSource = ""; var generationProfiles = ' + json.dumps(rows))
     expression = re.search(r'property var generationModel: (.*?)(?=\n    (?:readonly |property |on))', qml, re.S).group(1).strip()
     result = engine.evaluate('var generationModel = ' + expression)
     assert not result.isError(), result.toString()
@@ -239,3 +239,21 @@ def test_seed_controls_are_shared_and_do_not_override_connected_fields():
     c.apply_create_controls(graph, {'seed': 123})
     assert graph['1']['inputs']['seed'] == graph['2']['inputs']['noise_seed'] == 123
     assert graph['3']['inputs']['seed'] == ['2', 0]
+
+
+def test_source_picker_hides_models_without_source_edit_workflows():
+    import re
+    qml = (c.PROJECT_ROOT / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    engine = QJSEngine()
+    rows = c.build_remote_generation_profiles({
+        'UNETLoader': {'input': {'required': {'unet_name': [[c.REMOTE_KLEIN_9B_MODEL, c.KV_9B_MODEL]]}}}})
+    assert next(row for row in rows if row['model'] == c.KV_9B_MODEL)['sourceSupported'] is False
+    expression = re.search(r'property var generationModel: (.*?)(?=\n    (?:readonly |property |on))', qml, re.S).group(1).strip()
+    engine.evaluate('var generationProfiles = ' + json.dumps(rows))
+    for source, expected_count in [('', 2), ('original.png', 1)]:
+        engine.evaluate('var generationSource = ' + json.dumps(source))
+        result = engine.evaluate('var generationModel = ' + expression)
+        assert not result.isError(), result.toString()
+        assert engine.evaluate('generationModel.length').toInt() == expected_count
+        if source:
+            assert engine.evaluate('generationModel[0].model').toString() == c.REMOTE_KLEIN_9B_MODEL

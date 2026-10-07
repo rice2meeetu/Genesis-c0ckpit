@@ -28,7 +28,8 @@ from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.asset_inventory import unavailable_local_assets
 from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import (adapt_prompt, compatible_selection, refcontrol_prompt,
-                                         REFCONTROL_DEFAULT_STRENGTH, REFCONTROL_LORA)
+                                         REFCONTROL_DEFAULT_STRENGTH, REFCONTROL_LORA,
+                                         normalize_identity_instruction)
 from genesis import integrations, workflow_lab
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character
 from genesis.media_bridge import MediaBridge
@@ -102,6 +103,7 @@ REMOTE_KLEIN9B_SOURCE_MODELS = {
 }
 KLEIN9B_REFERENCE_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | {REGULAR_9B_MODEL, LOCAL_AISHA_9B_MODEL}
 REMOTE_SOURCE_MODELS = {*REMOTE_PHR00T_MODELS, *KLEIN9B_REFERENCE_MODELS}
+SOURCE_EDIT_MODELS = {QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_SDXL_MODELS
 
 SUPPORTED_CREATE_MODELS = {
     FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL, QWEN21_MODEL, LOCAL_AISHA_9B_MODEL,
@@ -148,9 +150,11 @@ def model_generation_settings(model_name: str, *, source=False, remote=False) ->
     if model_name in ({QWEN_MODEL} | REMOTE_PHR00T_MODELS):
         values.update(defaultWidth=832, defaultHeight=1216, defaultSteps=6,
                       defaultSampler="er_sde", defaultScheduler="beta")
-        if model_name in (REMOTE_PHR00T_V23_MODELS | {REMOTE_PHR00T_V23_GGUF_MODEL}):
+        if model_name in (REMOTE_PHR00T_V23_MODELS | REMOTE_PHR00T_V23_CACHE_MODELS):
             values.update(defaultWidth=2264, defaultHeight=1360, defaultSteps=4,
                           defaultCfg=1.2, defaultSampler="euler_ancestral")
+    elif model_name == REGULAR_9B_MODEL:
+        values.update(defaultSteps=50, defaultCfg=4.0)
     elif model_name == QWEN21_MODEL:
         values.update(defaultSteps=25)
     elif model_name == LOCAL_AISHA_9B_MODEL:
@@ -181,7 +185,7 @@ def model_generation_settings(model_name: str, *, source=False, remote=False) ->
                       defaultSampler="dpmpp_sde" if model_name == REMOTE_DONUTS_MODEL else "dpmpp_3m_sde",
                       defaultScheduler="karras", defaultDenoise=0.65 if source else 1.0)
     if source and model_name == REGULAR_9B_MODEL:
-        values.update(defaultSteps=5, defaultScheduler="Flux2Scheduler", schedulerFixed=True, denoiseFixed=True)
+        values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True, denoiseFixed=True)
     return values
 
 
@@ -192,7 +196,7 @@ def model_profile_settings(model_name: str, *, remote=False) -> dict:
               "createDefaults": create, "sourceDefaults": source}
     family = model_family(model_name)
     if family == "qwen_image":
-        result["identityGuidance"] = "Phr00t: source = image1 identity; pose = image2. v19 favors consistency; v23 is the instruction alternative. Keep saved sampler/CFG defaults. Lower denoise on its empty-latent edit graph does not lock the source face."
+        result["identityGuidance"] = "Phr00t: source = image1 identity; pose = image2. v19 favors consistency; v23 is the instruction alternative. Use 4–8 steps with the saved sampler/CFG defaults. Lower denoise on its empty-latent edit graph does not lock the source face."
     elif family == "sdxl":
         result["identityGuidance"] = "SDXL source edit: lower denoise keeps more source detail but can resist a new pose; higher denoise allows larger changes and may change the face. Start at 0.65. OpenPose controls geometry; Stage 3 uses the original source for facial identity."
     elif family.startswith("flux2_klein") or family == "aisha_9b":
@@ -228,7 +232,7 @@ def load_curated_pose_presets() -> list[dict]:
                 presets.append({
                     "id": "full70:" + str(row.get("id", "")),
                     "label": str(row.get("name", "Preset")),
-                    "prompt": str(row["prompt"]),
+                    "prompt": normalize_identity_instruction(str(row["prompt"])),
                     "priority": len(presets) + 1,
                     "collection": "Full 70",
                     "category": str(category),
@@ -248,7 +252,7 @@ def load_curated_pose_presets() -> list[dict]:
                 {
                     "id": "curated18:" + str(row.get("id", "")),
                     "label": str(row.get("name", "Preset")) + " · Curated 18",
-                    "prompt": str(row.get("prompt", "")),
+                    "prompt": normalize_identity_instruction(str(row.get("prompt", ""))),
                     "priority": 70 + int(row.get("priority", 9999)),
                     "collection": "Curated 18",
                     "category": "Curated",
@@ -309,6 +313,7 @@ def build_generation_profiles(
             "ready": ready,
             "runnable": runnable,
             "stageOneEligible": model_name in SUPPORTED_CREATE_MODELS,
+            "sourceSupported": model_name in SOURCE_EDIT_MODELS,
             "sourceRequired": model_family(model_name) == "qwen_image" or model_name == REMOTE_PHR00T_V23_Q2_MODEL,
             "maxLoras": model_lora_limit(model_name) if compatible else 0,
             "experimentalLoras": model_name in {REGULAR_9B_MODEL, FOUR_B_MODEL},
@@ -524,6 +529,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "ready": True,
             "runnable": runnable,
             "stageOneEligible": model_name in SUPPORTED_CREATE_MODELS,
+            "sourceSupported": model_name in SOURCE_EDIT_MODELS,
             "sourceRequired": model_name in (REMOTE_PHR00T_MODELS | {REMOTE_AISHA_BF16_MODEL, REMOTE_MIRACLEIN_V2_MODEL}) or model_name == QWEN_MODEL,
             "stageTwoConfigured": model_name in REMOTE_KLEIN9B_SOURCE_MODELS,
             "stageTwoEligible": model_name in REMOTE_KLEIN9B_SOURCE_MODELS and runnable,
@@ -1773,7 +1779,7 @@ class GenerationBridge(QObject):
         if model_name in ({QWEN_MODEL} | REMOTE_PHR00T_MODELS) and source is None:
             self._set_status("This workflow requires a source image.")
             return
-        if source is not None and model_name not in ({QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_SDXL_MODELS):
+        if source is not None and model_name not in SOURCE_EDIT_MODELS:
             self._set_status(
                 "That engine has no validated source-image graph. Choose 4B/Phr00t or a RunPod reference model."
             )
@@ -1969,7 +1975,7 @@ class GenerationBridge(QObject):
                     controls=generation_controls, model_override=QWEN21_MODEL,
                 )
             elif model_name in REMOTE_SDXL_MODELS:
-                prompt = build_create_prompt(info, adapt_prompt(prompt_text, model_name), width, height,
+                prompt = build_create_prompt(info, adapt_prompt(prompt_text, model_name, source_image=source is not None), width, height,
                                              model_name, [lora_one, lora_two, lora_three],
                                              [lora_one_strength, lora_two_strength, lora_three_strength])
                 prompt["3"]["inputs"]["text"] = negative_prompt
@@ -2073,14 +2079,14 @@ class GenerationBridge(QObject):
                     }
                     current = self._run_reference_stage(
                         client, info, remote_reference_workflow(stage_two_model), current,
-                        adapt_prompt(prompt_text, stage_two_model, source_image=True),
+                        adapt_prompt(prompt_text, stage_two_model, source_image=True, include_realism=False),
                         stamp, "Stage2-Aisha9B" if stage_two_model == REMOTE_AISHA_9B_MODEL else "Stage2-Klein9B",
                         controls=refine_controls, model_override=stage_two_model,
                     )
                 else:
                     current = self._run_reference_stage(
                         client, info, STAGE_2_WORKFLOW, current,
-                        adapt_prompt(prompt_text, "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors"),
+                        adapt_prompt(prompt_text, "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors", source_image=True, include_realism=False),
                         stamp, "Stage2",
                     )
             self._check_cancelled()

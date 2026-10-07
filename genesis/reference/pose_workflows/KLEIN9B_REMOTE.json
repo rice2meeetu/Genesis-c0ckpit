@@ -337,7 +337,7 @@
         "type": "flux2",
         "device": "default"
       },
-      "title": "Qwen3 8B — Klein 9B text encoder"
+      "title": "Qwen3 8B \u2014 Klein 9B text encoder"
     },
     {
       "id": 3,
@@ -745,7 +745,7 @@
         "ver": "0.25.1"
       },
       "widgets_values": [
-        ""
+        "Subject: Follow the requested edit and the separate pose/control input when supplied. Identity: Preserve recognizable facial identity and distinguishing features. Allow pose, viewpoint, expression and lighting to change naturally. Setting: preserve or infer a coherent environment. Composition: follow the selected pose/control independently of the original identity source. Lighting: follow the requested scene naturally. Texture: preserve distinguishing appearance details. Realism: natural realistic skin texture, coherent anatomy, natural body proportions, fine hair and detail, natural photographic lighting, natural photographic sharpness."
       ],
       "widgets_values_named": {
         "text": ""
@@ -1039,7 +1039,7 @@
   "groups": [
     {
       "id": 1,
-      "title": "1 — MODEL / VAE / SOURCE IMAGE",
+      "title": "1 \u2014 MODEL / VAE / SOURCE IMAGE",
       "bounding": [
         -60,
         -60,
@@ -1052,7 +1052,7 @@
     },
     {
       "id": 2,
-      "title": "2 — PROMPT + REFERENCE CONDITIONING",
+      "title": "2 \u2014 PROMPT + REFERENCE CONDITIONING",
       "bounding": [
         380,
         -60,
@@ -1065,7 +1065,7 @@
     },
     {
       "id": 3,
-      "title": "3 — SAMPLING",
+      "title": "3 \u2014 SAMPLING",
       "bounding": [
         1370,
         -60,
@@ -1078,7 +1078,7 @@
     },
     {
       "id": 4,
-      "title": "4 — DECODE + OUTPUT",
+      "title": "4 \u2014 DECODE + OUTPUT",
       "bounding": [
         2420,
         100,
