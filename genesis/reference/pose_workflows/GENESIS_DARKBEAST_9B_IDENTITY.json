@@ -746,7 +746,7 @@
         "ver": "0.25.1"
       },
       "widgets_values": [
-        "Preserve the subject's facial identity from the second reference image while refining the first image. Keep pose, framing, and clothing consistent."
+        "Subject: Follow the requested edit and the separate pose/control input when supplied. Identity: Preserve recognizable facial identity and distinguishing features. Allow pose, viewpoint, expression and lighting to change naturally. Setting: preserve or infer a coherent environment. Composition: follow the selected pose/control independently of the original identity source. Lighting: follow the requested scene naturally. Texture: preserve distinguishing appearance details. Realism: natural realistic skin texture, coherent anatomy, natural body proportions, fine hair and detail, natural photographic lighting, natural photographic sharpness."
       ],
       "widgets_values_named": {
         "text": "Preserve the subject's facial identity from the second reference image while refining the first image. Keep pose, framing, and clothing consistent."

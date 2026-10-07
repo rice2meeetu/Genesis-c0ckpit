@@ -54,7 +54,8 @@ def test_document_people_limit():
     with pytest.raises(ValueError):validate_document(d)
 
 def test_editor_interaction_roundtrip(tmp_path,monkeypatch):
-    from PyQt6.QtWidgets import QApplication,QFileDialog
+    from PyQt6.QtWidgets import QApplication
+    from genesis.skeleton_editor import QFileDialog
     from PyQt6.QtCore import QPoint,Qt
     from PyQt6.QtTest import QTest
     from genesis.skeleton_editor import SkeletonEditor,read_document

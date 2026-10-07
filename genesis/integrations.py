@@ -243,7 +243,7 @@ def _wait_for_gpu_services_idle(exclude=None, timeout=15):
 
 
 def gpu_kernel_preflight():
-    """Latch GPU work off after an AMD KFD/SVM warning appears this boot."""
+    """Block GPU faults; workqueue CPU timing notices are diagnostic only."""
     try:
         result = subprocess.run(
             ["journalctl", "-k", "-b", "--no-pager"],
@@ -256,9 +256,20 @@ def gpu_kernel_preflight():
         return True, "Kernel GPU warning check unavailable."
     if result.returncode != 0:
         return True, "Kernel GPU warning check unavailable."
-    hits = [pattern for pattern in GPU_SVM_WARNING_PATTERNS if pattern in result.stdout]
+    lines = result.stdout.splitlines()
+    # These scheduler notices do not report a failed memory restore or GPU fault.
+    timing_notice = lambda line: "workqueue:" in line and "hogged CPU" in line
+    fault_markers = ("GPU reset", "GPU fault", "GPU recovery", "ring timeout",
+                     "VM_L2_PROTECTION_FAULT", "VM fault", "page fault", "amdgpu_job_timedout")
+    hits = [line.strip() for line in lines if not timing_notice(line) and (
+        any(pattern in line for pattern in GPU_SVM_WARNING_PATTERNS)
+        or (any(tag in line.lower() for tag in ("amdgpu", "kfd"))
+            and any(marker.lower() in line.lower() for marker in fault_markers)
+            or (any(tag in line.lower() for tag in ("amdgpu", "kfd"))
+                and "ring " in line.lower() and "timeout" in line.lower()))
+    )]
     if hits:
-        return False, "GPU safety latch: reboot required after KFD/SVM warning: " + ", ".join(hits)
+        return False, "GPU safety latch: reboot required after GPU fault: " + ", ".join(hits)
     return True, "GPU kernel preflight clean."
 
 

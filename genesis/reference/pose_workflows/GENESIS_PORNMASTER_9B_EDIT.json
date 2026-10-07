@@ -429,7 +429,7 @@
         2.0
       ],
       "widgets_values_named": {
-        "cfg": 1.0
+        "cfg": 2.0
       }
     },
     {
@@ -465,8 +465,7 @@
         "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
       ],
       "widgets_values_named": {
-        "unet_name": "pornmasterFlux2Klein_v3-fp8.safetensors",
-        "weight_dtype": "default"
+        "unet_name": "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
       },
       "title": "FLUX.2 Klein 9B"
     },
@@ -744,7 +743,7 @@
         "ver": "0.25.1"
       },
       "widgets_values": [
-        "Use the reference photograph and describe the desired changes in complete natural-language sentences while preserving identity."
+        "Subject: Follow the requested edit and the separate pose/control input when supplied. Identity: Preserve recognizable facial identity and distinguishing features. Allow pose, viewpoint, expression and lighting to change naturally. Setting: preserve or infer a coherent environment. Composition: follow the selected pose/control independently of the original identity source. Lighting: follow the requested scene naturally. Texture: preserve distinguishing appearance details. Realism: natural realistic skin texture, coherent anatomy, natural body proportions, fine hair and detail, natural photographic lighting, natural photographic sharpness."
       ],
       "widgets_values_named": {
         "text": "Use the reference photograph and describe the desired changes in complete natural-language sentences while preserving identity."
@@ -802,7 +801,7 @@
         1024
       ],
       "widgets_values_named": {
-        "steps": 12,
+        "steps": 4,
         "width": 1024,
         "height": 1024
       }

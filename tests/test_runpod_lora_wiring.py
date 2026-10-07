@@ -5,8 +5,13 @@ from genesis.model_compatibility import lora_trigger
 
 
 def _cached_info():
-    path = qt_cockpit.Path.home() / ".cache" / "genesis" / "runpod-bdc8a6f5ef980e21-object-info.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    # Deterministic offline schema; no dependency on a user's transient cache.
+    path = qt_cockpit.Path(__file__).parent / "fixtures" / "runpod_stage_models_schema.json"
+    info = json.loads(path.read_text(encoding="utf-8"))
+    info["LoraLoaderModelOnly"] = {"input": {"required": {
+        "model": ["MODEL"], "lora_name": [["refcontrol_v2_poses.safetensors"]],
+        "strength_model": ["FLOAT"]}}}
+    return info
 
 
 def test_refcontrol_is_offered_for_remote_klein9b_cached_catalog():

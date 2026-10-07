@@ -262,6 +262,8 @@ class CockpitRepairTests(unittest.TestCase):
 
     def test_workbench_consumes_pose_and_source_roles_without_touching_stage_outputs(self):
         pose_app = Path("/home/rice2meetyou/AI/GENESIS_POSE_MAKER/app.py")
+        if not pose_app.is_file():
+            self.skipTest("External legacy Pose Maker is not installed; bundled skeleton editor is tested separately.")
         tree = ast.parse(pose_app.read_text(encoding="utf-8"))
         function = next(
             node

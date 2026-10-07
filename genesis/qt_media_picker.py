@@ -3,11 +3,11 @@ from collections import OrderedDict
 from pathlib import Path
 import re
 
-from PyQt6.QtCore import QSettings, QSize, Qt
-from PyQt6.QtGui import QIcon, QImageReader, QPixmap
+from PyQt6.QtCore import QFileInfo, QSettings, QSize, Qt, QUrl
+from PyQt6.QtGui import QFileSystemModel, QIcon, QImageReader, QPixmap
 from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QFileIconProvider, QLabel, QListView,
-    QSizePolicy, QToolButton, QVBoxLayout, QWidget,
+    QSizePolicy, QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
 IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff)"
@@ -48,6 +48,19 @@ class ThumbnailProvider(QFileIconProvider):
             return super().icon(value)
 
 
+class ThumbnailDelegate(QStyledItemDelegate):
+    """Read thumbnails on the GUI thread, outside QFileSystemModel's worker."""
+    def __init__(self, provider, parent=None):
+        super().__init__(parent)
+        self.provider = provider
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        path = index.data(QFileSystemModel.Roles.FilePathRole)
+        if path and Path(path).suffix.lower() in EXTENSIONS:
+            option.icon = self.provider.icon(QFileInfo(path))
+
+
 class ImagePicker(QFileDialog):
     def __init__(self, parent=None, title="GENESIS · Select image", folder=None, settings=None, multiple=False):
         self.settings = settings if settings is not None else QSettings("GENESIS", "MediaPicker")
@@ -63,7 +76,18 @@ class ImagePicker(QFileDialog):
         self.resize(1380, 860)
         self.setMinimumSize(960, 620)
         self.provider = ThumbnailProvider()
-        self.setIconProvider(self.provider)
+        # Keep the filesystem worker on Qt's native icon provider.
+        self.thumbnail_delegate = ThumbnailDelegate(self.provider, self)
+        self.findChild(QListView, "listView").setItemDelegate(self.thumbnail_delegate)
+        places = self.sidebarUrls()
+        for location in (Path("/mnt/C"), Path("/mnt/C/Users/p4uln")):
+            url = QUrl.fromLocalFile(str(location))
+            if location.is_dir():
+                if url not in places:
+                    places.append(url)
+            elif url in places:
+                places.remove(url)
+        self.setSidebarUrls(places)
         for name in ("listModeButton", "detailModeButton"):
             button = self.findChild(QToolButton, name)
             if button is not None:

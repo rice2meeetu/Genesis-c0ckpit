@@ -46,8 +46,43 @@ def test_reopening_same_endpoint_reuses_session_and_switching_captures_new_endpo
     bridge.triggerAction("grok imagine")
     bridge.triggerAction("grok imagine")
     assert launch.call_count == 1
-    opened.assert_called_once()
+    assert bridge.studioUrl.startswith("http://127.0.0.1:")
+    opened.assert_not_called()
     bridge.backend_router.endpoint = "https://new.example"
     bridge.triggerAction("grok imagine")
     assert launch.call_count == 2
     assert launch.call_args.kwargs["env"]["COMFY_URL"] == "https://new.example"
+
+
+def test_grok_never_inherits_managed_brain_without_shared_brain(studio, monkeypatch):
+    bridge, launch = studio
+    monkeypatch.setenv("MUNGBEAN_MANAGE_BRAIN", "1")
+    monkeypatch.delenv("GENESIS_BRAIN_URL", raising=False)
+    monkeypatch.delenv("GENESIS_CLOUD_BASE_URL", raising=False)
+    bridge.triggerAction("grok imagine")
+    assert launch.call_args.kwargs["env"]["MUNGBEAN_MANAGE_BRAIN"] == "0"
+
+
+def test_shared_brain_route_and_model_changes_start_a_new_session(studio, monkeypatch):
+    bridge, launch = studio
+    monkeypatch.setenv("GENESIS_BRAIN_URL", "https://brain.example/v1/")
+    monkeypatch.setenv("GENESIS_BRAIN_MODEL", "qwen-powerful")
+    monkeypatch.setenv("MUNGBEAN_MANAGE_BRAIN", "1")
+    bridge.triggerAction("grok imagine")
+    env = launch.call_args.kwargs["env"]
+    assert env["BRAIN_URL"] == "https://brain.example/v1"
+    assert env["GENESIS_BRAIN_MODEL"] == "qwen-powerful"
+    assert env["MUNGBEAN_MANAGE_BRAIN"] == "0"
+    monkeypatch.setenv("GENESIS_BRAIN_MODEL", "another-qwen")
+    bridge.triggerAction("grok imagine")
+    assert launch.call_count == 2
+
+
+@pytest.mark.parametrize("url", ["https://brain.example", "https://brain.example/v1/"])
+def test_assistant_shares_brain_configuration_without_duplicate_v1(monkeypatch, url):
+    from genesis.assistant_bridge import AssistantBridge
+    monkeypatch.setenv("GENESIS_BRAIN_URL", url)
+    monkeypatch.setenv("GENESIS_BRAIN_MODEL", "qwen-powerful")
+    bridge = AssistantBridge()
+    assert bridge._cloud_base_url() == "https://brain.example"
+    assert bridge._cloud_model() == "qwen-powerful"

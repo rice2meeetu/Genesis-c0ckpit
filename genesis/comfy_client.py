@@ -265,7 +265,7 @@ def collect_outputs(history_record: dict) -> list[dict]:
     for node_id, value in (history_record.get("outputs") or {}).items():
         if not isinstance(value, dict):
             continue
-        for kind in ("images", "gifs", "audio"):
+        for kind in ("images", "gifs", "audio", "videos"):
             for item in value.get(kind) or []:
                 if isinstance(item, dict):
                     found.append({"node_id": str(node_id), "kind": kind, **item})

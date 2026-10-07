@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
-import sys, json, contextlib
+import contextlib
+import json
+import os
+import sys
+from pathlib import Path
+
 import cv2
 import numpy as np
+import onnxruntime as ort
 from insightface.app import FaceAnalysis
+
+root = Path(os.environ.get(
+    "GENESIS_INSIGHTFACE_ROOT",
+    str(Path.home() / "AI/ComfyUI/models/insightface"),
+)).expanduser()
+providers = ort.get_available_providers()
+preferred = [name for name in ("ROCMExecutionProvider", "CPUExecutionProvider") if name in providers]
+if not preferred:
+    raise SystemExit("No supported ONNX Runtime provider is available")
 with contextlib.redirect_stdout(sys.stderr):
-    app = FaceAnalysis(name="buffalo_l", root="/mnt/AI-Storage/ComfyUI/models/insightface", providers=["ROCMExecutionProvider", "CPUExecutionProvider"])
+    app = FaceAnalysis(name="buffalo_l", root=str(root), providers=preferred)
     app.prepare(ctx_id=0, det_size=(640, 640))
 for line in sys.stdin:
     try:

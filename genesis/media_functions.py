@@ -30,8 +30,14 @@ AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".
 MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-GPU_TOOLS_PYTHON = Path.home() / "miniforge3/envs/genesis-gpu-tools/bin/python"
-COMFY_PYTHON = Path.home() / "miniforge3/envs/comfyui-reactor-rocm/bin/python"
+GPU_TOOLS_PYTHON = Path(os.environ.get(
+    "GENESIS_MEDIA_TOOLS_PYTHON",
+    str(Path.home() / ".local/share/genesis-media-tools/venv/bin/python"),
+))
+COMFY_PYTHON = Path(os.environ.get(
+    "GENESIS_FACE_TOOLS_PYTHON",
+    str(Path.home() / "AI/ComfyUI/.venv/bin/python"),
+))
 BACKGROUND_WORKER = PROJECT_ROOT / "genesis/gpu_background_worker.py"
 FACE_WORKER = PROJECT_ROOT / "genesis/gpu_face_worker.py"
 UPSCALE_MODEL = Path.home() / "AI/ComfyUI/models/upscale_models/4x-UltraSharp.safetensors"

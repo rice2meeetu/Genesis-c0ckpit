@@ -106,3 +106,53 @@ def test_folder_picker_keeps_directory_selection(tmp_path, monkeypatch):
         return QFileDialog.DialogCode.Accepted
     monkeypatch.setattr(FilePicker, "exec", accept)
     assert FilePicker.getExistingDirectory(None, "Folder", str(tmp_path)) == str(tmp_path)
+
+
+def test_windows_places_preserve_defaults_and_skip_missing(tmp_path, monkeypatch):
+    from pathlib import Path
+    from PyQt6.QtCore import QUrl
+    original = Path.is_dir
+    for mounted in (True, False):
+        monkeypatch.setattr(Path, "is_dir", lambda path: mounted if str(path) in ("/mnt/C", "/mnt/C/Users/p4uln") else original(path))
+        dialog = ImagePicker(folder=tmp_path, settings=QSettings(str(tmp_path / "places.ini"), QSettings.Format.IniFormat))
+        places = dialog.sidebarUrls()
+        assert QUrl.fromLocalFile(str(Path.home())) in places
+        for location in ("/mnt/C", "/mnt/C/Users/p4uln"):
+            assert (QUrl.fromLocalFile(location) in places) == mounted
+        assert len(places) == len(set(url.toString() for url in places))
+        dialog.reject()
+
+
+def test_visible_picker_renders_image_thumbnails_in_both_views(tmp_path):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QFileSystemModel
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QStyleOptionViewItem
+    path = tmp_path / "red.png"
+    fixture_image(path)
+    dialog = ImagePicker(folder=tmp_path, settings=QSettings(str(tmp_path / "render.ini"), QSettings.Format.IniFormat))
+    dialog.show()
+    model = dialog.findChild(QFileSystemModel)
+    view = dialog.findChild(QListView, "listView")
+    for _ in range(100):
+        APP.processEvents()
+        if model.index(str(path)).isValid() and model.rowCount(view.rootIndex()):
+            break
+        QTest.qWait(10)
+    index = model.index(str(path))
+    assert index.isValid()
+    assert model.iconProvider() is not dialog.provider
+    for mode, size in (("Thumbnail Grid", QSize(180, 140)), ("List", QSize(36, 36))):
+        dialog.view_choice.setCurrentText(mode)
+        option = QStyleOptionViewItem()
+        option.decorationSize = size
+        view.itemDelegate().initStyleOption(option, index)
+        image = option.icon.pixmap(size).toImage()
+        assert image.pixelColor(image.width() // 2, image.height() // 2) == QColor("red")
+        assert not dialog.grab().isNull()
+    fixture_image(path, "blue")
+    view.itemDelegate().initStyleOption(option, index)
+    image = option.icon.pixmap(size).toImage()
+    assert image.pixelColor(image.width() // 2, image.height() // 2) == QColor("blue")
+    assert len(dialog.provider.cache) <= 96
+    dialog.reject()

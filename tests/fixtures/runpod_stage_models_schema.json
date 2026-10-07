@@ -1,0 +1,1143 @@
+{
+  "CFGGuider": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL",
+          {}
+        ],
+        "positive": [
+          "CONDITIONING",
+          {}
+        ],
+        "negative": [
+          "CONDITIONING",
+          {}
+        ],
+        "cfg": [
+          "FLOAT",
+          {
+            "default": 8.0,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.1,
+            "round": 0.01
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "positive",
+        "negative",
+        "cfg"
+      ]
+    },
+    "output": [
+      "GUIDER"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "GUIDER"
+    ]
+  },
+  "CLIPLoader": {
+    "input": {
+      "required": {
+        "clip_name": [
+          [
+            "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            "qwen_3_8b_fp8mixed.safetensors"
+          ]
+        ],
+        "type": [
+          [
+            "stable_diffusion",
+            "stable_cascade",
+            "sd3",
+            "stable_audio",
+            "mochi",
+            "ltxv",
+            "pixart",
+            "cosmos",
+            "lumina2",
+            "wan",
+            "hidream",
+            "chroma",
+            "ace",
+            "omnigen2",
+            "qwen_image",
+            "hunyuan_image",
+            "flux2",
+            "ovis",
+            "longcat_image"
+          ]
+        ]
+      },
+      "optional": {
+        "device": [
+          [
+            "default",
+            "cpu"
+          ],
+          {
+            "advanced": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "clip_name",
+        "type"
+      ],
+      "optional": [
+        "device"
+      ]
+    },
+    "output": [
+      "CLIP"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CLIP"
+    ]
+  },
+  "CLIPLoaderGGUF": {
+    "input": {
+      "required": {
+        "clip_name": [
+          [
+            "Qwen2.5-VL-7B-Instruct-Q8_0.gguf",
+            "Qwen2.5-VL-7B-Instruct-mmproj-f16.gguf",
+            "qwen_2.5_vl_7b_fp8_scaled.safetensors"
+          ]
+        ],
+        "type": [
+          [
+            "stable_diffusion",
+            "stable_cascade",
+            "sd3",
+            "stable_audio",
+            "mochi",
+            "ltxv",
+            "pixart",
+            "cosmos",
+            "lumina2",
+            "wan",
+            "hidream",
+            "chroma",
+            "ace",
+            "omnigen2",
+            "qwen_image",
+            "hunyuan_image",
+            "flux2",
+            "ovis",
+            "longcat_image"
+          ]
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "clip_name",
+        "type"
+      ]
+    },
+    "output": [
+      "CLIP"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CLIP"
+    ]
+  },
+  "CLIPTextEncode": {
+    "input": {
+      "required": {
+        "text": [
+          "STRING",
+          {
+            "multiline": true,
+            "dynamicPrompts": true,
+            "tooltip": "The text to be encoded."
+          }
+        ],
+        "clip": [
+          "CLIP",
+          {
+            "tooltip": "The CLIP model used for encoding the text."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "text",
+        "clip"
+      ]
+    },
+    "output": [
+      "CONDITIONING"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CONDITIONING"
+    ]
+  },
+  "CheckpointLoaderSimple": {
+    "input": {
+      "required": {
+        "ckpt_name": [
+          [
+            "Qwen-Rapid-AIO-NSFW-v19.safetensors"
+          ],
+          {
+            "tooltip": "The name of the checkpoint (model) to load."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "ckpt_name"
+      ]
+    },
+    "output": [
+      "MODEL",
+      "CLIP",
+      "VAE"
+    ],
+    "output_is_list": [
+      false,
+      false,
+      false
+    ],
+    "output_name": [
+      "MODEL",
+      "CLIP",
+      "VAE"
+    ]
+  },
+  "ConditioningZeroOut": {
+    "input": {
+      "required": {
+        "conditioning": [
+          "CONDITIONING"
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "conditioning"
+      ]
+    },
+    "output": [
+      "CONDITIONING"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CONDITIONING"
+    ]
+  },
+  "EmptyFlux2LatentImage": {
+    "input": {
+      "required": {
+        "width": [
+          "INT",
+          {
+            "default": 1024,
+            "min": 16,
+            "max": 16384,
+            "step": 16
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 1024,
+            "min": 16,
+            "max": 16384,
+            "step": 16
+          }
+        ],
+        "batch_size": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 4096
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "width",
+        "height",
+        "batch_size"
+      ]
+    },
+    "output": [
+      "LATENT"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "LATENT"
+    ]
+  },
+  "EmptyLatentImage": {
+    "input": {
+      "required": {
+        "width": [
+          "INT",
+          {
+            "default": 512,
+            "min": 16,
+            "max": 16384,
+            "step": 8,
+            "tooltip": "The width of the latent images in pixels."
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 512,
+            "min": 16,
+            "max": 16384,
+            "step": 8,
+            "tooltip": "The height of the latent images in pixels."
+          }
+        ],
+        "batch_size": [
+          "INT",
+          {
+            "default": 1,
+            "min": 1,
+            "max": 4096,
+            "tooltip": "The number of latent images in the batch."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "width",
+        "height",
+        "batch_size"
+      ]
+    },
+    "output": [
+      "LATENT"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "LATENT"
+    ]
+  },
+  "Flux2Scheduler": {
+    "input": {
+      "required": {
+        "steps": [
+          "INT",
+          {
+            "default": 20,
+            "min": 1,
+            "max": 4096
+          }
+        ],
+        "width": [
+          "INT",
+          {
+            "default": 1024,
+            "min": 16,
+            "max": 16384,
+            "step": 1
+          }
+        ],
+        "height": [
+          "INT",
+          {
+            "default": 1024,
+            "min": 16,
+            "max": 16384,
+            "step": 1
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "steps",
+        "width",
+        "height"
+      ]
+    },
+    "output": [
+      "SIGMAS"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "SIGMAS"
+    ]
+  },
+  "GetImageSize": {
+    "input": {
+      "required": {
+        "image": [
+          "IMAGE",
+          {}
+        ]
+      },
+      "hidden": {
+        "unique_id": [
+          "UNIQUE_ID"
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "image"
+      ],
+      "hidden": [
+        "unique_id"
+      ]
+    },
+    "output": [
+      "INT",
+      "INT",
+      "INT"
+    ],
+    "output_is_list": [
+      false,
+      false,
+      false
+    ],
+    "output_name": [
+      "width",
+      "height",
+      "batch_size"
+    ]
+  },
+  "ImageScaleToTotalPixels": {
+    "input": {
+      "required": {
+        "image": [
+          "IMAGE",
+          {}
+        ],
+        "upscale_method": [
+          "COMBO",
+          {
+            "multiselect": false,
+            "options": [
+              "nearest-exact",
+              "bilinear",
+              "area",
+              "bicubic",
+              "lanczos"
+            ]
+          }
+        ],
+        "megapixels": [
+          "FLOAT",
+          {
+            "default": 1.0,
+            "min": 0.01,
+            "max": 16.0,
+            "step": 0.01
+          }
+        ],
+        "resolution_steps": [
+          "INT",
+          {
+            "advanced": true,
+            "default": 1,
+            "min": 1,
+            "max": 256
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "image",
+        "upscale_method",
+        "megapixels",
+        "resolution_steps"
+      ]
+    },
+    "output": [
+      "IMAGE"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "IMAGE"
+    ]
+  },
+  "KSampler": {
+    "input": {
+      "required": {
+        "model": [
+          "MODEL",
+          {
+            "tooltip": "The model used for denoising the input latent."
+          }
+        ],
+        "seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true,
+            "tooltip": "The random seed used for creating the noise."
+          }
+        ],
+        "steps": [
+          "INT",
+          {
+            "default": 20,
+            "min": 1,
+            "max": 10000,
+            "tooltip": "The number of steps used in the denoising process."
+          }
+        ],
+        "cfg": [
+          "FLOAT",
+          {
+            "default": 8.0,
+            "min": 0.0,
+            "max": 100.0,
+            "step": 0.1,
+            "round": 0.01,
+            "tooltip": "The Classifier-Free Guidance scale balances creativity and adherence to the prompt. Higher values result in images more closely matching the prompt however too high values will negatively impact quality."
+          }
+        ],
+        "sampler_name": [
+          [
+            "euler",
+            "euler_cfg_pp",
+            "euler_ancestral",
+            "euler_ancestral_cfg_pp",
+            "heun",
+            "heunpp2",
+            "exp_heun_2_x0",
+            "exp_heun_2_x0_sde",
+            "dpm_2",
+            "dpm_2_ancestral",
+            "lms",
+            "dpm_fast",
+            "dpm_adaptive",
+            "dpmpp_2s_ancestral",
+            "dpmpp_2s_ancestral_cfg_pp",
+            "dpmpp_sde",
+            "dpmpp_sde_gpu",
+            "dpmpp_2m",
+            "dpmpp_2m_cfg_pp",
+            "dpmpp_2m_sde",
+            "dpmpp_2m_sde_gpu",
+            "dpmpp_2m_sde_heun",
+            "dpmpp_2m_sde_heun_gpu",
+            "dpmpp_3m_sde",
+            "dpmpp_3m_sde_gpu",
+            "ddpm",
+            "lcm",
+            "ipndm",
+            "ipndm_v",
+            "deis",
+            "res_multistep",
+            "res_multistep_cfg_pp",
+            "res_multistep_ancestral",
+            "res_multistep_ancestral_cfg_pp",
+            "gradient_estimation",
+            "gradient_estimation_cfg_pp",
+            "er_sde",
+            "seeds_2",
+            "seeds_3",
+            "sa_solver",
+            "sa_solver_pece",
+            "ddim",
+            "uni_pc",
+            "uni_pc_bh2"
+          ],
+          {
+            "tooltip": "The algorithm used when sampling, this can affect the quality, speed, and style of the generated output."
+          }
+        ],
+        "scheduler": [
+          [
+            "simple",
+            "sgm_uniform",
+            "karras",
+            "exponential",
+            "ddim_uniform",
+            "beta",
+            "normal",
+            "linear_quadratic",
+            "kl_optimal"
+          ],
+          {
+            "tooltip": "The scheduler controls how noise is gradually removed to form the image."
+          }
+        ],
+        "positive": [
+          "CONDITIONING",
+          {
+            "tooltip": "The conditioning describing the attributes you want to include in the image."
+          }
+        ],
+        "negative": [
+          "CONDITIONING",
+          {
+            "tooltip": "The conditioning describing the attributes you want to exclude from the image."
+          }
+        ],
+        "latent_image": [
+          "LATENT",
+          {
+            "tooltip": "The latent image to denoise."
+          }
+        ],
+        "denoise": [
+          "FLOAT",
+          {
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "tooltip": "The amount of denoising applied, lower values will maintain the structure of the initial image allowing for image to image sampling."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "model",
+        "seed",
+        "steps",
+        "cfg",
+        "sampler_name",
+        "scheduler",
+        "positive",
+        "negative",
+        "latent_image",
+        "denoise"
+      ]
+    },
+    "output": [
+      "LATENT"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "LATENT"
+    ]
+  },
+  "KSamplerSelect": {
+    "input": {
+      "required": {
+        "sampler_name": [
+          "COMBO",
+          {
+            "multiselect": false,
+            "options": [
+              "euler",
+              "euler_cfg_pp",
+              "euler_ancestral",
+              "euler_ancestral_cfg_pp",
+              "heun",
+              "heunpp2",
+              "exp_heun_2_x0",
+              "exp_heun_2_x0_sde",
+              "dpm_2",
+              "dpm_2_ancestral",
+              "lms",
+              "dpm_fast",
+              "dpm_adaptive",
+              "dpmpp_2s_ancestral",
+              "dpmpp_2s_ancestral_cfg_pp",
+              "dpmpp_sde",
+              "dpmpp_sde_gpu",
+              "dpmpp_2m",
+              "dpmpp_2m_cfg_pp",
+              "dpmpp_2m_sde",
+              "dpmpp_2m_sde_gpu",
+              "dpmpp_2m_sde_heun",
+              "dpmpp_2m_sde_heun_gpu",
+              "dpmpp_3m_sde",
+              "dpmpp_3m_sde_gpu",
+              "ddpm",
+              "lcm",
+              "ipndm",
+              "ipndm_v",
+              "deis",
+              "res_multistep",
+              "res_multistep_cfg_pp",
+              "res_multistep_ancestral",
+              "res_multistep_ancestral_cfg_pp",
+              "gradient_estimation",
+              "gradient_estimation_cfg_pp",
+              "er_sde",
+              "seeds_2",
+              "seeds_3",
+              "sa_solver",
+              "sa_solver_pece",
+              "ddim",
+              "uni_pc",
+              "uni_pc_bh2"
+            ]
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "sampler_name"
+      ]
+    },
+    "output": [
+      "SAMPLER"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "SAMPLER"
+    ]
+  },
+  "LoadImage": {
+    "input": {
+      "required": {
+        "image": [
+          [
+            "source.png",
+            "pose.png"
+          ],
+          {
+            "image_upload": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "image"
+      ]
+    },
+    "output": [
+      "IMAGE",
+      "MASK"
+    ],
+    "output_is_list": [
+      false,
+      false
+    ],
+    "output_name": [
+      "IMAGE",
+      "MASK"
+    ]
+  },
+  "PreviewImage": {
+    "input": {
+      "required": {
+        "images": [
+          "IMAGE"
+        ]
+      },
+      "hidden": {
+        "prompt": "PROMPT",
+        "extra_pnginfo": "EXTRA_PNGINFO"
+      }
+    },
+    "input_order": {
+      "required": [
+        "images"
+      ],
+      "hidden": [
+        "prompt",
+        "extra_pnginfo"
+      ]
+    },
+    "output": [],
+    "output_is_list": [],
+    "output_name": []
+  },
+  "RandomNoise": {
+    "input": {
+      "required": {
+        "noise_seed": [
+          "INT",
+          {
+            "default": 0,
+            "min": 0,
+            "max": 18446744073709551615,
+            "control_after_generate": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "noise_seed"
+      ]
+    },
+    "output": [
+      "NOISE"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "NOISE"
+    ]
+  },
+  "ReferenceLatent": {
+    "input": {
+      "required": {
+        "conditioning": [
+          "CONDITIONING",
+          {}
+        ]
+      },
+      "optional": {
+        "latent": [
+          "LATENT",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "conditioning"
+      ],
+      "optional": [
+        "latent"
+      ]
+    },
+    "output": [
+      "CONDITIONING"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CONDITIONING"
+    ]
+  },
+  "SamplerCustomAdvanced": {
+    "input": {
+      "required": {
+        "noise": [
+          "NOISE",
+          {}
+        ],
+        "guider": [
+          "GUIDER",
+          {}
+        ],
+        "sampler": [
+          "SAMPLER",
+          {}
+        ],
+        "sigmas": [
+          "SIGMAS",
+          {}
+        ],
+        "latent_image": [
+          "LATENT",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "noise",
+        "guider",
+        "sampler",
+        "sigmas",
+        "latent_image"
+      ]
+    },
+    "output": [
+      "LATENT",
+      "LATENT"
+    ],
+    "output_is_list": [
+      false,
+      false
+    ],
+    "output_name": [
+      "output",
+      "denoised_output"
+    ]
+  },
+  "SaveImage": {
+    "input": {
+      "required": {
+        "images": [
+          "IMAGE",
+          {
+            "tooltip": "The images to save."
+          }
+        ],
+        "filename_prefix": [
+          "STRING",
+          {
+            "default": "ComfyUI",
+            "tooltip": "The prefix for the file to save. This may include formatting information such as %date:yyyy-MM-dd% or %Empty Latent Image.width% to include values from nodes."
+          }
+        ]
+      },
+      "hidden": {
+        "prompt": "PROMPT",
+        "extra_pnginfo": "EXTRA_PNGINFO"
+      }
+    },
+    "input_order": {
+      "required": [
+        "images",
+        "filename_prefix"
+      ],
+      "hidden": [
+        "prompt",
+        "extra_pnginfo"
+      ]
+    },
+    "output": [],
+    "output_is_list": [],
+    "output_name": []
+  },
+  "TextEncodeQwenImageEditPlus": {
+    "input": {
+      "required": {
+        "clip": [
+          "CLIP",
+          {}
+        ],
+        "prompt": [
+          "STRING",
+          {
+            "multiline": true,
+            "dynamicPrompts": true
+          }
+        ]
+      },
+      "optional": {
+        "vae": [
+          "VAE",
+          {}
+        ],
+        "image1": [
+          "IMAGE",
+          {}
+        ],
+        "image2": [
+          "IMAGE",
+          {}
+        ],
+        "image3": [
+          "IMAGE",
+          {}
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "clip",
+        "prompt"
+      ],
+      "optional": [
+        "vae",
+        "image1",
+        "image2",
+        "image3"
+      ]
+    },
+    "output": [
+      "CONDITIONING"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "CONDITIONING"
+    ]
+  },
+  "UNETLoader": {
+    "input": {
+      "required": {
+        "unet_name": [
+          [
+            "flux-2-klein-9b.safetensors",
+            "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors",
+            "miracleinNSFWGeneration_20FP8.safetensors",
+            "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors",
+            "Qwen-Rapid-AIO-NSFW-v23.safetensors"
+          ]
+        ],
+        "weight_dtype": [
+          [
+            "default",
+            "fp8_e4m3fn",
+            "fp8_e4m3fn_fast",
+            "fp8_e5m2"
+          ],
+          {
+            "advanced": true
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "unet_name",
+        "weight_dtype"
+      ]
+    },
+    "output": [
+      "MODEL"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "MODEL"
+    ]
+  },
+  "UnetLoaderGGUF": {
+    "input": {
+      "required": {
+        "unet_name": [
+          [
+            "Qwen-Rapid-NSFW-v23_Q8_0.gguf",
+            "Qwen-Rapid-NSFW-v23_Q2_K.gguf",
+            "Qwen-Rapid-AIO-NSFW-v19_Q8_0.gguf",
+            "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf",
+            "PornMaster v4.0 Turbo Q8_0 - Klein9B - cfg1,4steps,cfg1.5,8steps,edit cfg2,4steps.gguf"
+          ]
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "unet_name"
+      ]
+    },
+    "output": [
+      "MODEL"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "MODEL"
+    ]
+  },
+  "VAEDecode": {
+    "input": {
+      "required": {
+        "samples": [
+          "LATENT",
+          {
+            "tooltip": "The latent to be decoded."
+          }
+        ],
+        "vae": [
+          "VAE",
+          {
+            "tooltip": "The VAE model used for decoding the latent."
+          }
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "samples",
+        "vae"
+      ]
+    },
+    "output": [
+      "IMAGE"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "IMAGE"
+    ]
+  },
+  "VAEEncode": {
+    "input": {
+      "required": {
+        "pixels": [
+          "IMAGE"
+        ],
+        "vae": [
+          "VAE"
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "pixels",
+        "vae"
+      ]
+    },
+    "output": [
+      "LATENT"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "LATENT"
+    ]
+  },
+  "VAELoader": {
+    "input": {
+      "required": {
+        "vae_name": [
+          [
+            "qwen_image_vae.safetensors",
+            "flux2-vae.safetensors"
+          ]
+        ]
+      }
+    },
+    "input_order": {
+      "required": [
+        "vae_name"
+      ]
+    },
+    "output": [
+      "VAE"
+    ],
+    "output_is_list": [
+      false
+    ],
+    "output_name": [
+      "VAE"
+    ]
+  }
+}

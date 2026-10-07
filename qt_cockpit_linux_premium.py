@@ -63,6 +63,7 @@ PAGE_INDEXES = {
     "face-swap": 12,
     "grok": 13,
     "home": 14,
+    "characters": 15,
 }
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
@@ -84,7 +85,7 @@ GROK_PAGE_QML = r"""
                                 spacing: 10
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Text { Layout.fillWidth: true; text: "GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                                    Text { Layout.fillWidth: true; text: "MUNGBEAN"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
                                     Text { text: backendBridge.message; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.maximumWidth: 520 }
                                 }
                                 Text {
@@ -105,22 +106,15 @@ GROK_PAGE_QML = r"""
                                         onEditingFinished: backendBridge.setEndpoint(text)
                                     }
                                     GButton { text: backendBridge.checking ? "Checking…" : "Refresh backend"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
-                                    GButton { text: "Open Grok UI"; active: true; onClicked: moduleBridge.triggerAction("grok imagine") }
+                                    GButton { text: "Open Mungbean"; active: true; onClicked: moduleBridge.triggerAction("grok imagine") }
                                 }
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    color: "#070707"
-                                    radius: 2
-                                    border.color: appRoot.line
-                                    Column {
-                                        anchors.centerIn: parent
-                                        spacing: 8
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "MUNGBEAN GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Auto · Klein 9B · Aisha · Qwen Edit · WAN Fast · WAN Quality"; color: appRoot.textDim; font.pixelSize: 11 }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Use Open Grok UI for the full canvas, reference-image, history and video interface."; color: appRoot.textDim; font.pixelSize: 11 }
-                                    }
+                                Loader {
+                                    Layout.fillWidth: true; Layout.fillHeight: true
+                                    active: moduleBridge.studioUrl.length > 0 && appRoot.pageIndex === 13 && !privacyMode
+                                    sourceComponent: Component { WebEngineView { url: moduleBridge.studioUrl; backgroundColor: "#070707" } }
                                 }
+                                Text { visible: moduleBridge.studioUrl.length === 0; text: "Open Mungbean to load its full image/video workspace."; color: appRoot.textDim }
+
                             }
                         }
                     }

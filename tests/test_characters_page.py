@@ -1,0 +1,74 @@
+from pathlib import Path
+from unittest.mock import Mock
+import pytest
+import qt_cockpit as c
+from genesis.backend_routing import Route, use_route
+from genesis.character_library import save_character, add_reference, set_reference_details, preferred_reference, update_reference, character_items
+
+
+def test_candidates_approval_and_replacement_preserve_master(tmp_path):
+    master = tmp_path / 'master.png'; master.write_bytes(b'master')
+    candidate = tmp_path / 'candidate.png'; candidate.write_bytes(b'candidate')
+    replacement = tmp_path / 'replacement.png'; replacement.write_bytes(b'replacement')
+    index = tmp_path / 'characters.json'
+    row = save_character('Character A', str(master), adult_confirmed=True, path=index)
+    add_reference(row['id'], str(candidate), role='Profile', path=index)
+    set_reference_details(row['id'], str(candidate), 'face', False, path=index)
+    assert preferred_reference(row['id'], 'Profile', index) == str(master)
+    set_reference_details(row['id'], str(candidate), 'face', True, path=index)
+    assert preferred_reference(row['id'], 'Profile', index) == str(candidate)
+    set_reference_details(row['id'], str(candidate), 'ignore', True, path=index)
+    assert preferred_reference(row['id'], 'Profile', index) == str(master)
+    update_reference(row['id'], str(candidate), str(replacement), path=index)
+    assert character_items(index)[0]['referenceItems'][1]['category'] == 'ignore'
+    with pytest.raises(ValueError, match='Master identity'):
+        set_reference_details(row['id'], str(master), 'pose', False, path=index)
+    assert master.read_bytes() == b'master'
+
+
+@pytest.mark.parametrize('model', [c.REMOTE_DONUTS_MODEL, c.REMOTE_BIGLUSTY_DONUT_MODEL])
+def test_sdxl_source_route_encodes_source_and_honors_controls(monkeypatch, tmp_path, model):
+    bridge = c.GenerationBridge()
+    client = Mock(); client.upload_image.return_value = {'name': 'source.png', 'subfolder': 'uploads'}
+    monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (client, {}))
+    graph = {'1': {'class_type': 'CheckpointLoaderSimple', 'inputs': {'ckpt_name': model}},
+             '3': {'class_type': 'CLIPTextEncode', 'inputs': {}},
+             '5': {'class_type': 'KSampler', 'inputs': {'latent_image': ['4', 0], 'denoise': 1., 'steps': 25, 'cfg': 4., 'seed': 0, 'sampler_name': 'euler', 'scheduler': 'karras'}}}
+    monkeypatch.setattr(c, 'build_create_prompt', lambda *args: graph)
+    monkeypatch.setattr(c, 'validate_operation_prompt', Mock())
+    submit = Mock(return_value=tmp_path/'result.png'); monkeypatch.setattr(bridge, '_submit_and_save', submit)
+    bridge._output_dir = tmp_path
+    source = tmp_path/'source.png'; source.write_bytes(b'source')
+    with use_route(Route('LOCAL', '')):
+        bridge._run_generate('portrait', '', 1024, 1024, model, 'None', 'None', 'None', 0, 0, 0, source, None, False, False, False,
+                             {'denoise': .35, 'seed': 123})
+    submit.assert_called_once()
+    client.upload_image.assert_called_once_with(source)
+    assert graph['5']['inputs']['latent_image'] == ['genesis_source_encode', 0]
+    assert graph['genesis_source_encode']['inputs']['vae'] == ['1', 2]
+    assert graph['5']['inputs']['denoise'] == .35
+    assert graph['5']['inputs']['seed'] == 123
+    assert bridge._original_master == source
+
+@pytest.mark.parametrize('model', [c.REMOTE_DONUTS_MODEL, c.REMOTE_BIGLUSTY_DONUT_MODEL])
+def test_sdxl_pose_controls_conditioning_without_replacing_source_latent(model):
+    graph = {'5': {'inputs': {'latent_image': ['genesis_source_encode', 0]}}, '1': {'inputs': {'ckpt_name': model}}}
+    info = {'ControlNetLoader': {'input': {'required': {'control_net_name': [[c.REMOTE_SDXL_POSE_CONTROLNET]]}}}}
+    c.attach_sdxl_pose(graph, info, {'name': 'pose.png'}, 1024, 1024)
+    assert graph['5']['inputs']['latent_image'] == ['genesis_source_encode', 0]
+    assert graph['5']['inputs']['positive'] == ['genesis_pose_apply', 0]
+    assert graph['genesis_pose_controlnet']['inputs']['control_net_name'] == 'OpenPoseXL2.safetensors'
+
+
+def test_generate_uses_typed_prompt_or_pose_prompt():
+    import re
+    from PyQt6.QtQml import QJSEngine
+    qml = (c.UI_ROOT/'MainPremiumLinux.qml').read_text()
+    fn = re.search(r'    function generateCurrent\(\).*?\n    }', qml, re.S).group()
+    engine = QJSEngine()
+    engine.evaluate('var captured; var genesisBridge={queueGenerateAdvanced:function(p){captured=p}}; var generationPrompt="", selectedPosePrompt="pose description", generationNegativePrompt="", generationWidth=1024,generationHeight=1024,selectedGenerationProfile={model:"sdxl"},selectedLora="None",selectedLoraTwo="None",generationSource="source",selectedPoseSource="pose",useStageTwo=false,useStageThree=false,useUpscale=false,generationSteps=25,generationCfg=4,generationSeed=1,generationDenoise=.65,generationSampler="euler",generationScheduler="karras",selectedLoraThree="None",selectedLoraStrength=0,selectedLoraTwoStrength=0,selectedLoraThreeStrength=0;')
+    assert not engine.evaluate(fn).isError()
+    engine.evaluate('generateCurrent()')
+    assert engine.evaluate('captured').toString() == 'pose description'
+    engine.evaluate('generationPrompt="custom instruction"; generateCurrent()')
+    assert engine.evaluate('captured').toString() == 'custom instruction'

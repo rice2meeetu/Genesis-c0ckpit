@@ -6,7 +6,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "UnetLoaderGGUF",
+      "type": "UNETLoader",
       "pos": [
         75.27214756560079,
         -119.93480393153024
@@ -28,11 +28,11 @@
           ]
         }
       ],
-      "title": "Diffusion Model (GGUF)",
+      "title": "Diffusion Model (RunPod safetensors)",
       "properties": {
-        "cnr_id": "comfyui-gguf",
+        "cnr_id": "comfy-core",
         "ver": "1.1.10",
-        "Node name for S&R": "UnetLoaderGGUF",
+        "Node name for S&R": "UNETLoader",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "7.8",
@@ -40,12 +40,13 @@
         }
       },
       "widgets_values": [
-        "Qwen-Rapid-NSFW-v23_Q2_K.gguf"
+        "Qwen-Rapid-AIO-NSFW-v23.safetensors",
+        "default"
       ]
     },
     {
       "id": 2,
-      "type": "CLIPLoaderGGUF",
+      "type": "CLIPLoader",
       "pos": [
         108.3877274764177,
         59.36801729173993
@@ -67,11 +68,11 @@
           ]
         }
       ],
-      "title": "Text Encoder (Qwen2.5-VL + mmproj)",
+      "title": "Text Encoder (RunPod Qwen2.5-VL FP8)",
       "properties": {
-        "cnr_id": "comfyui-gguf",
+        "cnr_id": "comfy-core",
         "ver": "1.1.10",
-        "Node name for S&R": "CLIPLoaderGGUF",
+        "Node name for S&R": "CLIPLoader",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "7.8",
@@ -79,8 +80,9 @@
         }
       },
       "widgets_values": [
-        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
-        "qwen_image"
+        "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        "qwen_image",
+        "default"
       ]
     },
     {
@@ -235,7 +237,7 @@
         }
       },
       "widgets_values": [
-        "Photorealistic source-image edit. Preserve the subject identity and follow the GENESIS prompt."
+        "Preserve the same person and facial identity, recognizable facial features and distinguishing features from image1. Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. Allow the body pose, body position, framing, composition, viewpoint, expression and lighting to change naturally according to the instruction. Edit instruction: Follow the requested edit and the separate pose/control input when supplied. Realism: natural realistic skin texture, coherent anatomy, natural body proportions, fine hair and detail, natural photographic lighting, natural photographic sharpness."
       ]
     },
     {
