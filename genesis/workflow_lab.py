@@ -765,7 +765,7 @@ def discover_workflow_controls(prompt: dict) -> dict:
         "vae": {"vae_name"},
         "encoder": {"clip_name", "text_encoder"},
         "positive": {"text", "prompt", "positive"},
-        "negative": {"negative"},
+        "negative": {"negative", "negative_prompt"},
     }
 
     for node_id, node in prompt.items():

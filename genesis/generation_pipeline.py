@@ -11,7 +11,25 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
-from genesis.model_compatibility import is_compatible, model_family
+from genesis.model_compatibility import is_compatible, model_family, lora_trigger
+
+REFCONTROL_LORA = "refcontrol_v2_poses.safetensors"
+REFCONTROL_TRIGGER = lora_trigger(REFCONTROL_LORA)
+REFCONTROL_DEFAULT_STRENGTH = 0.9
+
+
+def uses_refcontrol(model: str, loras: Iterable[str]) -> bool:
+    return any(Path(name.replace("\\", "/")).name == REFCONTROL_LORA
+               and is_compatible(model, name) for name in loras)
+
+
+def refcontrol_prompt(prompt: str, model: str, loras: Iterable[str], *, has_pose: bool, has_source: bool) -> str:
+    if uses_refcontrol(model, loras):
+        if not has_pose or not has_source:
+            raise ValueError("RefControl requires a separate pose/control image and original source image.")
+        if REFCONTROL_TRIGGER not in prompt:
+            return REFCONTROL_TRIGGER + ". " + prompt
+    return prompt
 
 
 @dataclass(frozen=True)
@@ -43,7 +61,7 @@ class PipelineStage:
     input_source: str
 
 
-def adapt_prompt(prompt: str, model: str, *, source_image: bool = False) -> str:
+def adapt_prompt(prompt: str, model: str, *, source_image: bool = False, pose_image: bool = False) -> str:
     """Wrap user/preset text in a family-specific prompt structure.
 
     The user's text is retained verbatim.  Adapters add structure only and do
@@ -53,12 +71,22 @@ def adapt_prompt(prompt: str, model: str, *, source_image: bool = False) -> str:
     if not text:
         return ""
     family = model_family(model)
+    if family == "qwen_image_2_1":
+        if source_image:
+            return (
+                "Use <image1> as the primary subject/reference and preserve its identity and important visual traits. "
+                "If <image2> is present, follow its pose, body arrangement, and composition while keeping <image1> as the subject reference. "
+                "Instruction: " + text
+            )
+        return "Create the requested image with coherent anatomy and composition. Instruction: " + text
     if family == "qwen_image":
-        identity = (
-            "Preserve the same person, facial identity, skin tone, hair, and clothing from image1. "
-            if source_image else "Create one coherent subject with stable identity. "
-        )
-        return identity + "Pose and action: " + text + " Change only what the instruction requires."
+        if source_image:
+            identity = "Preserve the same person and facial identity, recognizable facial features, skin tone, hair, and appearance from image1. "
+            pose = ("Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. "
+                    if pose_image else "")
+            return (identity + pose + "Allow the body pose, body position, framing, and composition to change according to the instruction. "
+                    + "Edit instruction: " + text)
+        return "Create one coherent subject with stable identity. Instruction: " + text
     if family in {"flux2_klein_4b", "flux2_klein_9b_base", "flux2_klein_9b_kv", "aisha_9b"}:
         return (
             "Subject: " + text
