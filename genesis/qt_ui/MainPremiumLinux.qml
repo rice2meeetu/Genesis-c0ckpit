@@ -1138,11 +1138,11 @@ ApplicationWindow {
                                                     anchors.fill: parent
                                                     anchors.margins: appRoot.compactNavigation ? 10 : 14
                                                     spacing: 5
-                                                    Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 14; font.bold: true; font.letterSpacing: 1 }
+                                                    Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
                                                     Text { objectName: "generationStageModel" + index; Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: 18; font.bold: true; maximumLineCount: 2; elide: Text.ElideRight; wrapMode: Text.Wrap }
-                                                    Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
+                                                    Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
                                                     Item { Layout.fillHeight: true }
-                                                    Text { text: modelData.enabled ? "CLICK TO CHANGE" : "CLICK TO ENABLE"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 14; font.bold: true }
+                                                    Text { text: modelData.enabled ? "CLICK TO CHANGE" : "CLICK TO ENABLE"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9; font.bold: true }
                                                 }
                                                 MouseArea {
                                                     objectName: "stageModelBoxClick" + index
@@ -1328,16 +1328,16 @@ ApplicationWindow {
                                             ? "RunPod connection active. Disconnect stops GENESIS remote polling."
                                             : "RunPod disconnected by default. GENESIS will not contact the saved endpoint until Connect RunPod is pressed."
                                         color: backendBridge.connected ? appRoot.gold : appRoot.textDim
-                                        font.pixelSize: 14
+                                        font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }
                                     Text {
                                         Layout.fillWidth: true
                                         text: "Destination: " + (appRoot.selectedGenerationProfile.destination || "UNAVAILABLE")
-                                        color: appRoot.gold; font.pixelSize: 14; font.bold: true
+                                        color: appRoot.gold; font.pixelSize: 12; font.bold: true
                                     }
                                     SectionLabel { text: "STAGE 1 · MODEL" }
-                                    ComboBox { implicitHeight: 44;
+                                    ComboBox {
                                         objectName: "stageOneModelPicker"
                                         Layout.fillWidth: true
                                         enabled: !genesisBridge.busy && appRoot.stageOneSelectableChoices.length > 0
@@ -1346,9 +1346,9 @@ ApplicationWindow {
                                         currentIndex: appRoot.stageOneChoiceIndex
                                         onActivated: appRoot.selectStageOneAvailableChoice(currentIndex)
                                     }
-                                    Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
-                                    Text { Layout.fillWidth: true; text: "MODEL PATH: " + (appRoot.selectedGenerationProfile.modelPath || appRoot.selectedGenerationProfile.model || "Unknown"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
-                                    Text { Layout.fillWidth: true; text: "WORKFLOW: " + (appRoot.selectedGenerationProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: "MODEL PATH: " + (appRoot.selectedGenerationProfile.modelPath || appRoot.selectedGenerationProfile.model || "Unknown"); color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; text: "WORKFLOW: " + (appRoot.selectedGenerationProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.WrapAnywhere }
                                     SectionLabel { text: "COMPATIBLE LORA" }
                                     Text {
                                         Layout.fillWidth: true
@@ -1360,13 +1360,13 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 0
-                                        ComboBox { implicitHeight: 44;
+                                        ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
                                             currentIndex: Math.max(0, model.indexOf(appRoot.selectedLora))
                                             onActivated: appRoot.selectedLora = currentText
                                         }
-                                        SpinBox { implicitHeight: 44;
+                                        SpinBox {
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLora !== "None"
@@ -1378,13 +1378,13 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 1
-                                        ComboBox { implicitHeight: 44;
+                                        ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
                                             currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraTwo))
                                             onActivated: appRoot.selectedLoraTwo = currentText
                                         }
-                                        SpinBox { implicitHeight: 44;
+                                        SpinBox {
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraTwoStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLoraTwo !== "None"
@@ -1396,13 +1396,13 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 2
-                                        ComboBox { implicitHeight: 44;
+                                        ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
                                             currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraThree))
                                             onActivated: appRoot.selectedLoraThree = currentText
                                         }
-                                        SpinBox { implicitHeight: 44;
+                                        SpinBox {
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraThreeStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLoraThree !== "None"
@@ -1417,7 +1417,7 @@ ApplicationWindow {
                                         text: (appRoot.selectedGenerationProfile.experimentalLoras ? "EXPERIMENTAL · " : "")
                                             + "LoRAs run in picker order with independent strengths."
                                         color: appRoot.selectedGenerationProfile.experimentalLoras ? appRoot.gold : appRoot.textDim
-                                        font.pixelSize: 14
+                                        font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }
                                     Text {
@@ -1425,7 +1425,7 @@ ApplicationWindow {
                                         visible: appRoot.selectedLoraTriggerText().length > 0
                                         text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()
                                         color: appRoot.brightGold
-                                        font.pixelSize: 14
+                                        font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }
                                     SectionLabel { text: "QUALITY" }
@@ -1444,26 +1444,26 @@ ApplicationWindow {
                                         columns: 2
                                         columnSpacing: 8
                                         rowSpacing: 5
-                                        Text { text: "Width"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationWidth; editable: true; onValueModified: appRoot.generationWidth = value }
-                                        Text { text: "Height"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationHeight; editable: true; onValueModified: appRoot.generationHeight = value }
-                                        Text { text: "Steps"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 1; to: 100; value: appRoot.generationSteps; editable: true; onValueModified: appRoot.generationSteps = value }
-                                        Text { text: "CFG"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
-                                        Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
+                                        Text { text: "Width"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationWidth; editable: true; onValueModified: appRoot.generationWidth = value }
+                                        Text { text: "Height"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationHeight; editable: true; onValueModified: appRoot.generationHeight = value }
+                                        Text { text: "Steps"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 1; to: 100; value: appRoot.generationSteps; editable: true; onValueModified: appRoot.generationSteps = value }
+                                        Text { text: "CFG"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
                                         Text { Layout.columnSpan: 2; Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.identityGuidance || "Keep model defaults initially."; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
-                                        Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); enabled: !appRoot.activeGenerationDefaults.denoiseFixed; editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
-                                        Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde", "dpmpp_3m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
-                                        Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; enabled: !appRoot.activeGenerationDefaults.schedulerFixed; model: appRoot.activeGenerationDefaults.schedulerFixed ? ["Flux2Scheduler"] : ["beta", "simple", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
+                                        Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        SpinBox { Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); enabled: !appRoot.activeGenerationDefaults.denoiseFixed; editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        ComboBox { Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde", "dpmpp_3m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
+                                        Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        ComboBox { Layout.fillWidth: true; enabled: !appRoot.activeGenerationDefaults.schedulerFixed; model: appRoot.activeGenerationDefaults.schedulerFixed ? ["Flux2Scheduler"] : ["beta", "simple", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
                                     }
                                     SectionLabel { text: "PIPELINE" }
-                                    ComboBox { implicitHeight: 44;
+                                    ComboBox {
                                         Layout.fillWidth: true
                                         model: ["Single model", "3-stage · Selected model → Refine → Identity"]
                                         currentIndex: (appRoot.useStageTwo && appRoot.useStageThree) ? 1 : 0
@@ -1479,7 +1479,7 @@ ApplicationWindow {
                                             ? "Stage 1 " + (appRoot.selectedGenerationProfile.label || "selected model") + " → Stage 2 refinement → Stage 3 identity lock"
                                             : "Single-model generation; stages can also be enabled individually below."
                                         color: appRoot.textDim
-                                        font.pixelSize: 14
+                                        font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }
                                     CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; enabled: !genesisBridge.busy; onToggled: appRoot.useStageTwo = checked }
@@ -1490,7 +1490,7 @@ ApplicationWindow {
                                     GButton { Layout.fillWidth: true; text: appRoot.stageThreeLabel; enabled: !genesisBridge.busy; onClicked: appRoot.openStageModels(2) }
                                     CheckBox { text: "Final upscale"; checked: appRoot.useUpscale; enabled: genesisBridge.upscaleAvailable; onToggled: appRoot.useUpscale = checked }
                                     Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
-                                    Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 14; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 11; wrapMode: Text.Wrap }
 
 
                                 }

@@ -59,8 +59,8 @@ class BackendBridge(QObject):
         self._local_status = {'ready': False, 'comfyOnline': False, 'remote': False}
         self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
         self._running = False
-        # A saved endpoint alone never causes polling. Connection requires
-        # Connect or the explicit GENESIS_RUNPOD_AUTOCONNECT startup option.
+        # RunPod is deliberately opt-in per app session. A saved endpoint is
+        # configuration only; it must never cause background remote polling.
         self._connected = False
         self._local_safe = False
         self._revision = 0
@@ -164,11 +164,8 @@ class BackendBridge(QObject):
         self._publish()
 
     def start(self):
-        requested = os.environ.get('GENESIS_RUNPOD_AUTOCONNECT', '').lower() in {'1', 'true', 'yes'}
-        if requested and self._mode == 'RUNPOD' and self._endpoint:
-            self.connectRemote()
-        else:
-            self.refresh()
+        # Probe local state once. RunPod remains untouched until Connect.
+        self.refresh()
 
     @pyqtSlot()
     def refresh(self):

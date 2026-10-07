@@ -114,3 +114,22 @@ def test_local_catalog_preserves_lora_subdirectory_names(monkeypatch, tmp_path):
     row = c.load_generation_profiles()[0]
     assert row['loras'] == ['None', 'klein9b/refcontrol_v2_poses.safetensors']
     assert row['triggers']['klein9b/refcontrol_v2_poses.safetensors'] == ['refcontrol']
+
+
+def test_base_9b_graph_defaults_match_undistilled_profile(monkeypatch):
+    monkeypatch.setattr(c, "REGULAR_9B_WORKFLOWS", (c.REMOTE_MIRACLEIN_T2I_WORKFLOW,))
+    info = json.loads((Path(__file__).parent / 'fixtures/runpod_stage_models_schema.json').read_text())
+    info['UnetLoaderGGUF']['input']['required']['unet_name'][0].append(c.REGULAR_9B_MODEL)
+    info['FluxGuidance'] = {'input': {'required': {'conditioning': ['CONDITIONING'], 'guidance': ['FLOAT']}}}
+    prompt = c.build_create_prompt(info, 'A ceramic vase', 512, 512, c.REGULAR_9B_MODEL)
+    assert prompt['134']['inputs']['steps'] == 50
+    assert prompt['134']['inputs']['cfg'] == 4.0
+
+
+def test_aisha_t2i_keeps_legacy_face_swap_workflow_separate():
+    legacy = json.loads((c.REFERENCE_WORKFLOW_ROOT / 'GENESIS_AISHA_9B_TEST.json').read_text())
+    assert any(node['type'] == 'ReActorFaceSwap' for node in legacy['nodes'])
+    assert c.LOCAL_AISHA_9B_WORKFLOW.name == 'GENESIS_AISHA_9B_T2I.json'
+    create = json.loads(c.LOCAL_AISHA_9B_WORKFLOW.read_text())
+    assert any(node['class_type'] == 'Flux2Scheduler' for node in create.values())
+    assert not any(node['class_type'] == 'ReActorFaceSwap' for node in create.values())

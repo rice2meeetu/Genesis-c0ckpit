@@ -121,7 +121,7 @@ REMOTE_DARKBEAST_IDENTITY_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_DARKBEAS
 REMOTE_PORNMASTER_T2I_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_PORNMASTER_9B_T2I.json"
 QWEN21_T2I_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "QWEN_IMAGE_2_1_T2I.json"
 QWEN21_REFERENCE_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "QWEN_IMAGE_2_1_REFERENCE.json"
-LOCAL_AISHA_9B_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_AISHA_9B_TEST.json"
+LOCAL_AISHA_9B_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "GENESIS_AISHA_9B_T2I.json"
 REMOTE_KLEIN_REFERENCE_WORKFLOWS = {REMOTE_KLEIN9B_WORKFLOW, REMOTE_PORNMASTER_V4_WORKFLOW, REMOTE_MIRACLEIN_EDIT_WORKFLOW, REMOTE_DARKBEAST_IDENTITY_WORKFLOW}
 STAGE_1_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_1_PHR00T_POSE.json"
 STAGE_2_WORKFLOW = REFERENCE_WORKFLOW_ROOT / "STAGE_2_LUSTIFY_REFINE.json"
@@ -833,7 +833,7 @@ def build_create_prompt(
         prompt["126"]["inputs"] = {"unet_name": REGULAR_9B_MODEL}
         prompt["136"]["inputs"]["clip_name"] = TEXT_ENCODER_9B
         prompt["107"]["inputs"]["text"] = prompt_text
-        prompt["134"]["inputs"].update({"steps": 4, "cfg": 1.0})
+        prompt["134"]["inputs"].update({"steps": 50, "cfg": 4.0})
         prompt["105"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["9"]["inputs"]["filename_prefix"] = "GENESIS-Klein9B-Regular"
         insert_model_only_loras(prompt, "126", "134", "model", loras, lora_strengths)

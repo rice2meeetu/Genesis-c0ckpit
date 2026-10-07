@@ -30,3 +30,9 @@ This follow-up changes `qt_cockpit.py`, `genesis/generation_pipeline.py`, `genes
 - `GENESIS_DARKBEAST_9B_IDENTITY.json`
 
 Original checkout remains dirty and uncommitted. The GitHub draft is built from a separate tested snapshot and includes dependencies needed by the earlier routing fix; unrelated original working-tree changes are excluded.
+
+## Review tightening
+
+The draft preserves GENESIS_AISHA_9B_TEST.json exactly as it exists on GitHub main, including its editor layout and face-swap route. The required base-generation graph lives separately in GENESIS_AISHA_9B_T2I.json. Removed inherited font/control-size changes, unrelated FLUX.1 catalog changes and startup auto-connect changes. Base 9B graph defaults now match its profile even when no controls are supplied. Review snapshot: 213 tests passed in 1.36s. The original local working-tree diff and status were checked and stayed unchanged during review.
+
+The latest seven-section design update is recorded in the current Work chat. Character A multi-angle editing and independent finishing actions, modernized Stage 2 without Lustify, and execution checks remain follow-up requirements; this routing draft does not claim those features are implemented. No merge or deployment has occurred.

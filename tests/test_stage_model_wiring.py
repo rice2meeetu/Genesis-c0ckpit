@@ -151,9 +151,9 @@ def test_refinement_uses_selected_model_settings_and_previous_output(monkeypatch
 
 
 @pytest.mark.parametrize('mode,opt_in,expected', [
-    ('RUNPOD', '1', True), ('RUNPOD', '0', False), ('RUNPOD', '', False), ('LOCAL', '1', False),
+    ('RUNPOD', '1', False), ('RUNPOD', '0', False), ('RUNPOD', '', False), ('LOCAL', '1', False),
 ])
-def test_startup_connects_only_with_explicit_option(monkeypatch, mode, opt_in, expected):
+def test_startup_preserves_explicit_connect_behavior(monkeypatch, mode, opt_in, expected):
     monkeypatch.setenv('GENESIS_BACKEND_MODE', mode)
     monkeypatch.setenv('GENESIS_RUNPOD_URL', 'https://test-8188.proxy.runpod.net')
     monkeypatch.setenv('GENESIS_RUNPOD_AUTOCONNECT', opt_in)

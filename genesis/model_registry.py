@@ -41,7 +41,7 @@ MODEL_PROFILES = (
         "lora": (),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_8b", "qwen3_8b"),
-        "workflow": ("aisha",),
+        "workflow": ("GENESIS_AISHA_9B_T2I",),
     },
     {
         "name": "FLUX.2 Klein 9B Base",
@@ -88,12 +88,12 @@ MODEL_PROFILES = (
         "workflow": ("GENESIS_DARKBEAST_9B_IDENTITY",),
     },
     {
-        "name": "FluxedUp FLUX.1 · planned / assets missing",
-        "model": ("fluxedUpFluxNSFW_40DevFp8.safetensors", "fluxedUpFluxNSFW_40Q4KSGguf.gguf", "fluxedup", "fluxup"),
+        "name": "FluxedUp",
+        "model": ("fluxedup", "fluxup"),
         "lora": (),
-        "vae": ("ae.safetensors",),
-        "encoder": ("clip_l.safetensors", "t5xxl"),
-        "workflow": ("FLUXUP_IMG2IMG_RX9060",),
+        "vae": ("flux2-vae", "ae.safetensors"),
+        "encoder": (),
+        "workflow": ("fluxedup", "fluxup"),
     },
     {
         "name": "Qwen Image 2.1 BF16 · native T2I / reference",
