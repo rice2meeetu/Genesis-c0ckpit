@@ -94,20 +94,21 @@ def character_items(path: Path = INDEX_PATH) -> list[dict]:
         "id": row["id"], "name": row.get("name", row["id"]),
         "primaryImage": Path(row["primary_image"]).as_uri(),
         "primaryPath": row["primary_image"],
+        "referenceSheets": [Path(sheet).as_uri() for sheet in row.get("reference_sheets", []) if Path(sheet).is_file()],
         "referenceCount": len(row.get("references", [])),
         "references": [Path(ref).as_uri() for ref in row.get("references", []) if Path(ref).is_file()],
         "referenceItems": [{
             "source": Path(ref).as_uri(),
             "path": ref,
             "approved": reference_is_approved(row, ref),
-            "category": row.get("reference_categories", {}).get(ref, "face"),
+            "category": reference_category(row, ref),
             "master": ref == row.get("primary_image"),
             "role": row.get("reference_roles", {}).get(ref, "primary" if ref == row.get("primary_image") else "anchor"),
         } for ref in row.get("references", []) if Path(ref).is_file()],
     } for row in load_characters(path)]
 
 
-REFERENCE_ANGLES = ("Primary/Front", "¾ Left", "¾ Right", "Profile", "Upper Body", "Full Body")
+REFERENCE_ANGLES = ("Primary/Front", "¾ Left", "¾ Right", "Profile", "Back", "Upper Body", "Full Body")
 
 def update_reference(character_id: str, old_image: str, new_image: str = "", *, role: str = "", path: Path = INDEX_PATH) -> dict:
     """Replace/delete a library link only; never modify either image file."""
@@ -147,11 +148,27 @@ def update_reference(character_id: str, old_image: str, new_image: str = "", *, 
     return row
 
 
+def reference_category(row: dict, image: str) -> str:
+    if image == row.get("primary_image"):
+        return "face"
+    category = row.get("reference_categories", {}).get(image)
+    if category in {"face", "body", "pose", "ignore"}:
+        return category
+    role = str(row.get("reference_roles", {}).get(image, "")).lower()
+    if role == "ignore":
+        return "ignore"
+    if role in {"pose", "pose reference"}:
+        return "pose"
+    if "body" in role or role in {"back", "back view"}:
+        return "body"
+    return "face"
+
+
 def reference_is_approved(row: dict, image: str) -> bool:
     # Legacy references remain usable; new candidates require explicit approval.
     return image == row.get("primary_image") or (
         row.get("reference_approved", {}).get(image, True)
-        and row.get("reference_categories", {}).get(image, "face") != "ignore")
+        and reference_category(row, image) != "ignore")
 
 
 def set_reference_details(character_id: str, image: str, category: str, approved: bool, *, path: Path = INDEX_PATH) -> dict:
@@ -167,4 +184,54 @@ def set_reference_details(character_id: str, image: str, category: str, approved
     row.setdefault("reference_categories", {})[image] = category
     row.setdefault("reference_approved", {})[image] = bool(approved)
     path.write_text(json.dumps({"version": 1, "characters": rows}, indent=2), encoding="utf-8")
+    return row
+
+
+REFERENCE_BUILD_REQUESTS = (
+    ("Primary/Front", "face", "Same adult character as the source, front-facing portrait, neutral expression, plain background, preserve facial identity."),
+    ("¾ Left", "face", "Same adult character as the source, three-quarter left portrait, preserve facial identity, plain background."),
+    ("¾ Right", "face", "Same adult character as the source, three-quarter right portrait, preserve facial identity, plain background."),
+    ("Profile", "face", "Same adult character as the source, side-profile portrait, preserve facial identity, plain background."),
+    ("Back", "body", "Same adult character as the source, full-body back view, neutral upright stance, preserve body proportions and identity."),
+    ("Upper Body", "body", "Same adult character as the source, upper-body reference, neutral upright stance, preserve identity and body proportions."),
+    ("Full Body", "body", "Same adult character as the source, full-body reference, neutral upright stance, preserve identity and body proportions."),
+)
+
+
+def best_reference(character_id: str, instruction: str, path: Path = INDEX_PATH) -> str:
+    """Match explicit angle phrases to approved references; otherwise keep master."""
+    row = get_character(character_id, path)
+    if not row:
+        return ""
+    def canonical(value):
+        value = value.lower().replace("¾", "three-quarter").replace("3/4", "three-quarter")
+        return " ".join(re.sub(r"[^a-z0-9]+", " ", value).split())
+    text = canonical(instruction)
+    aliases = {
+        "three quarter left": ("three quarter left", "left three quarter"),
+        "three quarter right": ("three quarter right", "right three quarter"),
+        "profile": ("profile", "side view"),
+        "full body": ("full body",), "upper body": ("upper body",),
+        "primary front": ("front view", "front facing"),
+        "back": ("back view", "back facing"),
+    }
+    for angle, phrases in aliases.items():
+        if not any(" " + phrase + " " in " " + text + " " for phrase in phrases):
+            continue
+        for image in row.get("references", []):
+            if reference_is_approved(row, image) and reference_category(row, image) not in {"pose", "ignore"} and Path(image).is_file():
+                role = canonical(row.get("reference_roles", {}).get(image, ""))
+                if role == angle or role in phrases:
+                    return image
+    return preferred_reference(character_id, path=path)
+
+
+def save_reference_sheet(character_id: str, sheet: str, *, path: Path = INDEX_PATH):
+    rows = load_characters(path)
+    row = next((r for r in rows if r['id'] == character_id), None)
+    sheet = str(Path(sheet).resolve())
+    if row is None or not Path(sheet).is_file():
+        raise ValueError('Character or reference sheet is unavailable.')
+    row.setdefault('reference_sheets', []).append(sheet)
+    path.write_text(json.dumps({'version': 1, 'characters': rows}, indent=2), encoding='utf-8')
     return row

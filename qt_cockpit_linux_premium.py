@@ -232,6 +232,29 @@ def main() -> int:
 
     window = engine.rootObjects()[0]
     window.setProperty("pageIndex", PAGE_INDEXES[args.page])
+    from genesis.pose_workbench import POSE_WORKBENCH_HANDOFF_FILE, consume_pose_workbench_handoff
+    def accept_pose_handoff():
+        if generation_bridge.busy or not POSE_WORKBENCH_HANDOFF_FILE.is_file():
+            return
+        try:
+            source = window.property("generationSource").toLocalFile()
+            pose = window.property("selectedPoseSource").toLocalFile()
+            next_source, next_pose, _ = consume_pose_workbench_handoff(source, pose, "skeleton", POSE_WORKBENCH_HANDOFF_FILE)
+            if next_source != source:
+                window.setProperty("generationSource", QUrl.fromLocalFile(next_source))
+            if next_pose != pose:
+                window.setProperty("selectedPoseSource", QUrl.fromLocalFile(next_pose))
+                window.setProperty("selectedPoseThumbnail", QUrl.fromLocalFile(next_pose))
+                window.setProperty("selectedPoseName", Path(next_pose).stem)
+            window.setProperty("pageIndex", 1)
+            generation_bridge._set_status("Pose handoff loaded · source and pose remain separate.")
+        except ValueError as exc:
+            generation_bridge._set_status(str(exc))
+    if not args.screenshot:
+        pose_handoff_timer = QTimer(app)
+        pose_handoff_timer.timeout.connect(accept_pose_handoff)
+        pose_handoff_timer.start(1000)
+        accept_pose_handoff()
     if args.screenshot and args.review_image:
         review_image = Path(args.review_image).expanduser().resolve()
         if not review_image.is_file():

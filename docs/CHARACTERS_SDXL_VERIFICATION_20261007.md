@@ -1,68 +1,63 @@
-# GENESIS Characters and local SDXL audit — 7 October 2026
+# GENESIS verification — 7 October 2026
 
-Repository: `/home/rice2meetyou/Genesis-c0ckpit`. Existing dirty changes were retained; no reset, clean, stash or commits performed. Existing character data was not rewritten during validation.
+## Current result
 
-## Implemented
+Dedicated Characters page uses the existing Character A library and shared selection. Master controls are protected. Face/body/pose/ignore categories, review/approval, gallery previews and zoom are available. Existing references remain intact; legacy body/pose roles are interpreted without rewriting the library. No Character B identity was introduced.
 
-- Dedicated Characters sidebar page (page 15), registered in both launchers.
-- Existing `CharacterReferences.qml` and `genesis/character_library.py` reused; no Character B identity or second library.
-- Master image selection and saved Character A profiles; master replacement/removal disabled in the gallery UI.
-- Face/body/pose/ignore gallery filters, review filter, explicit approval, zoom preview, gallery replacement/removal. Source image files are not modified.
-- Legacy references remain usable. New builder candidates are stored unapproved. Ignored/unapproved references are excluded from preferred selection and supplemental identity input; pose-category references are excluded from supplemental identity inputs.
-- Create has a saved-character selector and Manage Characters link. Character selection is shared through the existing bridge.
-- Reference Builder prepares master + angle/pose instructions in Create; saved generated images can be imported for review and approval.
-- Both SDXL models added to the local filesystem readiness catalog, exposing the existing source-edit route and compatible LoRAs.
+The Reference Builder now generates seven candidate requests (front, left/right three-quarter, profile, back, upper body, full body), stores them unapproved, and creates a separate review contact sheet. The sheet is never treated as an identity reference. A failed batch preserves earlier candidates; cancellation is supported. Candidate/reference mutation controls are disabled during generation. Explicit requested angles can select matching approved references when Create is using the saved master; arbitrary manually loaded source images are not replaced. Face finishing still receives the saved master.
 
-## Model files and wiring
+The old external Pose Maker launcher has been replaced with the maintained Pose Library. The existing source/pose handoff contract is consumed by the premium cockpit and preserves separate image roles. It no longer depends on the missing legacy web application or its obsolete model workflows. The formerly skipped test now tests this maintained integration and passes.
 
-| Model | Exact local file | Size in bytes |
-|---|---|---:|
-| DonutsDeliveryMix V4.1 | `/home/rice2meetyou/AI/ComfyUI/models/checkpoints/donutsdeliverymixV4_v41.safetensors` | 6,938,051,602 |
-| BigLustyDonutMix NSFW v1.2 | `/home/rice2meetyou/AI/ComfyUI/models/checkpoints/biglustydonutmixNSFW_v12.safetensors` | 6,938,462,898 |
+## SDXL files, LoRAs and settings
 
-Each file contains 2,515 tensors; header offsets agree with file length. This does not verify provenance or GPU inference quality.
+Both files exist under `/home/rice2meetyou/AI/ComfyUI/models/checkpoints/`:
 
-`genesis/model_registry.py` now includes both local profiles. `genesis/model_compatibility.py` classifies both as SDXL. `qt_cockpit.py` defines the filenames, supported source models, shared graph builder, sampler defaults, SDXL LoRA insertion, and generation branch. Base graph: `/home/rice2meetyou/Genesis-c0ckpit/genesis/reference/pose_workflows/GENESIS_SDXL_SHARED_T2I.json`.
+- `donutsdeliverymixV4_v41.safetensors` — 6,938,051,602 bytes.
+- `biglustydonutmixNSFW_v12.safetensors` — 6,938,462,898 bytes.
 
-With a loaded source: LoadImage → ImageScale → VAEEncode → KSampler source latent. Optional pose: OpenPoseXL2 → ControlNetApplyAdvanced controls positive/negative conditioning while retaining the source latent. Without a source the graph uses an empty latent for text-to-image. The file name containing T2I does not prevent the runtime source-image graph mutation.
+Their tensor header offsets match their file sizes. Local catalog entries are in `genesis/model_registry.py`; compatibility is in `genesis/model_compatibility.py`; source/pose generation and controls are in `qt_cockpit.py`. Both use `genesis/reference/pose_workflows/GENESIS_SDXL_SHARED_T2I.json` as a base graph. Source images replace the empty latent through VAEEncode at runtime. OpenPoseXL2 controls conditioning without replacing that source latent.
 
-User flow remains: load image → optionally choose pose → use the pose's prompt or type instructions → Generate. Typed text takes precedence; otherwise the selected pose prompt is passed. The existing source default denoise is 0.65, text-only default 1.0; user-selected denoise is honored. Existing finishing toggles remain user controlled.
+Compatible optional files under `/home/rice2meetyou/AI/ComfyUI/models/loras/`:
 
-## LoRA files and data
+- `add-detail-xl.safetensors` — 228,452,344 bytes.
+- `face_xl_v0_1.safetensors` — 223,735,220 bytes.
+- `skin texture style v4.safetensors` — 912,552,748 bytes.
 
-Directory: `/home/rice2meetyou/AI/ComfyUI/models/loras/`.
+All three can be chained with independent strengths. Training tags extracted for add-detail are not guaranteed activation phrases; no activation words were extracted for the other two. No authoritative list of further intended adapters was supplied, so no additional adapters or URLs were invented.
 
-| Compatible local SDXL LoRA | Size in bytes | Current trigger extraction |
-|---|---:|---|
-| `add-detail-xl.safetensors` | 228,452,344 | `portrait`, `all`, `misc`, `anime` extracted from training-tag metadata |
-| `face_xl_v0_1.safetensors` | 223,735,220 | No trigger terms extracted |
-| `skin texture style v4.safetensors` | 912,552,748 | No trigger terms extracted |
+Normal SDXL defaults remain **25 steps**, CFG 4, Karras, source denoise 0.65 (text-only 1.0). Donuts uses dpmpp_sde; BigLusty uses dpmpp_3m_sde. No SDXL default was changed to 40 steps. The normal user flow remains load image → optionally choose pose → typed prompt or pose prompt → Generate. Finishing toggles remain user controlled.
 
-The local scanner reads these files, the compatibility filter exposes them to both models, and the SDXL graph chains selected adapters through model and CLIP. Up to three adapters are supported with individual strengths. They are optional, not automatically applied. Training tags are not evidence of required activation phrases. No trigger phrases or download URLs were invented.
+## Installed missing weights
 
-No supplied authoritative list identifies further intended SDXL LoRAs or their required activation terms; those cannot be declared complete. Other locally present Flux/Klein LoRAs are excluded by family compatibility.
+ReSwapper `models/reswapper/reswapper_256.onnx` (554,298,280 bytes) and HyperSwap `models/hyperswap/hyperswap_1a_256.onnx` (402,742,682 bytes) were installed from the sources documented by the installed ReActor plugin. Both were checked against Hugging Face LFS SHA-256 values and are listed by the live backend.
 
-Pose weight present: `/home/rice2meetyou/AI/ComfyUI/models/controlnet/OpenPoseXL2.safetensors`.
+The legacy upscale workflow's exact missing assets are now installed and publisher-hash verified:
 
-## Verification and remaining gaps
+- `models/checkpoints/Realistic_Vision_V6.0_NV_B1.safetensors` — 4,265,096,996 bytes; [publisher](https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE/blob/main/Realistic_Vision_V6.0_NV_B1.safetensors).
+- `models/vae/vae-ft-mse-840000-ema-pruned.safetensors` — 334,641,190 bytes; [publisher](https://huggingface.co/stabilityai/sd-vae-ft-mse-original).
 
-108 focused tests passed: character persistence and approvals, QML component loading, SDXL source latent/denoise/seed, optional pose conditioning, typed/pose prompt fallback, finishing contracts, model defaults, local routing, RunPod endpoint exclusions, compatibility and LoRA wiring. The full premium Characters page rendered successfully with an isolated offscreen runtime; reviewed its screenshot. No GPU generation or live RunPod mutation performed.
+The old Final upscale graph now validates and completed a real 128→256 image upscale. Independent UltraSharp finishing is also available. The legacy SD1.5 upscale graph has its own saved settings; these do not alter SDXL generation defaults.
 
-Earlier broader checks exposed existing stale tests: seven `test_runpod_runtime_contract.py` failures using excluded 8188 endpoints, and one `test_local_workflow_configuration.py` failure referencing removed `STAGE_2_WORKFLOW`. Those behaviors were not changed to make stale tests pass.
+## FaceFusion and actual execution providers
 
-Remaining: visual GPU identity-quality verification; automatic best-angle matching; batch multi-angle character-sheet generation; automatic attachment of generation outputs to candidate galleries (currently explicit import). SDXL source encoding preserves source information but cannot guarantee an unchanged face. Existing face finishing requires its runtime nodes/assets to be available and enabled; this audit did not certify a live face-lock inference run.
+[FaceFusion 3.9.1](https://github.com/facefusion/facefusion/tree/3.9.1) is installed separately at `Genesis-c0ckpit/.runtime/facefusion`, with an isolated environment and onnxruntime-migraphx 1.27.1. Its normal model/content checks were retained. A reproducible installer and configuration template are included in the repository. Local image-only and RunPod video exclusions remain enforced.
 
-RunPod routing, endpoints, exclusions, launch configuration and network state were not changed by this work.
+Fixed the FaceFusion launcher referencing undefined variables, relative output paths, and local ReActor finishing ignoring the selected engine. FaceFusion exposes explicit AMD GPU (MIGraphX) and CPU choices. AMD GPU mode preflights real device access and model-session provider initialization and stops on failure; CPU is not substituted as a successful GPU result.
 
+**GPU face swapping is not verified.** The tool environment has no `/dev/kfd` or `/dev/dri`, HIP reports zero devices, and a real MIGraphX model session cannot initialize. A filesystem-access request did not expose those devices. ComfyUI runs separately and reports the RX 9060 XT for diffusion. Its installed ReActor swapper explicitly uses `CPUExecutionProvider`, with a preexisting comment that its ROCm path stalled. Successful ReActor face tests therefore prove CPU face-swap inference, not GPU swapping. That existing provider configuration was preserved.
 
-## Final extended verification
+FaceFusion completed a CPU swap through the actual GENESIS launch function, producing a readable changed output. All three ReActor engines completed actual swaps on generated neutral portraits with changed readable outputs. The user’s actual Character A likeness has not been evaluated.
 
-The current automated suite finishes: **466 passed, 1 skipped, 4 subtests passed**. The skipped test explicitly requires the absent external legacy `/home/rice2meetyou/AI/GENESIS_POSE_MAKER/app.py`; it is not reported as passing. Its recovered ZIP lacks the handoff consumer and contains older workflow configurations, so it was not restored. The bundled skeleton editor's interaction, save and export test passes after mocking the actual GENESIS file picker. The stale remote fixture was changed to 8189 while preserving the 8188 exclusion tests. The obsolete refinement test now checks the current selected workflow. `pytest.ini` targets the maintained `tests/` suite; root `test_face_v03.py` is an older manual database smoke script whose OpenCV/face-recognition dependencies are not present in the GUI environment.
+## Verification
 
-Live local ComfyUI reports the AMD RX 9060 XT and validates both SDXL source/pose graphs with all three adapters. Both models completed actual local source-image generation at **25 steps**, saving readable 512×512 PNGs. DonutsDelivery also completed a source + OpenPoseXL2 + all three SDXL LoRA generation at **25 steps**. These were neutral synthetic smoke inputs, not a test of likeness to a real character. No model default was changed to 40 steps.
+**473 automated tests passed, 4 subtests passed, no skips.** Tests include current backend exclusions, local routes, supported model settings, source/pose prompt handling, reference approvals, batch failures, reference sheets, selected local face engines, FaceFusion execution and rejection of silent GPU fallback. QML component loading and full Characters page rendering were checked.
 
-ReSwapper `/home/rice2meetyou/AI/ComfyUI/models/reswapper/reswapper_256.onnx` (554,298,280 bytes) and HyperSwap `/home/rice2meetyou/AI/ComfyUI/models/hyperswap/hyperswap_1a_256.onnx` (402,742,682 bytes) were downloaded from the installed ReActor documentation's publisher sources and checked against Hugging Face LFS SHA-256 values. The running backend now lists both alongside Inswapper. All three engines pass finishing asset/node availability checks. A face-swap inference quality test has not been performed.
+Both SDXL models completed live local 512×512 image-to-image tests at 25 steps. Donuts also completed source + OpenPoseXL2 + all three LoRAs at 25 steps. A complete seven-candidate batch ran on an isolated temporary profile at 512×512 and 25 steps; every candidate remained unapproved and the master file hash stayed unchanged. The derived sheet was rendered and reviewed.
 
-The independent finishing path validates refine, face lock and UltraSharp upscale against the live backend. The older Final upscale graph still lacks `Realistic_Vision_V6.0_NV_B1.safetensors` and `vae-ft-mse-840000-ema-pruned.safetensors`; local availability blocks that old path. The supported independent UltraSharp action is available. FaceFusion remains uninstalled and its UI explicitly shows this; no FaceFusion inference is claimed.
+**Image-quality limit:** the SDXL batch produced candidates but did not reliably obey every requested viewpoint/framing; several profile/body requests remained frontal portraits. The builder does not claim that an angle label proves the image achieved that angle. Human review and explicit approval remain required. This is not proof of preserved likeness or reliable multi-view synthesis. No actual user character profile was modified during smoke testing.
 
-The normal launcher currently defaults to RUNPOD by existing configuration. LOCAL must be selected for local SDXL execution. This preference was preserved. No remote GPU jobs or RunPod configuration changes were made by these checks.
+RunPod jobs, endpoints, existing exclusions and launcher backend preference were preserved. The existing normal launcher defaults to RUNPOD; LOCAL selection is required for local work. Old manual root face-detection scripts are outside the maintained test suite; their GUI-environment dependencies were not installed or falsely reported as tested.
+
+## Backup
+
+Code and verification changes are saved in local Git checkpoints and portable bundles. Git does not back up the separately installed model weights, runtime dependencies, or private character image files. The public GitHub push remains unapproved and has not been performed.

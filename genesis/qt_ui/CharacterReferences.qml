@@ -8,8 +8,11 @@ ColumnLayout {
     property bool privatePreview: true
     property string characterId: bridge ? bridge.selectedCharacterA : ""
     property string inputSource: ""
+    property string builderModel: ""
     readonly property string masterSource: character.primaryImage || inputSource
     property int referenceIndex: 0
+    property string previewSource: ""
+    property string previewTitle: ""
     property var character: {
         var rows = bridge ? bridge.characters : []
         for (var i = 0; i < rows.length; ++i)
@@ -34,13 +37,14 @@ ColumnLayout {
             Layout.fillWidth: true
             model: root.bridge ? root.bridge.characters : []
             textRole: "name"
+            enabled: root.bridge && !root.bridge.busy
             currentIndex: { for (var i=0; i<model.length; i++) if (model[i].id === root.characterId) return i; return -1 }
             onActivated: {
                 root.bridge.selectCharacterA(model[currentIndex].id)
                 root.referenceIndex = 0
             }
         }
-        Button { text: "Use identity"; enabled: root.masterSource.length > 0; onClicked: root.useMaster(root.masterSource) }
+        Button { text: "Use identity"; enabled: root.masterSource.length > 0 && !root.bridge.busy; onClicked: root.useMaster(root.masterSource) }
     }
     RowLayout {
         Layout.fillWidth: true
@@ -49,7 +53,7 @@ ColumnLayout {
         CheckBox { id: adult; text: "Adult 18+" }
         Button {
             text: "Save Character A"
-            enabled: adult.checked && root.inputSource.length > 0
+            enabled: adult.checked && root.inputSource.length > 0 && !root.bridge.busy
             onClicked: {
                 var id = root.bridge.createCharacterFromImage(characterName.text || "Character A", root.inputSource, adult.checked)
                 if (id.length) { root.bridge.selectCharacterA(id); root.referenceIndex = 0 }
@@ -58,10 +62,10 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true
-        ComboBox { id: angle; model: ["Primary/Front", "¾ Left", "¾ Right", "Profile", "Upper Body", "Full Body"]; Layout.fillWidth: true }
+        ComboBox { id: angle; model: ["Primary/Front", "¾ Left", "¾ Right", "Profile", "Back", "Upper Body", "Full Body"]; Layout.fillWidth: true }
         Button {
             text: "Add master angle"
-            enabled: root.characterId.length > 0
+            enabled: root.characterId.length > 0 && !root.bridge.busy
             onClicked: { var source = root.bridge.chooseSourceImage(); if (source.length) root.bridge.addCharacterReference(root.characterId, source, angle.currentText) }
         }
     }
@@ -88,11 +92,11 @@ ColumnLayout {
             MouseArea { anchors.fill: parent; onClicked: root.referenceIndex = index }
         }
     }
-    Button { text: "Large reference preview / zoom"; enabled: root.references.length > 0; onClicked: preview.open() }
+    Button { text: "Large reference preview / zoom"; enabled: root.references.length > 0; onClicked: { root.previewSource = root.selectedReference.source || ""; root.previewTitle = root.selectedReference.role || "Identity master"; preview.open() } }
     RowLayout {
         Button {
             text: "Replace gallery reference"
-            enabled: !!root.selectedReference.path && !root.selectedReference.master
+            enabled: !!root.selectedReference.path && !root.selectedReference.master && !root.bridge.busy
             onClicked: {
                 var source = root.bridge.chooseSourceImage()
                 if (source.length) root.bridge.updateCharacterReference(root.characterId, root.selectedReference.path, source, angle.currentText)
@@ -100,27 +104,39 @@ ColumnLayout {
         }
         Button {
             text: "Remove reference"
-            enabled: !!root.selectedReference.path && root.selectedReference.path !== root.character.primaryPath
+            enabled: !!root.selectedReference.path && root.selectedReference.path !== root.character.primaryPath && !root.bridge.busy
             onClicked: { if (root.bridge.updateCharacterReference(root.characterId, root.selectedReference.path, "", "")) root.referenceIndex = 0 }
         }
     }
     RowLayout {
         ComboBox { id: category; model: ["face", "body", "pose", "ignore"] }
-        Button { text: "Approve role"; enabled: !!root.selectedReference.path && !root.selectedReference.master; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, true) }
-        Button { text: "Needs review"; enabled: !!root.selectedReference.path && !root.selectedReference.master; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, false) }
+        Button { text: "Approve role"; enabled: !!root.selectedReference.path && !root.selectedReference.master && !root.bridge.busy; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, true) }
+        Button { text: "Needs review"; enabled: !!root.selectedReference.path && !root.selectedReference.master && !root.bridge.busy; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, false) }
     }
     Label { text: "CHARACTER REFERENCE BUILDER"; color: "#d9b65d"; font.bold: true }
     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: "#aaa"; text: "Prepare an angle or pose in Create using the master. Choose a reference-capable workflow there; SDXL image-to-image uses the source; lower denoise preserves more detail but does not guarantee identity. Import the saved result for review, then approve its face/body/pose role. The master stays unchanged." }
     TextField { id: builderPrompt; Layout.fillWidth: true; placeholderText: "e.g. three-quarter left view, neutral expression, same identity" }
     RowLayout {
-        Button { text: "Prepare in Create"; enabled: root.characterId.length > 0 && builderPrompt.text.trim().length > 0; onClicked: root.buildReference(root.masterSource, builderPrompt.text) }
+        Button { text: "Prepare in Create"; enabled: root.characterId.length > 0 && builderPrompt.text.trim().length > 0 && !root.bridge.busy; onClicked: root.buildReference(root.masterSource, builderPrompt.text) }
         Button {
-            text: "Import candidate for review"; enabled: root.characterId.length > 0
+            text: "Import candidate for review"; enabled: root.characterId.length > 0 && !root.bridge.busy && !root.bridge.busy
             onClicked: {
                 var source = root.bridge.chooseSourceImage()
                 if (source.length) root.bridge.importCharacterCandidate(root.characterId, source, builderPrompt.text, category.currentText)
             }
         }
+    }
+    Button {
+        text: root.bridge && root.bridge.busy ? "Generating…" : "Generate reference set"
+        enabled: root.characterId.length > 0 && root.builderModel.length > 0 && !root.bridge.busy
+        onClicked: root.bridge.queueCharacterReferenceSet(root.characterId, root.builderModel)
+    }
+    Button { text: "Cancel generation"; visible: root.bridge && root.bridge.busy; onClicked: root.bridge.cancelGeneration() }
+    Label { Layout.fillWidth: true; color: "#aaa"; wrapMode: Text.Wrap; text: "Uses the model selected in Create. Seven separate candidates are saved for review; nothing is approved automatically. Cancel remains available in Create." }
+    Button {
+        text: "Preview latest generated reference sheet"
+        enabled: (root.character.referenceSheets || []).length > 0
+        onClicked: { var sheets = root.character.referenceSheets; root.previewSource = sheets[sheets.length - 1]; root.previewTitle = "Generated reference set · review"; preview.open() }
     }
     Popup {
         id: preview
@@ -132,7 +148,7 @@ ColumnLayout {
         ColumnLayout {
             anchors.fill: parent
             RowLayout {
-                Label { text: root.selectedReference.role || "Identity master"; Layout.fillWidth: true }
+                Label { text: root.previewTitle || "Identity master"; Layout.fillWidth: true }
                 Slider { id: zoom; from: 1; to: 4; value: 1 }
                 Button { text: "Close"; onClicked: preview.close() }
             }
@@ -141,7 +157,7 @@ ColumnLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true
                 clip: true
                 contentWidth: width * zoom.value; contentHeight: height * zoom.value
-                Image { width: referenceView.contentWidth; height: referenceView.contentHeight; source: root.privatePreview ? "" : root.selectedReference.source || ""; fillMode: Image.PreserveAspectFit }
+                Image { width: referenceView.contentWidth; height: referenceView.contentHeight; source: root.privatePreview ? "" : root.previewSource; fillMode: Image.PreserveAspectFit }
                 Label { anchors.centerIn: parent; text: "PRIVATE"; visible: root.privatePreview }
             }
         }

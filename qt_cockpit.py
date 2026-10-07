@@ -35,7 +35,7 @@ from genesis.generation_pipeline import (adapt_prompt, compatible_selection, ref
                                          normalize_identity_instruction, uses_refcontrol)
 from genesis import integrations, workflow_lab
 from genesis.finishing import finishing_plan, run_finishing, REFINE_INSTRUCTION
-from genesis.character_library import add_reference, character_items, preferred_reference, save_character, update_reference, get_character, set_reference_details, reference_is_approved
+from genesis.character_library import add_reference, character_items, preferred_reference, save_character, update_reference, get_character, set_reference_details, reference_is_approved, reference_category
 from genesis.media_bridge import MediaBridge
 from genesis.backend_routing import remote_url, local_start_allowed, use_route
 # GENESIS_COMFY_URL remains supported through backend_routing for older launchers.
@@ -1418,6 +1418,7 @@ class GenerationBridge(QObject):
         self._finish_width, self._finish_height = 1024, 1024
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
         self._stage_three_engine = "reactor_inswapper"
+        self._facefusion_provider = "migraphx"
         self._cancel_requested = False
         self._active_client = None
         self._active_prompt_id = None
@@ -1450,10 +1451,20 @@ class GenerationBridge(QObject):
     def inpaintAvailable(self) -> bool:
         return True
 
+    @pyqtProperty(str, notify=statusChanged)
+    def faceFusionProvider(self):
+        return self._facefusion_provider
+
+    @pyqtSlot(str)
+    def setFaceFusionProvider(self, provider):
+        if provider in {'migraphx', 'cpu'} and not self._busy:
+            self._facefusion_provider = provider
+            self.statusChanged.emit()
+
     @pyqtProperty(bool, constant=True)
     def faceFusionAvailable(self) -> bool:
         ff_root = integrations.FACEFUSION_ROOT
-        ff_python = Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
+        ff_python = ff_root / ".venv/bin/python" if (ff_root / ".venv/bin/python").is_file() else Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
         return ff_python.is_file() and (ff_root / "facefusion.py").is_file() and (ff_root / "facefusion.ini").is_file()
 
     @pyqtProperty(bool, constant=True)
@@ -1602,6 +1613,67 @@ class GenerationBridge(QObject):
             return False
         self.charactersChanged.emit()
         return True
+
+    @pyqtSlot(str, str, result=str)
+    def characterReferenceSource(self, character_id, instruction):
+        from genesis.character_library import best_reference
+        path = best_reference(character_id, instruction)
+        return QUrl.fromLocalFile(path).toString() if path else ""
+
+    @pyqtSlot(str, str)
+    def queueCharacterReferenceSet(self, character_id, model):
+        if self._busy:
+            return
+        character = get_character(character_id)
+        if not character or model not in SOURCE_EDIT_MODELS or model not in SUPPORTED_CREATE_MODELS:
+            self._set_status("Select a saved character and a supported source-image model in Create.")
+            return
+        source = Path(character['primary_image'])
+        if not source.is_file():
+            self._set_status("The master reference is unavailable.")
+            return
+        try:
+            route = self.backend_router.resolve(model) if self.backend_router else None
+            if model in LOCAL_PENDING_KLEIN_MODELS and (route is None or route.destination != "RUNPOD"):
+                raise ValueError("This model's local render is not verified; choose a supported model.")
+        except ValueError as exc:
+            self._set_status(str(exc))
+            return
+        self._cancel_requested = False
+        self._finish_route = route
+        self._set_busy(True)
+        self._set_status("Preparing character reference set for review…")
+        threading.Thread(target=self._run_character_reference_set, args=(route, character_id, source, model), daemon=True).start()
+
+    def _run_character_reference_set(self, route, character_id, source, model):
+        from genesis.character_library import REFERENCE_BUILD_REQUESTS
+        from contextlib import nullcontext
+        try:
+            with use_route(route) if route else nullcontext():
+                defaults = model_generation_settings(model, source=True, remote=bool(remote_url()))
+                controls = {key: defaults['default' + key.capitalize()] for key in ('steps', 'cfg', 'denoise', 'sampler', 'scheduler')}
+                controls['seed'] = -1
+                candidates = []
+                for angle, category, instruction in REFERENCE_BUILD_REQUESTS:
+                    self._check_cancelled()
+                    output = self._run_generate(instruction, "", defaults['defaultWidth'], defaults['defaultHeight'], model,
+                        "None", "None", "None", 0, 0, 0, source, None, False, False, False, controls, release_busy=False)
+                    if output is None:
+                        return
+                    candidates.append(output)
+                    add_reference(character_id, str(output), role=angle, category=category, approved=False)
+                    self.charactersChanged.emit()
+                from genesis.reference_sheet import create_reference_sheet
+                from genesis.character_library import save_reference_sheet
+                sheet = create_reference_sheet(candidates, self._output_dir / ('GENESIS-ReferenceSheet-' + str(time.time_ns()) + '.png'))
+                save_reference_sheet(character_id, str(sheet))
+                self.charactersChanged.emit()
+                self._set_status("Reference set and review sheet saved · candidates need review and approval.")
+        except (ValueError, OSError, workflow_lab.ComfyError) as exc:
+            self._set_status("Reference builder stopped · " + str(exc))
+        finally:
+            self._cancel_requested = False
+            self._set_busy(False)
 
     def _identity_master(self, master_url=""):
         if self._character_a:
@@ -1940,20 +2012,25 @@ class GenerationBridge(QObject):
         if self.backend_router is not None and self.backend_router.mode != 'LOCAL':
             self._set_status("FaceFusion is local image-only. Select LOCAL explicitly to run it; RunPod video is not connected.")
             return
-        safe, detail = integrations.gpu_kernel_preflight()
-        if not safe:
-            self._set_status(detail)
-            return
         ff_root = integrations.FACEFUSION_ROOT
-        ff_python = Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
+        ff_python = ff_root / ".venv/bin/python" if (ff_root / ".venv/bin/python").is_file() else Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
         ff_entry = ff_root / "facefusion.py"
         ff_config = ff_root / "facefusion.ini"
         if not ff_python.is_file() or not ff_entry.is_file() or not ff_config.is_file():
             self._set_status("FaceFusion install is unavailable.")
             return
 
+        from configparser import ConfigParser
+        config = ConfigParser()
+        config.read(ff_config)
+        providers = config.get('execution', 'execution_providers', fallback='cpu').split()
+        if any(provider != 'cpu' for provider in providers):
+            safe, detail = integrations.gpu_kernel_preflight()
+            if not safe:
+                self._set_status(detail)
+                return
         self._set_busy(True)
-        self._set_status("Preparing FaceFusion · HyperSwap ROCm…")
+        self._set_status("Preparing FaceFusion · local image swap…")
         threading.Thread(
             target=self._run_facefusion,
             args=(target, source, ff_python, ff_entry, ff_config),
@@ -1964,19 +2041,29 @@ class GenerationBridge(QObject):
         self, target: Path, source: Path, ff_python: Path, ff_entry: Path, ff_config: Path
     ) -> None:
         try:
-            self._finish_info = info
-            self._finish_width, self._finish_height = width, height
             self._output_dir.mkdir(parents=True, exist_ok=True)
-            stamp = time.strftime("%Y%m%d-%H%M%S")
+            if self._facefusion_provider == 'migraphx':
+                probe = subprocess.run([str(ff_python), '-c',
+                    "import ctypes,sys; from pathlib import Path; import onnxruntime as ort; "
+                    "lib=ctypes.CDLL('/opt/rocm/lib/libamdhip64.so'); n=ctypes.c_int(); "
+                    "status=lib.hipGetDeviceCount(ctypes.byref(n)); "
+                    "sys.exit('AMD GPU is not accessible to this process') if status or n.value<1 else None; "
+                    "session=ort.InferenceSession('.assets/models/hyperswap_1a_256.onnx',providers=['MIGraphXExecutionProvider']); "
+                    "sys.exit('MIGraphX failed; CPU fallback is not allowed in GPU mode') if session.get_providers()[0]!='MIGraphXExecutionProvider' else None"],
+                    cwd=str(ff_entry.parent), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
+                if probe.returncode:
+                    raise RuntimeError((probe.stdout or 'AMD GPU preflight failed').strip().splitlines()[-1])
+            stamp = str(time.time_ns())
             suffix = target.suffix.lower() if target.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"} else ".png"
             output = self._output_dir / f"GENESIS-FaceFusion-{stamp}{suffix}"
             command = [
                 str(ff_python), str(ff_entry), "headless-run",
                 "--config-path", str(ff_config),
-                "--source-paths", str(source),
-                "--target-path", str(target),
-                "--output-path", str(output),
+                "--source-paths", str(source.resolve()),
+                "--target-path", str(target.resolve()),
+                "--output-path", str(output.resolve()),
                 "--workflow-mode", "image-to-image",
+                "--execution-providers", self._facefusion_provider,
             ]
             completed = subprocess.run(
                 command,
@@ -1990,7 +2077,7 @@ class GenerationBridge(QObject):
             if completed.returncode != 0 or not output.is_file():
                 tail = "\n".join((completed.stdout or "").splitlines()[-8:])
                 raise RuntimeError(tail or f"FaceFusion exited with code {completed.returncode}")
-            self._set_preview(QUrl.fromLocalFile(str(output)).toString())
+            self._set_preview(QUrl.fromLocalFile(str(output.resolve())).toString())
             self._set_status(f"FaceFusion complete · {output.name}")
         except subprocess.TimeoutExpired:
             self._set_status("FaceFusion timed out.")
@@ -2284,7 +2371,8 @@ class GenerationBridge(QObject):
         use_stage_three: bool,
         use_upscale: bool,
         generation_controls: dict | None = None,
-    ) -> None:
+        *, release_busy: bool = True,
+    ) -> Path | None:
         try:
             refcontrol_prompt(prompt_text, model_name, [lora_one, lora_two, lora_three],
                               has_pose=pose is not None, has_source=source is not None)
@@ -2333,7 +2421,7 @@ class GenerationBridge(QObject):
                     if enabled:
                         validate_remote_workflow_assets(workflow, info)
             self._output_dir.mkdir(parents=True, exist_ok=True)
-            stamp = time.strftime("%Y%m%d-%H%M%S")
+            stamp = time.strftime("%Y%m%d-%H%M%S") + "-" + str(time.time_ns())
             if model_name == QWEN21_MODEL and (source is not None or pose is not None):
                 primary = source if source is not None else pose
                 secondary = pose if source is not None else None
@@ -2452,7 +2540,7 @@ class GenerationBridge(QObject):
                 self._set_status("Preparing Stage 3 identity lock…")
                 current = self._run_reference_stage(
                     client, info, STAGE_3_WORKFLOW, current, "", stamp, "Stage3",
-                    secondary_image=source,
+                    secondary_image=self._identity_master() or source,
                 )
                 self._record_finish("Face Lock", current)
             self._check_cancelled()
@@ -2463,6 +2551,7 @@ class GenerationBridge(QObject):
             self._record_finish("Generated", current)
             self._set_progress(1.0)
             self._set_status(f"Complete · {current.name}")
+            return current
         except Exception as exc:
             self._set_progress(-1.0)
             if self._cancel_requested:
@@ -2470,8 +2559,9 @@ class GenerationBridge(QObject):
             else:
                 self._set_status(f"Generation failed · {exc}")
         finally:
-            self._cancel_requested = False
-            self._set_busy(False)
+            if release_busy:
+                self._cancel_requested = False
+                self._set_busy(False)
 
     def _run_4b_source(
         self, client, info: dict, source: Path, prompt_text: str,
@@ -2599,7 +2689,7 @@ class GenerationBridge(QObject):
                                            loras or [], has_pose=secondary_image is not None, has_source=True)
             if model_override == REGULAR_9B_MODEL:
                 prompt["1"] = {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": model_override}}
-        if remote_url() and workflow == STAGE_3_WORKFLOW:
+        if workflow == STAGE_3_WORKFLOW:
             swap_models = {
                 "reactor_inswapper": "inswapper_128.onnx",
                 "reactor_reswapper": "reswapper_256.onnx",
@@ -2704,7 +2794,7 @@ class GenerationBridge(QObject):
                 if encode:
                     field = "image3" if "image2" in encode["inputs"] else "image2"
                     for ref in character.get("references", []):
-                        if Path(ref).resolve() == input_image.resolve() or not Path(ref).is_file() or not reference_is_approved(character, ref) or character.get("reference_categories", {}).get(ref) == "pose":
+                        if Path(ref).resolve() == input_image.resolve() or not Path(ref).is_file() or not reference_is_approved(character, ref) or reference_category(character, ref) == "pose":
                             continue
                         if field not in optional:
                             break

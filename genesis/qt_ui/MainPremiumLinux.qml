@@ -486,6 +486,10 @@ ApplicationWindow {
 
     function generateCurrent() {
         var prompt = generationPrompt.trim().length ? generationPrompt : selectedPosePrompt
+        var source = generationSource.toString()
+        if (genesisBridge.selectedCharacterA && source === genesisBridge.characterIdentitySource(genesisBridge.selectedCharacterA)) {
+            source = genesisBridge.characterReferenceSource(genesisBridge.selectedCharacterA, prompt) || source
+        }
         genesisBridge.queueGenerateAdvanced(
             prompt,
             generationNegativePrompt,
@@ -494,7 +498,7 @@ ApplicationWindow {
             selectedGenerationProfile.model,
             selectedLora,
             selectedLoraTwo,
-            generationSource.toString(),
+            source,
             selectedPoseSource.toString(),
             useStageTwo,
             useStageThree,
@@ -2224,6 +2228,7 @@ ApplicationWindow {
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }
                                 GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN REACTOR"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
+                                ComboBox { model: ["AMD GPU · MIGraphX", "CPU"]; enabled: !genesisBridge.busy; currentIndex: genesisBridge.faceFusionProvider === "cpu" ? 1 : 0; onActivated: genesisBridge.setFaceFusionProvider(currentIndex === 0 ? "migraphx" : "cpu") }
                                 GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : (genesisBridge.faceFusionAvailable ? "FACEFUSION · LOCAL IMAGE" : "FACEFUSION · NOT INSTALLED"); enabled:genesisBridge.faceFusionAvailable && !genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
                                 GButton { Layout.preferredWidth: implicitWidth; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
                             } }
@@ -2325,6 +2330,7 @@ ApplicationWindow {
                         CharacterReferences {
                             Layout.fillWidth: true; bridge: genesisBridge; privatePreview: appRoot.privacyMode
                             inputSource: appRoot.generationSource.toString()
+                            builderModel: appRoot.selectedGenerationProfile.model || ""
                             onUseMaster: function(source) { appRoot.generationSource = source; appRoot.pageIndex = 0 }
                             onBuildReference: function(source, prompt) { appRoot.generationSource = source; appRoot.generationPrompt = prompt; appRoot.pageIndex = 0 }
                         }

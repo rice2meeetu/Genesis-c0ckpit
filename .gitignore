@@ -59,3 +59,7 @@ To
 
 # Machine-local RunPod selection
 .genesis-runpod-current
+
+# Isolated installed applications and smoke-test files
+.runtime/
+work/
