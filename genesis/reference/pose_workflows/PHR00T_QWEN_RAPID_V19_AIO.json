@@ -4,7 +4,7 @@
   "nodes": [
     {
       "id": 1,
-      "type": "UnetLoaderGGUF",
+      "type": "CheckpointLoaderSimple",
       "pos": [
         50,
         200
@@ -24,15 +24,32 @@
             1
           ],
           "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3,
+            11
+          ],
+          "slot_index": 2
         }
       ],
       "properties": {
-        "Node name for S&R": "UnetLoaderGGUF"
+        "Node name for S&R": "CheckpointLoaderSimple"
       },
       "widgets_values": [
-        "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf"
+        "Qwen-Rapid-AIO-NSFW-v19.safetensors"
       ],
-      "title": "Phr00t v19 GGUF Q4 model"
+      "title": "Phr00t v19 AIO checkpoint"
     },
     {
       "id": 2,
@@ -419,70 +436,6 @@
       ],
       "color": "#432",
       "bgcolor": "#653"
-    },
-    {
-      "id": 31,
-      "type": "CLIPLoaderGGUF",
-      "pos": [
-        50,
-        1150
-      ],
-      "size": [
-        350,
-        110
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "CLIP",
-          "type": "CLIP",
-          "links": [
-            2
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CLIPLoaderGGUF"
-      },
-      "widgets_values": [
-        "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
-        "qwen_image"
-      ]
-    },
-    {
-      "id": 32,
-      "type": "VAELoader",
-      "pos": [
-        50,
-        1350
-      ],
-      "size": [
-        350,
-        110
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "VAE",
-          "type": "VAE",
-          "links": [
-            3,
-            11
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VAELoader"
-      },
-      "widgets_values": [
-        "qwen_image_vae.safetensors"
-      ]
     }
   ],
   "links": [
@@ -496,16 +449,16 @@
     ],
     [
       2,
-      31,
-      0,
+      1,
+      1,
       4,
       0,
       "CLIP"
     ],
     [
       3,
-      32,
-      0,
+      1,
+      2,
       4,
       1,
       "VAE"
@@ -568,8 +521,8 @@
     ],
     [
       11,
-      32,
-      0,
+      1,
+      2,
       8,
       1,
       "VAE"
@@ -614,5 +567,6 @@
       ]
     }
   },
-  "version": 0.4
+  "version": 0.4,
+  "id": "genesis-phr00t-v19-aio"
 }

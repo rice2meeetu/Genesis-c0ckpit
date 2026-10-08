@@ -41,7 +41,7 @@ MODEL_PROFILES = (
         "lora": (),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_8b", "qwen3_8b"),
-        "workflow": ("aisha",),
+        "workflow": ("GENESIS_AISHA_9B_T2I",),
     },
     {
         "name": "FLUX.2 Klein 9B Base",
@@ -96,6 +96,22 @@ MODEL_PROFILES = (
         "workflow": ("fluxedup", "fluxup"),
     },
     {
+        "name": "Qwen Image 2.1 BF16 · native T2I / reference",
+        "model": ("qwen_image_2.1_bf16.safetensors",),
+        "lora": (),
+        "vae": ("qwen_image_2.1_vae_bf16.safetensors",),
+        "encoder": ("qwen3vl_8b_int8_convrot.safetensors",),
+        "workflow": ("QWEN_IMAGE_2_1_T2I",),
+    },
+    {
+        "name": "Phr00t v23 Q2 · LOCAL",
+        "model": ("Qwen-Rapid-NSFW-v23_Q2_K.gguf",),
+        "lora": (),
+        "vae": (),
+        "encoder": (),
+        "workflow": ("STAGE_1_PHR00T_POSE",),
+    },
+    {
         "name": "Phr00t / QwenRapid AIO",
         "model": ("Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf",),
         "lora": (),
@@ -133,11 +149,15 @@ def _files(roots: tuple[Path, ...], suffixes: set[str]) -> list[Path]:
 def _match(paths: list[Path], tokens: tuple[str, ...]) -> Path | None:
     if not tokens:
         return None
+    exact_suffixes = {".safetensors", ".gguf", ".ckpt", ".pt", ".onnx", ".pth"}
     lowered = tuple(token.lower() for token in tokens)
-    return next(
-        (path for path in paths if any(token in path.name.lower() for token in lowered)),
-        None,
-    )
+    for path in paths:
+        name = path.name.lower()
+        for token in lowered:
+            token_suffix = Path(token).suffix.lower()
+            if (name == token if token_suffix in exact_suffixes else token in name):
+                return path
+    return None
 
 
 def readiness_report() -> dict:

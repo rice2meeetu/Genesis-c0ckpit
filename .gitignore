@@ -56,3 +56,6 @@ To
 
 # Track schema, keep runtime database ignored
 !database/face_schema.sql
+
+# Machine-local RunPod connection selection
+.genesis-runpod-current
