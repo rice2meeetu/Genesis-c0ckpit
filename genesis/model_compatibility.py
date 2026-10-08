@@ -27,6 +27,9 @@ KLEIN_4B_RUNTIME_VERIFIED_LORAS: set[str] = set()
 
 # Metadata-verified on the GENESIS machine as flux2_klein_9b.
 KLEIN_9B_LORAS = {
+    # Shared-volume safetensors metadata inspected on B2, 2026-10-05.
+    "Flux2 Klein 9B Realistic Detail LoRA.safetensors",
+    "Flux2-Klein-9B-consistency-V2.safetensors",
     "Flux Klein - NSFW v2.safetensors",
     "Klein_Anatomy_Revamped.safetensors",
     "flux2klein_body_version_a.safetensors",
@@ -41,8 +44,10 @@ KLEIN_9B_LORAS = {
 }
 
 # Expose verified training triggers to the UI/assistant. Prompt adaptation never
-# injects these silently; the user or a preset must explicitly apply them.
+# injects appearance triggers silently. RefControl routing adds its required phrase.
 LORA_TRIGGERS = {
+    "Flux2 Klein 9B Realistic Detail LoRA.safetensors": "srx_detail",
+    "Flux2-Klein-9B-consistency-V2.safetensors": "consistency",
     "F2K4BBabe_Engel_v1.0.safetensors": "F2K4BBabe_Engel_v1.0",
     "FK_sloppydeepthroat_epoch_10.safetensors": "FK_sloppydeepthroat",
     "FK_teeththroat.safetensors": "FK_strappadoblowjob",
@@ -96,11 +101,15 @@ KNOWN_MODELS = {
     "aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors": "flux2_klein_4b",
     "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors": "aisha_9b",
     "biglust17_v17.safetensors": "sdxl",
+    "biglustydonutmixNSFW_v12.safetensors": "sdxl",
+    "donutsdeliverymixV4_v41.safetensors": "sdxl",
     "juggernautXL_ragnarokBy.safetensors": "sdxl",
     "lustifySDXLNSFW_endgameDMD2.safetensors": "sdxl",
     "lustifySDXLNSFWSFW_v20LIGHTNING.safetensors": "sdxl",
     "Qwen-Rapid-AIO-NSFW-v19.safetensors": "qwen_image",
     "Qwen-Rapid-NSFW-v23_Q8_0.gguf": "qwen_image",
+    "Qwen-Rapid-AIO-NSFW-v23.safetensors": "qwen_image",
+    "qwen_image_2.1_bf16.safetensors": "qwen_image_2_1",
     "aisha_nsfw_beta_v8_fp8.safetensors": "aisha_9b",
     "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors": "aisha_9b",
     "flux-2-klein-4b.safetensors": "flux2_klein_4b",
@@ -110,6 +119,7 @@ KNOWN_MODELS = {
     "miracleinNSFWGeneration_20FP8.safetensors": "flux2_klein_9b_base",
     "pornmasterFlux2Klein_v3-fp8.safetensors": "flux2_klein_9b_base",
     "darkBeast_DBKleinv2BFS.safetensors": "flux2_klein_9b_base",
+    "darkBeastMar0326Latest_dbkleinv2BFS.safetensors": "flux2_klein_9b_base",
     "flux1-dev-kontext_fp8_scaled.safetensors": "flux1",
     "fluxedUpFluxNSFW_40DevFp8.safetensors": "flux1",
 }
@@ -126,6 +136,8 @@ def model_family(name: str | None) -> str:
     stem = Path(value).name
     if stem in _KNOWN_MODELS_LOWER:
         return _KNOWN_MODELS_LOWER[stem]
+    if "qwen-rapid" in stem or "qwenrapid" in stem or "phr00t" in stem:
+        return "qwen_image"
     if "aisha" in stem:
         return "aisha_9b"
     if "klein" in stem and "9b" in stem and ("kv" in stem or "9b_kv" in value):
@@ -181,6 +193,8 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     if base in BLOCKED_UNVERIFIED_LORAS or base in RUNTIME_QUARANTINED_LORAS:
         return False
     family = model_family(model)
+    if family == "unknown":
+        return False
     if family == "flux2_klein_4b":
         return base in KLEIN_4B_RUNTIME_VERIFIED_LORAS
     if family == "flux2_klein_9b_kv":
@@ -209,4 +223,5 @@ def compatibility_note(model: str | None) -> str:
         "flux1": "FLUX.1 · only FLUX.1 LoRAs",
         "sdxl": "SDXL · only SDXL LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
+        "qwen_image_2_1": "Qwen Image 2.1 · LoRAs disabled until a 2.1-specific adapter is verified",
     }.get(family, "Unknown model family · workflow defaults only")

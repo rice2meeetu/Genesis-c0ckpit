@@ -54,10 +54,11 @@ def test_document_people_limit():
     with pytest.raises(ValueError):validate_document(d)
 
 def test_editor_interaction_roundtrip(tmp_path,monkeypatch):
-    from PyQt6.QtWidgets import QApplication,QFileDialog
+    from PyQt6.QtWidgets import QApplication
     from PyQt6.QtCore import QPoint,Qt
     from PyQt6.QtTest import QTest
     from genesis.skeleton_editor import SkeletonEditor,read_document
+    from genesis.qt_media_picker import FilePicker
     app=QApplication.instance() or QApplication([])
     editor=SkeletonEditor()
     editor.show()
@@ -80,11 +81,11 @@ def test_editor_interaction_roundtrip(tmp_path,monkeypatch):
     QTest.mouseRelease(editor.canvas,Qt.MouseButton.LeftButton,pos=start+QPoint(20,15))
     assert editor.document["people"][0][PARTS[0]][:2]!=original["people"][0][PARTS[0]][:2]
     saved=tmp_path/"pose.json"
-    monkeypatch.setattr(QFileDialog,"getSaveFileName",lambda *a,**k:(str(saved),""))
+    monkeypatch.setattr(FilePicker,"getSaveFileName",lambda *a,**k:(str(saved),""))
     assert editor.save()
     assert read_document(saved)==editor.document
     exported=tmp_path/"pose.png"
-    monkeypatch.setattr(QFileDialog,"getSaveFileName",lambda *a,**k:(str(exported),""))
+    monkeypatch.setattr(FilePicker,"getSaveFileName",lambda *a,**k:(str(exported),""))
     editor.export_png()
     from PyQt6.QtGui import QImage
     image=QImage(str(exported))

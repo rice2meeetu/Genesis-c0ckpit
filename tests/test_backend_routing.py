@@ -5,7 +5,7 @@ from genesis.backend_routing import Route, choose_route, normalize_endpoint, rem
 
 
 def test_endpoint_accepts_pod_id_and_rejects_embedded_credentials():
-    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-3000.proxy.runpod.net'
+    assert normalize_endpoint('z58et1sa2stn1g') == 'https://z58et1sa2stn1g-8189.proxy.runpod.net'
     with pytest.raises(ValueError): normalize_endpoint('https://user:secret@pod.example')
     with pytest.raises(ValueError): normalize_endpoint('http://pod.example')
 
@@ -44,3 +44,46 @@ def test_route_is_job_scoped(monkeypatch):
     with use_route(Route('RUNPOD', 'https://new.example')):
         assert remote_url() == 'https://new.example'
     assert remote_url() == 'https://legacy.example'
+
+
+def test_verified_phr00t_is_local_but_still_obeys_fault_guard():
+    import qt_cockpit
+    from genesis.backend_bridge import BackendBridge
+    bridge = object.__new__(type("RouteProbe", (), {"resolve": BackendBridge.resolve}))
+    bridge._mode = "LOCAL"
+    bridge._local = [{"model": qt_cockpit.QWEN_MODEL, "runnable": True}]
+    bridge._remote = []
+    bridge._local_status = {"ready": True}
+    bridge._remote_status = {}
+    bridge._endpoint = ""
+    bridge._local_safe = True
+    assert bridge.resolve(qt_cockpit.QWEN_MODEL).destination == "LOCAL"
+    bridge._local_safe = False
+    with pytest.raises(ValueError, match="safety"):
+        bridge.resolve(qt_cockpit.QWEN_MODEL)
+
+
+@pytest.mark.parametrize('endpoint', ['http://127.0.0.1:18189',
+    'http://localhost:8189', 'https://pod-8189.proxy.runpod.net'])
+def test_explicit_b2_endpoint_is_accepted(endpoint):
+    assert normalize_endpoint(endpoint) == endpoint
+
+
+def test_new_runpod_environment_takes_precedence(monkeypatch):
+    monkeypatch.setenv('GENESIS_RUNPOD_URL', 'https://paul-8189.proxy.runpod.net')
+    monkeypatch.setenv('GENESIS_COMFY_URL', 'http://127.0.0.1:18189')
+    assert remote_url() == 'https://paul-8189.proxy.runpod.net'
+
+
+def test_remote_identity_engines_fail_closed_without_reactor():
+    from genesis.backend_bridge import remote_identity_engines
+    assert remote_identity_engines({}) == []
+    assert remote_identity_engines({'SomeFaceNode': {'input': {}}}) == []
+
+
+def test_remote_identity_engines_require_advertised_swap_weights():
+    from genesis.backend_bridge import remote_identity_engines
+    info = {'ReActorFaceSwap': {'input': {'required': {'swap_model': [[
+        'inswapper_128.onnx', 'hyperswap_1a_256.onnx'
+    ]]}}}}
+    assert remote_identity_engines(info) == ['reactor_inswapper', 'reactor_hyperswap']

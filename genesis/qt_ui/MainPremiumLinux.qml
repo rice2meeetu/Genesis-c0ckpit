@@ -64,7 +64,13 @@ ApplicationWindow {
     Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 7 }
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
 
-    property var generationModel: typeof generationProfiles !== "undefined" ? generationProfiles : []
+    // Show configured models even when the current backend is offline. Route
+    // readiness gates GENERATE, not visibility or choosing a model profile.
+    property var generationModel: typeof generationProfiles !== "undefined"
+        ? generationProfiles.filter(function(row) {
+            return (row.runnable === true || (row.stageOneConfigured === true && row.profileSelectable === true))
+                && (!generationSource.toString().length || row.sourceSupported !== false)
+        }) : []
     property int selectedGenerationIndex: 0
     property bool modelDefaultsApplied: false
     property string selectedModelName: ""
@@ -75,12 +81,12 @@ ApplicationWindow {
                 if (generationModel[i].model === selectedModelName) { index = i; break }
             selectedGenerationIndex = index
             if (!modelDefaultsApplied || generationModel[index].model !== selectedModelName) {
-                selectGeneration(index)
+                selectGeneration(index, false)
                 modelDefaultsApplied = true
             }
         }
     }
-    Component.onCompleted: if (generationModel.length) { selectGeneration(0); modelDefaultsApplied = true }
+    Component.onCompleted: if (generationModel.length) { selectGeneration(0, false); modelDefaultsApplied = true }
     readonly property var selectedGenerationProfile: generationModel.length
         ? generationModel[Math.min(selectedGenerationIndex, generationModel.length - 1)]
         : ({label:"No model available", model:"", note:"Waiting for the backend model catalog", loras:["None"], runnable:false, sourceRequired:false})
@@ -91,6 +97,7 @@ ApplicationWindow {
     property real selectedLoraTwoStrength: 0.65
     property real selectedLoraThreeStrength: 0.65
     property url generationSource: ""
+    onGenerationSourceChanged: applyGenerationDefaults(selectedGenerationProfile)
     property url faceSwapTarget: ""
     property url faceSwapSource: ""
     property string generationPrompt: ""
@@ -103,8 +110,51 @@ ApplicationWindow {
     property real generationDenoise: 1.0
     property string generationSampler: "er_sde"
     property string generationScheduler: "beta"
+    onStageTwoModelChanged: finishLora = "None"
+    property string finishLora: "None"
+    property real finishLoraStrength: 0.65
+    property int finishScale: 2
+    readonly property var finishAvailability: {
+        var refresh = genesisBridge.previewUrl + genesisBridge.status + genesisBridge.busy + backendBridge.connected + backendBridge.endpoint
+        return genesisBridge.finishingAvailability(stageTwoModel, generationSource.toString(), finishScale)
+    }
     property bool useStageTwo: false
     property bool useStageThree: false
+    property string stageTwoModel: "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
+    readonly property var stageTwoChoices: generationModel.filter(function(row) { return row.stageTwoEligible === true && row.selectable !== false })
+    readonly property var stageTwoSelectableChoices: stageTwoChoices.filter(function(row) { return row.selectable !== false })
+    readonly property string stageTwoLabel: {
+        for (var i = 0; i < stageTwoChoices.length; ++i)
+            if (stageTwoChoices[i].model === stageTwoModel) return stageTwoChoices[i].label
+        return "Choose a refinement model"
+    }
+    readonly property var selectedStageTwoProfile: {
+        for (var i = 0; i < stageTwoChoices.length; ++i)
+            if (stageTwoChoices[i].model === stageTwoModel) return stageTwoChoices[i]
+        return ({})
+    }
+    readonly property var liveIdentityEngines: (runtimeStatus && runtimeStatus.identityEngines) ? runtimeStatus.identityEngines : []
+    readonly property var stageThreeChoices: [
+        {label:"ReActor · Inswapper", engine:"reactor_inswapper", available:liveIdentityEngines.indexOf("reactor_inswapper") >= 0},
+        {label:"ReActor · ReSwapper", engine:"reactor_reswapper", available:liveIdentityEngines.indexOf("reactor_reswapper") >= 0},
+        {label:"ReActor · HyperSwap", engine:"reactor_hyperswap", available:liveIdentityEngines.indexOf("reactor_hyperswap") >= 0}
+    ].filter(function(row) { return row.available === true })
+    readonly property bool stageThreeReady: liveIdentityEngines.length > 0
+    readonly property string stageThreeLabel: {
+        for (var i = 0; i < stageThreeChoices.length; ++i)
+            if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
+        return "Choose an identity engine"
+    }
+    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false || row.stageOneConfigured === true })
+    readonly property var stageOneSelectableChoices: stageOneChoices
+    readonly property int stageOneChoiceIndex: {
+        for (var i = 0; i < stageOneSelectableChoices.length; ++i)
+            if (stageOneSelectableChoices[i].model === selectedGenerationProfile.model) return i
+        return -1
+    }
+    property int editingStage: 0
+    readonly property var stageChoices: editingStage === 0 ? stageOneChoices
+        : (editingStage === 1 ? stageTwoChoices : stageThreeChoices)
     property string stageThreeEngine: "reactor_inswapper"
     property bool useUpscale: false
 
@@ -115,6 +165,15 @@ ApplicationWindow {
     property string selectedPoseName: "No pose selected"
     property string selectedPoseCategory: ""
     property string selectedPosePrompt: ""
+    property var selectedPresetPayload: null
+    property string presetAttribution: ""
+    property string presetSettingsNote: ""
+    readonly property string comparisonSource: {
+        var rows = genesisBridge.finishingResults
+        for (var i = 0; i < rows.length; ++i)
+            if (rows[i].source === genesisBridge.previewUrl) return rows[i].inputSource || ""
+        return ""
+    }
     property string selectedPresetName: "No preset selected"
     property string presetSearch: ""
     property string presetCategory: "All"
@@ -233,8 +292,51 @@ ApplicationWindow {
         if (chosen.length) editSource = chosen
     }
 
-    function selectGeneration(index) {
-        if (generationModel[index]) selectedModelName = generationModel[index].model
+    function openStageModels(stage) {
+        if (genesisBridge.busy) return
+        editingStage = stage
+        stageModelPopup.open()
+    }
+
+    function selectStageChoice(index) {
+        var row = stageChoices[index]
+        if (!row || genesisBridge.busy || row.available === false || (editingStage !== 0 && row.selectable === false)) return
+        if (editingStage === 0) {
+            selectStageOneChoice(index)
+        } else if (editingStage === 1) {
+            stageTwoModel = row.model
+            if (row.remote === true || String(row.destination || "").indexOf("RUNPOD") >= 0)
+                backendBridge.prepareModelRoute(row.model)
+            genesisBridge.setStageTwoModel(row.model)
+            useStageTwo = true
+        } else {
+            stageThreeEngine = row.engine
+            genesisBridge.setStageThreeEngine(row.engine)
+            useStageThree = true
+        }
+        stageModelPopup.close()
+    }
+
+    function selectStageOneChoice(index) {
+        var row = stageOneChoices[index]
+        if (!row || genesisBridge.busy) return
+        for (var i = 0; i < generationModel.length; ++i)
+            if (generationModel[i].model === row.model) { selectGeneration(i); return }
+    }
+
+    function selectStageOneAvailableChoice(index) {
+        var row = stageOneSelectableChoices[index]
+        if (!row || genesisBridge.busy) return
+        for (var i = 0; i < generationModel.length; ++i)
+            if (generationModel[i].model === row.model) { selectGeneration(i); return }
+    }
+
+    function selectGeneration(index, userChoseModel) {
+        if (generationModel[index]) {
+            selectedModelName = generationModel[index].model
+            if (userChoseModel !== false && (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0))
+                backendBridge.prepareModelRoute(generationModel[index].model)
+        }
         selectedGenerationIndex = index
         selectedLora = "None"
         selectedLoraTwo = "None"
@@ -243,15 +345,59 @@ ApplicationWindow {
         selectedLoraTwoStrength = 0.65
         selectedLoraThreeStrength = 0.65
 
-        var profile = selectedGenerationProfile
+        // Use the row selected by the user directly. Reading the bound
+        // selectedGenerationProfile here can briefly expose the previous row
+        // while selectedGenerationIndex is changing, which leaks old model
+        // defaults into the newly selected model.
+        var profile = generationModel[index]
         if (!profile) return
-        if (profile.defaultWidth !== undefined) generationWidth = profile.defaultWidth
-        if (profile.defaultHeight !== undefined) generationHeight = profile.defaultHeight
-        if (profile.defaultSteps !== undefined) generationSteps = profile.defaultSteps
-        if (profile.defaultCfg !== undefined) generationCfg = profile.defaultCfg
-        if (profile.defaultDenoise !== undefined) generationDenoise = profile.defaultDenoise
-        if (profile.defaultSampler !== undefined) generationSampler = profile.defaultSampler
-        if (profile.defaultScheduler !== undefined) generationScheduler = profile.defaultScheduler
+        applyGenerationDefaults(profile)
+    }
+
+    function applyGenerationDefaults(profile) {
+        if (!profile) return
+        var defaults = generationSource.toString().length
+            ? (profile.sourceDefaults || profile) : (profile.createDefaults || profile)
+        generationWidth = defaults.defaultWidth !== undefined ? defaults.defaultWidth : 1024
+        generationHeight = defaults.defaultHeight !== undefined ? defaults.defaultHeight : 1024
+        generationSteps = defaults.defaultSteps !== undefined ? defaults.defaultSteps : 4
+        generationCfg = defaults.defaultCfg !== undefined ? defaults.defaultCfg : 1.0
+        generationDenoise = defaults.defaultDenoise !== undefined ? defaults.defaultDenoise : 1.0
+        generationSampler = defaults.defaultSampler !== undefined ? defaults.defaultSampler : "euler"
+        generationScheduler = defaults.defaultScheduler !== undefined ? defaults.defaultScheduler : "simple"
+        if (typeof selectedPresetPayload !== "undefined" && selectedPresetPayload) applyPresetPayload(selectedPresetPayload, profile)
+    }
+
+    readonly property var activeGenerationDefaults: generationSource.toString().length
+        ? (selectedGenerationProfile.sourceDefaults || selectedGenerationProfile)
+        : (selectedGenerationProfile.createDefaults || selectedGenerationProfile)
+
+    function qualityPresetActive(name, width, height) {
+        var presets = selectedGenerationProfile.qualityPresets
+        var size = presets && presets[name] ? presets[name] : ({width: width, height: height})
+        return generationWidth === size.width && generationHeight === size.height
+    }
+
+    function applyQualityPreset(name, width, height) {
+        var presets = selectedGenerationProfile.qualityPresets
+        if (presets && presets[name]) {
+            applyGenerationDefaults(selectedGenerationProfile)
+            generationWidth = presets[name].width
+            generationHeight = presets[name].height
+        } else {
+            generationWidth = width
+            generationHeight = height
+        }
+    }
+
+    onSelectedLoraChanged: selectedLoraStrength = defaultLoraStrength(selectedLora)
+
+    onSelectedLoraTwoChanged: selectedLoraTwoStrength = defaultLoraStrength(selectedLoraTwo)
+
+    onSelectedLoraThreeChanged: selectedLoraThreeStrength = defaultLoraStrength(selectedLoraThree)
+
+    function defaultLoraStrength(name) {
+        return String(name).split("/").pop() === "refcontrol_v2_poses.safetensors" ? 0.9 : 0.65
     }
 
     function clearPose() {
@@ -260,14 +406,40 @@ ApplicationWindow {
         selectedPoseName = "No pose selected"
         selectedPoseCategory = ""
         selectedPosePrompt = ""
+        selectedPresetPayload = null
+        presetAttribution = ""
+        presetSettingsNote = ""
+    }
+
+    function applyPresetPayload(row, profile) {
+        if (!row || !profile) return
+        var payload = moduleBridge.posePresetPayload(row, profile.model)
+        generationPrompt = payload.prompt || ""
+        selectedPosePrompt = generationPrompt
+        generationNegativePrompt = payload.negativePrompt || ""
+        presetAttribution = String(payload.attribution || "") + " · prompt: " + String(payload.promptSource || "")
+        presetSettingsNote = payload.settingsNote || ""
+        var settings = payload.settings || ({})
+        if (settings.steps !== undefined) generationSteps = settings.steps
+        if (settings.cfg !== undefined) generationCfg = settings.cfg
+        if (settings.width !== undefined) generationWidth = settings.width
+        if (settings.height !== undefined) generationHeight = settings.height
+        if (settings.seed !== undefined) generationSeed = settings.seed
+        if (settings.denoise !== undefined) generationDenoise = settings.denoise
+        if (settings.sampler !== undefined) generationSampler = settings.sampler
+        // FLUX scheduler node has its own fixed schedule.
+        if (settings.scheduler !== undefined && !activeGenerationDefaults.schedulerFixed)
+            generationScheduler = settings.scheduler
     }
 
     function applyPreset(row) {
         if (!row) return
+        if (row.source) { applyPose(row); selectedPresetName = row.label || row.name; return }
         clearPose()
+        selectedPresetPayload = row
+        applyGenerationDefaults(selectedGenerationProfile)
         selectedPresetName = row.label || row.name || "Preset"
-        if (row.prompt && row.prompt.length)
-            generationPrompt = row.prompt
+
     }
 
     function applyPose(row) {
@@ -277,8 +449,8 @@ ApplicationWindow {
         selectedPoseThumbnail = row.thumbnail || row.source || ""
         selectedPoseName = row.name || "Pose"
         selectedPoseCategory = row.category || ""
-        selectedPosePrompt = row.prompt || ""
-        generationPrompt = row.prompt || ""
+        selectedPresetPayload = row
+        applyGenerationDefaults(selectedGenerationProfile)
     }
 
     function filteredPresets() {
@@ -342,6 +514,28 @@ ApplicationWindow {
         )
     }
 
+    Popup {
+        id: finishCompare
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 40, 1200)
+        height: Math.min(parent.height - 40, 800)
+        modal: true
+        ColumnLayout {
+            anchors.fill: parent
+            RowLayout {
+                Text { text: "Previous result · Selected finishing result"; color: appRoot.textMain; Layout.fillWidth: true }
+                GButton { text: "Close"; onClicked: finishCompare.close() }
+            }
+            RowLayout {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Image { Layout.fillWidth: true; Layout.fillHeight: true; fillMode: Image.PreserveAspectFit; source: appRoot.privacyMode ? "" : appRoot.comparisonSource }
+                Image { Layout.fillWidth: true; Layout.fillHeight: true; fillMode: Image.PreserveAspectFit; source: appRoot.privacyMode ? "" : genesisBridge.previewUrl }
+            }
+            Text { visible: appRoot.privacyMode; text: "Turn off private preview to view the saved results."; color: appRoot.textDim }
+        }
+    }
+
     component Panel: Rectangle {
         color: appRoot.panel
         radius: 2
@@ -364,11 +558,75 @@ ApplicationWindow {
         }
     }
 
+    Popup {
+        id: stageModelPopup
+        objectName: "stageModelPopup"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(760, appRoot.width - 48)
+        height: Math.min(760, appRoot.height - 48)
+        modal: true
+        focus: true
+        padding: 20
+        background: Rectangle { color: appRoot.panel; radius: 8; border.color: appRoot.gold; border.width: 2 }
+        contentItem: ColumnLayout {
+            spacing: 14
+            Text { text: "STAGE " + (appRoot.editingStage + 1) + " · CHOOSE " + (appRoot.editingStage === 2 ? "IDENTITY ENGINE" : "MODEL"); color: appRoot.brightGold; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { Layout.fillWidth: true; text: appRoot.editingStage === 2 ? "Choose the configured identity engine. Its required weights are checked before generation." : "Choose a configured model · " + appRoot.stageChoices.length + " available/configured entries. Scroll to see the full list."; color: appRoot.textDim; font.pixelSize: 15; wrapMode: Text.Wrap }
+            ListView {
+                objectName: "stageModelChoiceList"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 8
+                model: appRoot.stageChoices
+                delegate: Button {
+                    objectName: "stageModelChoice" + index
+                    width: ListView.view.width
+                    implicitHeight: 64
+                    enabled: !genesisBridge.busy && (modelData.engine ? modelData.available !== false : (appRoot.editingStage === 0 || modelData.selectable !== false))
+                    Accessible.name: modelData.label
+                    readonly property bool currentStageOneChoice: appRoot.editingStage === 0 && modelData.model === appRoot.selectedGenerationProfile.model
+                    contentItem: Column {
+                        spacing: 5
+                        Text { width: parent.width; text: modelData.label; color: parent.parent.currentStageOneChoice ? appRoot.brightGold : appRoot.textMain; font.pixelSize: 17; font.bold: true; elide: Text.ElideRight }
+                        Text {
+                            width: parent.width
+                            text: modelData.engine
+                                ? (modelData.available !== false ? "Identity pass · available" : "Unavailable · ReActor engine missing on current RunPod")
+                                : (modelData.routeReady === true && modelData.runnable === true
+                                    ? (parent.parent.currentStageOneChoice ? "Selected · ready to generate" : "Ready to generate")
+                                    : "Selectable · generation unavailable on current backend")
+                            color: (modelData.engine ? modelData.available !== false : (modelData.routeReady === true && modelData.runnable === true)) ? appRoot.success : appRoot.textDim
+                            font.pixelSize: 14
+                            elide: Text.ElideRight
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 5
+                        color: parent.hovered ? appRoot.raised2 : appRoot.raised
+                        border.color: parent.currentStageOneChoice ? appRoot.brightGold : (parent.hovered ? appRoot.brightGold : appRoot.line)
+                        border.width: parent.currentStageOneChoice ? 2 : 1
+                    }
+                    onClicked: appRoot.selectStageChoice(index)
+                }
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
+            }
+            Text { visible: appRoot.stageChoices.length === 0; text: "No compatible models found for this stage on the selected backend. Refresh to check again."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            RowLayout {
+                Layout.fillWidth: true
+                CheckBox { visible: appRoot.editingStage > 0; text: "Use this stage"; checked: appRoot.editingStage === 1 ? appRoot.useStageTwo : appRoot.useStageThree; enabled: !genesisBridge.busy && (appRoot.editingStage === 1 ? appRoot.selectedStageTwoProfile.selectable !== false : appRoot.stageThreeReady); onToggled: { if (appRoot.editingStage === 1) appRoot.useStageTwo = checked; else appRoot.useStageThree = checked } }
+                Item { Layout.fillWidth: true }
+                GButton { text: "Close"; onClicked: stageModelPopup.close() }
+            }
+        }
+    }
+
     component GButton: Button {
         id: button
         property bool active: false
         property bool premium: false
-        implicitHeight: 36
+        implicitHeight: appRoot.pageIndex === 0 ? 44 : 36
         implicitWidth: Math.max(58, contentItem.implicitWidth + 22)
         Layout.maximumWidth: 16777215
         activeFocusOnTab: true
@@ -925,16 +1183,17 @@ ApplicationWindow {
                                     spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: appRoot.compactNavigation ? 96 : 148
+                                        Layout.preferredHeight: 164
                                         Layout.minimumHeight: Layout.preferredHeight
                                         Layout.maximumHeight: Layout.preferredHeight
                                         objectName: "generationStageStrip"
                                         spacing: 10
                                         Repeater {
+                                            objectName: "generationStageRepeater"
                                             model: [
-                                                {title:"STAGE 1", name:"Phr00t / Qwen", detail:"Create the base image", enabled:true},
-                                                {title:"STAGE 2", name:"Aisha 9B / Klein 9B", detail:"Refine the previous output", enabled:appRoot.useStageTwo},
-                                                {title:"STAGE 3", name:"Identity engine", detail:"Apply the identity pass", enabled:appRoot.useStageThree}
+                                                {title:"STAGE 1", name:appRoot.selectedGenerationProfile.label || "Choose a model", detail:"Create the base image with your selected model", enabled:true},
+                                                {title:"STAGE 2", name:appRoot.stageTwoLabel, detail:"Refine the previous output", enabled:appRoot.useStageTwo},
+                                                {title:"STAGE 3", name:appRoot.stageThreeLabel, detail:"Apply the identity pass", enabled:appRoot.useStageThree}
                                             ]
                                             Rectangle {
                                                 objectName: "generationStageCard" + index
@@ -951,15 +1210,29 @@ ApplicationWindow {
                                                     anchors.margins: appRoot.compactNavigation ? 10 : 14
                                                     spacing: 5
                                                     Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
-                                                    Text { Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: appRoot.compactNavigation ? 11 : 14; font.bold: true; wrapMode: Text.Wrap }
+                                                    Text { objectName: "generationStageModel" + index; Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: 18; font.bold: true; maximumLineCount: 2; elide: Text.ElideRight; wrapMode: Text.Wrap }
                                                     Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
                                                     Item { Layout.fillHeight: true }
-                                                    Text { text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9; font.bold: true }
+                                                    Text { text: modelData.enabled ? "CLICK TO CHANGE" : "CLICK TO ENABLE"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9; font.bold: true }
+                                                }
+                                                MouseArea {
+                                                    objectName: "stageModelBoxClick" + index
+                                                    anchors.fill: parent
+                                                    enabled: !genesisBridge.busy
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: appRoot.openStageModels(index)
                                                 }
                                             }
                                         }
                                     }
                                     SectionLabel { text: "PROMPT" }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        visible: appRoot.presetAttribution.length > 0
+                                        textFormat: Text.PlainText
+                                        text: "Preset source: " + appRoot.presetAttribution + "\n" + appRoot.presetSettingsNote
+                                        color: appRoot.textDim; wrapMode: Text.WordWrap; font.pixelSize: 12
+                                    }
                                     TextArea {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
@@ -992,9 +1265,10 @@ ApplicationWindow {
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 44
                                             active: enabled
+                                            objectName: "generateButton"
                                             text: genesisBridge.busy ? "GENERATING…" : "GENERATE"
                                             enabled: !genesisBridge.busy
-                                                && appRoot.selectedGenerationProfile.runnable
+                                                && appRoot.selectedGenerationProfile.routeReady === true && appRoot.selectedGenerationProfile.runnable === true
                                                 && (appRoot.generationPrompt.trim().length > 0 || appRoot.selectedPosePrompt.trim().length > 0)
                                                 && (!appRoot.selectedGenerationProfile.sourceRequired || appRoot.generationSource.toString().length > 0)
                                             onClicked: appRoot.generateCurrent()
@@ -1060,6 +1334,25 @@ ApplicationWindow {
                                             GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
                                         }
                                     }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 6
+                                        GButton { text: "Keep / Save"; enabled: !genesisBridge.busy && genesisBridge.previewUrl.length > 0; onClicked: genesisBridge.keepResult() }
+                                        GButton { text: "Refine / More Realism"; enabled: !genesisBridge.busy && appRoot.finishAvailability.refine; onClicked: genesisBridge.queueFinish(true, false, 0, appRoot.generationSource.toString(), appRoot.stageTwoModel, appRoot.finishLora, appRoot.finishLoraStrength) }
+                                        GButton { text: "Identity / Face Lock"; enabled: !genesisBridge.busy && appRoot.finishAvailability.identity; onClicked: genesisBridge.queueFinish(false, true, 0, appRoot.generationSource.toString(), appRoot.stageTwoModel, "None", 0) }
+                                        GButton { text: "Upscale " + appRoot.finishScale + "×"; enabled: !genesisBridge.busy && appRoot.finishAvailability.upscale; onClicked: genesisBridge.queueFinish(false, false, appRoot.finishScale, appRoot.generationSource.toString(), appRoot.stageTwoModel, "None", 0) }
+                                        GButton { text: "Full Finish"; enabled: !genesisBridge.busy && appRoot.finishAvailability.refine && appRoot.finishAvailability.identity && appRoot.finishAvailability.upscale; onClicked: genesisBridge.queueFinish(true, true, appRoot.finishScale, appRoot.generationSource.toString(), appRoot.stageTwoModel, appRoot.finishLora, appRoot.finishLoraStrength) }
+                                    }
+                                    GButton { text: "Compare with previous result"; enabled: appRoot.comparisonSource.length > 0; onClicked: finishCompare.open() }
+                                    GButton { text: "Reject finishing result / return to previous"; enabled: !genesisBridge.busy && genesisBridge.finishingResults.length > 1; onClicked: genesisBridge.rejectFinishingResult() }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        ComboBox { model: ["2×", "4×"]; onActivated: appRoot.finishScale = currentIndex === 0 ? 2 : 4 }
+                                        ComboBox { Layout.fillWidth: true; model: (appRoot.selectedStageTwoProfile.loras || ["None"]).filter(function(name) { return name !== "refcontrol_v2_poses.safetensors" }); currentIndex: Math.max(0, model.indexOf(appRoot.finishLora)); onActivated: appRoot.finishLora = currentText }
+                                        SpinBox { from: 0; to: 100; value: 65; editable: true; onValueModified: appRoot.finishLoraStrength = value / 100.0 }
+                                    }
+                                    Text { Layout.fillWidth: true; text: appRoot.finishAvailability.reason || ""; color: appRoot.textDim; wrapMode: Text.Wrap }
+                                    ComboBox { Layout.fillWidth: true; model: genesisBridge.finishingResults; textRole: "label"; onActivated: genesisBridge.selectFinishingResult(model[currentIndex].source) }
+                                    CharacterReferences { Layout.fillWidth: true; bridge: genesisBridge; privatePreview: appRoot.privacyMode; inputSource: appRoot.generationSource.toString(); onUseMaster: function(source) { appRoot.generationSource = source } }
                                     Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 9; elide: Text.ElideMiddle }
                                     RowLayout {
                                     Layout.fillWidth: true
@@ -1141,17 +1434,30 @@ ApplicationWindow {
                                         text: "Destination: " + (appRoot.selectedGenerationProfile.destination || "UNAVAILABLE")
                                         color: appRoot.gold; font.pixelSize: 12; font.bold: true
                                     }
+                                    SectionLabel { text: "STAGE 1 · MODEL" }
                                     ComboBox {
+                                        objectName: "stageOneModelPicker"
                                         Layout.fillWidth: true
-                                        model: appRoot.generationModel
+                                        enabled: !genesisBridge.busy && appRoot.stageOneSelectableChoices.length > 0
+                                        model: appRoot.stageOneSelectableChoices
                                         textRole: "label"
-                                        currentIndex: appRoot.selectedGenerationIndex
-                                        onActivated: appRoot.selectGeneration(currentIndex)
+                                        currentIndex: appRoot.stageOneChoiceIndex
+                                        onActivated: appRoot.selectStageOneAvailableChoice(currentIndex)
                                     }
                                     Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: "MODEL PATH: " + (appRoot.selectedGenerationProfile.modelPath || appRoot.selectedGenerationProfile.model || "Unknown"); color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; text: "WORKFLOW: " + (appRoot.selectedGenerationProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.WrapAnywhere }
                                     SectionLabel { text: "COMPATIBLE LORA" }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: (appRoot.selectedGenerationProfile.maxLoras || 0) > 0
+                                            ? "Choose up to 3 compatible LoRAs below, each with its own strength."
+                                            : "No compatible LoRAs available for this model."
+                                        color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap
+                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
+                                        visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 0
                                         ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
@@ -1173,6 +1479,7 @@ ApplicationWindow {
                                         ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraTwo))
                                             onActivated: appRoot.selectedLoraTwo = currentText
                                         }
                                         SpinBox {
@@ -1190,6 +1497,7 @@ ApplicationWindow {
                                         ComboBox {
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraThree))
                                             onActivated: appRoot.selectedLoraThree = currentText
                                         }
                                         SpinBox {
@@ -1219,12 +1527,13 @@ ApplicationWindow {
                                         wrapMode: Text.Wrap
                                     }
                                     SectionLabel { text: "QUALITY" }
+                                    Text { Layout.fillWidth: true; visible: text.length > 0; text: appRoot.selectedGenerationProfile.qualityNote || ""; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 14 }
                                     GridLayout {
                                         Layout.fillWidth: true
                                         columns: 3
-                                        GButton { Layout.preferredWidth: implicitWidth; text: "Fast"; active: appRoot.generationWidth === 512; onClicked: { generationWidth = 512; generationHeight = 512 } }
-                                        GButton { Layout.preferredWidth: implicitWidth; text: "Balanced"; active: appRoot.generationWidth === 768; onClicked: { generationWidth = 768; generationHeight = 1152 } }
-                                        GButton { Layout.preferredWidth: implicitWidth; text: "Quality"; active: appRoot.generationWidth === 1024; onClicked: { generationWidth = 1024; generationHeight = 1024 } }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Fast"; active: appRoot.qualityPresetActive("Fast", 512, 512); onClicked: appRoot.applyQualityPreset("Fast", 512, 512) }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Balanced"; active: appRoot.qualityPresetActive("Balanced", 768, 1152); onClicked: appRoot.applyQualityPreset("Balanced", 768, 1152) }
+                                        GButton { Layout.preferredWidth: implicitWidth; text: "Quality"; active: appRoot.qualityPresetActive("Quality", 1024, 1024); onClicked: appRoot.applyQualityPreset("Quality", 1024, 1024) }
                                         GButton { Layout.preferredWidth: implicitWidth; text: "2K"; visible: !!appRoot.selectedGenerationProfile.remote; active: appRoot.generationWidth === 2048; onClicked: { generationWidth = 2048; generationHeight = 2048 } }
                                         GButton { Layout.preferredWidth: implicitWidth; text: "4K"; visible: !!appRoot.selectedGenerationProfile.remote; active: appRoot.generationWidth === 4096; onClicked: { generationWidth = 4096; generationHeight = 4096 } }
                                     }
@@ -1243,17 +1552,18 @@ ApplicationWindow {
                                         SpinBox { Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
                                         Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 10 }
                                         SpinBox { Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
+                                        Text { Layout.columnSpan: 2; Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.identityGuidance || "Keep model defaults initially."; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
                                         Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        SpinBox { Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); enabled: !appRoot.activeGenerationDefaults.denoiseFixed; editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
                                         Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        ComboBox { Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
+                                        ComboBox { Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde", "dpmpp_3m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
                                         Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        ComboBox { Layout.fillWidth: true; model: ["beta", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
+                                        ComboBox { Layout.fillWidth: true; enabled: !appRoot.activeGenerationDefaults.schedulerFixed; model: appRoot.activeGenerationDefaults.schedulerFixed ? ["Flux2Scheduler"] : ["beta", "simple", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
                                     }
                                     SectionLabel { text: "PIPELINE" }
                                     ComboBox {
                                         Layout.fillWidth: true
-                                        model: ["Single model", "3-stage · Phr00t → Refine → Identity"]
+                                        model: ["Single model", "3-stage · Selected model → Refine → Identity"]
                                         currentIndex: (appRoot.useStageTwo && appRoot.useStageThree) ? 1 : 0
                                         onActivated: {
                                             var fullPipeline = currentIndex === 1
@@ -1264,49 +1574,18 @@ ApplicationWindow {
                                     Text {
                                         Layout.fillWidth: true
                                         text: appRoot.useStageTwo && appRoot.useStageThree
-                                            ? "Stage 1 Phr00t/Qwen → Stage 2 selectable Klein-family refine → Stage 3 identity lock"
+                                            ? "Stage 1 " + (appRoot.selectedGenerationProfile.label || "selected model") + " → Stage 2 refinement → Stage 3 identity lock"
                                             : "Single-model generation; stages can also be enabled individually below."
                                         color: appRoot.textDim
                                         font.pixelSize: 10
                                         wrapMode: Text.Wrap
                                     }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
-                                        ComboBox {
-                                            Layout.fillWidth: true
-                                            visible: appRoot.selectedGenerationProfile.remote === true
-                                            enabled: !genesisBridge.busy
-                                            model: [
-                                                {label:"Aisha 9B v9.7", file:"aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"},
-                                                {label:"Klein 9B", file:"flux-2-klein-9b.safetensors"},
-                                                {label:"Miracle v2 FP8", file:"miracleinNSFWGeneration_20FP8.safetensors"},
-                                                {label:"PornMaster v3 FP8", file:"pornmasterFlux2Klein_v3-fp8.safetensors"},
-                                                {label:"DarkBeast V2 BFS FP8", file:"darkBeast_DBKleinv2BFS.safetensors"}
-                                            ]
-                                            textRole: "label"
-                                            onActivated: genesisBridge.setStageTwoModel(model[currentIndex].file)
-                                        }
-                                    }
-                                    CheckBox { text: "Stage 3 · identity lock"; checked: appRoot.useStageThree; onToggled: appRoot.useStageThree = checked }
-                                    ComboBox {
-                                        Layout.fillWidth: true
-                                        enabled: appRoot.useStageThree
-                                        model: ["ReActor · Inswapper ✓", "ReActor · ReSwapper ✓", "ReActor · HyperSwap ✓", "PuLID FLUX.2 · pending"]
-                                        currentIndex: appRoot.stageThreeEngine === "reactor_reswapper" ? 1
-                                            : (appRoot.stageThreeEngine === "reactor_hyperswap" ? 2 : 0)
-                                        onActivated: {
-                                            if (currentIndex === 0) appRoot.stageThreeEngine = "reactor_inswapper"
-                                            else if (currentIndex === 1) appRoot.stageThreeEngine = "reactor_reswapper"
-                                            else if (currentIndex === 2) appRoot.stageThreeEngine = "reactor_hyperswap"
-                                            else {
-                                                currentIndex = appRoot.stageThreeEngine === "reactor_reswapper" ? 1
-                                                    : (appRoot.stageThreeEngine === "reactor_hyperswap" ? 2 : 0)
-                                                return
-                                            }
-                                            genesisBridge.setStageThreeEngine(appRoot.stageThreeEngine)
-                                        }
-                                    }
+                                    CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; enabled: !genesisBridge.busy; onToggled: appRoot.useStageTwo = checked }
+                                    GButton { Layout.fillWidth: true; text: appRoot.stageTwoLabel; enabled: !genesisBridge.busy; onClicked: appRoot.openStageModels(1) }
+                                    Text { Layout.fillWidth: true; visible: appRoot.useStageTwo; text: "MODEL PATH: " + (appRoot.selectedStageTwoProfile.modelPath || appRoot.stageTwoModel || "Unknown"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; visible: appRoot.useStageTwo; text: "WORKFLOW: " + (appRoot.selectedStageTwoProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    CheckBox { text: "Stage 3 · identity lock"; checked: appRoot.useStageThree; enabled: !genesisBridge.busy && appRoot.stageThreeReady; onToggled: appRoot.useStageThree = checked }
+                                    GButton { Layout.fillWidth: true; text: appRoot.stageThreeLabel; enabled: !genesisBridge.busy; onClicked: appRoot.openStageModels(2) }
                                     CheckBox { text: "Final upscale"; checked: appRoot.useUpscale; enabled: genesisBridge.upscaleAvailable; onToggled: appRoot.useUpscale = checked }
                                     Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
                                     Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 11; wrapMode: Text.Wrap }
