@@ -19,7 +19,7 @@ if sys.platform != "win32":
 # XDG runtime directory, so point it at the current user's temp directory.
 os.environ.setdefault("XDG_RUNTIME_DIR", tempfile.gettempdir())
 
-from PyQt6.QtCore import QUrl, pyqtSlot
+from PyQt6.QtCore import QUrl, pyqtSlot, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices
 
 import qt_cockpit
@@ -229,5 +229,9 @@ def install_windows_compatibility() -> None:
 
 
 if __name__ == "__main__":
+    # Windows Qt normally sends startup diagnostics to the debugger. Preserve
+    # them in source/CI consoles; the windowed package has no stderr stream.
+    if sys.stderr is not None:
+        qInstallMessageHandler(lambda _kind, _context, message: print(message, file=sys.stderr))
     install_windows_compatibility()
     raise SystemExit(premium.main())
