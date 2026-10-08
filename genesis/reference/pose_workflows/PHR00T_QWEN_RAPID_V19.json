@@ -1,0 +1,198 @@
+{
+  "last_node_id": 32,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UnetLoaderGGUF",
+      "pos": [50, 200],
+      "size": [320, 100],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
+      "properties": {"Node name for S&R": "UnetLoaderGGUF"},
+      "widgets_values": ["Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf"],
+      "title": "Phr00t v19 model"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [50, 380],
+      "size": [320, 310],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [4], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": null, "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["source_image.png", "image"],
+      "title": "SOURCE / IDENTITY (image1)"
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [50, 740],
+      "size": [320, 310],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [5], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": null, "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["pose_reference.png", "image"],
+      "title": "POSE REFERENCE (image2)"
+    },
+    {
+      "id": 4,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [450, 200],
+      "size": [420, 280],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 2},
+        {"name": "vae", "type": "VAE", "link": 3, "shape": 7},
+        {"name": "image1", "type": "IMAGE", "link": 4, "shape": 7},
+        {"name": "image2", "type": "IMAGE", "link": 5, "shape": 7}
+      ],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6, 7], "slot_index": 0}],
+      "properties": {"Node name for S&R": "TextEncodeQwenImageEditPlus"},
+      "widgets_values": [
+        "Keep the same person and facial identity from image1. Change only the body pose and body position according to image2 and/or the instruction. Preserve recognizable facial features, skin tone, hair, and overall identity. Photorealistic, natural skin texture, realistic anatomy, sharp focus.",
+        896
+      ],
+      "title": "Phr00t v19 instruction"
+    },
+    {
+      "id": 5,
+      "type": "ConditioningZeroOut",
+      "pos": [450, 520],
+      "size": [240, 50],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [{"name": "conditioning", "type": "CONDITIONING", "link": 7}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [8], "slot_index": 0}],
+      "properties": {"Node name for S&R": "ConditioningZeroOut"}
+    },
+    {
+      "id": 6,
+      "type": "EmptyLatentImage",
+      "pos": [450, 620],
+      "size": [280, 110],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
+      "properties": {"Node name for S&R": "EmptyLatentImage"},
+      "widgets_values": [832, 1216, 1]
+    },
+    {
+      "id": 7,
+      "type": "KSampler",
+      "pos": [950, 200],
+      "size": [320, 460],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "positive", "type": "CONDITIONING", "link": 6},
+        {"name": "negative", "type": "CONDITIONING", "link": 8},
+        {"name": "latent_image", "type": "LATENT", "link": 9}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [10], "slot_index": 0}],
+      "properties": {"Node name for S&R": "KSampler"},
+      "widgets_values": [42, "randomize", 6, 1.0, "er_sde", "beta", 1.0],
+      "title": "Phr00t v19 · 6 steps · CFG 1.0 · er_sde · beta"
+    },
+    {
+      "id": 8,
+      "type": "VAEDecode",
+      "pos": [1350, 200],
+      "size": [220, 50],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 10},
+        {"name": "vae", "type": "VAE", "link": 11}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [12, 13], "slot_index": 0}],
+      "properties": {"Node name for S&R": "VAEDecode"}
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [1650, 150],
+      "size": [300, 300],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 12}],
+      "properties": {"Node name for S&R": "PreviewImage"}
+    },
+    {
+      "id": 10,
+      "type": "SaveImage",
+      "pos": [1650, 500],
+      "size": [300, 100],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 13}],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["GENESIS_PHR00T_V19"],
+      "title": "SAVE · PHR00T v19"
+    },
+    {
+      "id": 31,
+      "type": "CLIPLoaderGGUF",
+      "pos": [50, 1150],
+      "size": [350, 110],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0}],
+      "properties": {"Node name for S&R": "CLIPLoaderGGUF"},
+      "widgets_values": ["Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf", "qwen_image"]
+    },
+    {
+      "id": 32,
+      "type": "VAELoader",
+      "pos": [50, 1350],
+      "size": [350, 110],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [3, 11], "slot_index": 0}],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["qwen_image_vae.safetensors"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 7, 0, "MODEL"],
+    [2, 31, 0, 4, 0, "CLIP"],
+    [3, 32, 0, 4, 1, "VAE"],
+    [4, 2, 0, 4, 2, "IMAGE"],
+    [5, 3, 0, 4, 3, "IMAGE"],
+    [6, 4, 0, 7, 1, "CONDITIONING"],
+    [7, 4, 0, 5, 0, "CONDITIONING"],
+    [8, 5, 0, 7, 2, "CONDITIONING"],
+    [9, 6, 0, 7, 3, "LATENT"],
+    [10, 7, 0, 8, 0, "LATENT"],
+    [11, 32, 0, 8, 1, "VAE"],
+    [12, 8, 0, 9, 0, "IMAGE"],
+    [13, 8, 0, 10, 0, "IMAGE"]
+  ],
+  "groups": [{"title": "RUNPOD · PHR00T v19", "bounding": [30, 30, 1950, 1050], "color": "#3f789e", "font_size": 18}],
+  "config": {},
+  "extra": {"ds": {"scale": 0.7, "offset": [0, 0]}},
+  "version": 0.4
+}
