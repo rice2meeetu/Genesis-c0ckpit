@@ -35,6 +35,10 @@ WORKFLOW_ROOTS = (
 )
 
 MODEL_PROFILES = (
+    {"name": "DonutsDeliveryMix V4.1 · SDXL", "model": ("donutsdeliverymixV4_v41.safetensors",),
+     "lora": (), "vae": (), "encoder": (), "workflow": ("GENESIS_SDXL_SHARED_T2I",)},
+    {"name": "BigLustyDonutMix NSFW v1.2 · SDXL", "model": ("biglustydonutmixNSFW_v12.safetensors",),
+     "lora": (), "vae": (), "encoder": (), "workflow": ("GENESIS_SDXL_SHARED_T2I",)},
     {
         "name": "Aisha 9B standard BF16 · GPU test pending",
         "model": ("aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors",),
