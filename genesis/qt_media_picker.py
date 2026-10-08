@@ -110,6 +110,11 @@ class ImagePicker(QFileDialog):
         self.change_view(self.view_choice.currentText())
         self.setWindowState(self.windowState() | Qt.WindowState.WindowMaximized)
 
+    def selectedFiles(self):
+        # QFileDialog exposes slash-normalized paths on Windows. Convert them at
+        # the dialog boundary so every GENESIS caller receives native paths.
+        return [str(Path(path)) for path in super().selectedFiles()]
+
     def change_view(self, mode):
         # Touch only the file view, never QFileDialog's places sidebar.
         self.setViewMode(QFileDialog.ViewMode.List)

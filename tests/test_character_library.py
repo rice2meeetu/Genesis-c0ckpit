@@ -54,3 +54,28 @@ def test_reference_items_expose_roles(tmp_path):
     assert item["referenceItems"][0]["role"] == "primary"
     assert item["referenceItems"][1]["role"] == "side"
     assert preferred_reference(row["id"], "side", index) == str(side.resolve())
+
+
+def test_replace_delete_reference_never_modifies_master_files(tmp_path):
+    from genesis.character_library import update_reference
+    index=tmp_path/'characters.json'
+    primary=tmp_path/'primary';primary.write_bytes(b'original')
+    side=tmp_path/'side';side.write_bytes(b'left')
+    replacement=tmp_path/'newside';replacement.write_bytes(b'right')
+    row=save_character('Character A',str(primary),adult_confirmed=True,path=index)
+    add_reference(row['id'],str(side),role='¾ Left',path=index)
+    changed=update_reference(row['id'],str(side),str(replacement),role='¾ Right',path=index)
+    assert changed['primary_image']==str(primary)
+    assert changed['reference_roles'][str(replacement)]=='¾ Right'
+    update_reference(row['id'],str(replacement),path=index)
+    assert primary.read_bytes()==b'original' and side.read_bytes()==b'left' and replacement.read_bytes()==b'right'
+
+
+def test_primary_requires_explicit_replacement_not_silent_removal(tmp_path):
+    from genesis.character_library import update_reference
+    import pytest
+    primary=tmp_path/'primary';primary.write_bytes(b'original');index=tmp_path/'characters.json'
+    row=save_character('Character A',str(primary),adult_confirmed=True,path=index)
+    with pytest.raises(ValueError,match='Replace the primary'):
+        update_reference(row['id'],str(primary),path=index)
+    assert preferred_reference(row['id'],path=index)==str(primary)

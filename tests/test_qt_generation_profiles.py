@@ -38,14 +38,14 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertFalse(profiles[0]["runnable"])  # local 9B render verification pending
         self.assertFalse(profiles[1]["runnable"])  # local 9B render verification pending
 
-    def test_phroot_is_runnable_but_explicitly_requires_source(self):
+    def test_unverified_local_phroot_variant_keeps_source_requirement(self):
         report = {"profiles": [{
             "name": "Phr00t / QwenRapid AIO",
             "ready": True,
             "evidence": {"MODEL": "/models/Qwen-Rapid-AIO-NSFW-v19.safetensors"},
         }]}
         profile = build_generation_profiles(report, [])[0]
-        self.assertTrue(profile["runnable"])
+        self.assertFalse(profile["runnable"])
         self.assertTrue(profile["sourceRequired"])
 
     def test_unavailable_models_are_not_exposed(self):
