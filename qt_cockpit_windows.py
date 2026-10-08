@@ -19,6 +19,10 @@ if sys.platform != "win32":
 # XDG runtime directory, so point it at the current user's temp directory.
 os.environ.setdefault("XDG_RUNTIME_DIR", tempfile.gettempdir())
 
+# The premium QML supplies its own styling. Use Qt's portable controls rather
+# than the native Windows style plugin, which requires additional system DLLs.
+os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+
 from PyQt6.QtCore import QUrl, pyqtSlot, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices
 
