@@ -12,6 +12,7 @@ ApplicationWindow {
     title: "GENESIS c0ckpit · Linux"
     color: "#040404"
     font.family: "Noto Sans"
+    font.pixelSize: pageIndex === 0 ? 16 : 14
 
     readonly property color gold: "#e8b654"
     readonly property color brightGold: "#ffda87"
@@ -105,6 +106,37 @@ ApplicationWindow {
     property string generationScheduler: "beta"
     property bool useStageTwo: false
     property bool useStageThree: false
+    property string stageTwoModel: "aisha_nsfw_beta_v9_7_distilled_fp8.safetensors"
+    readonly property var stageTwoChoices: generationModel.filter(function(row) { return row.stageTwoConfigured === true || row.stageTwoEligible === true })
+    readonly property string stageTwoLabel: {
+        for (var i = 0; i < stageTwoChoices.length; ++i)
+            if (stageTwoChoices[i].model === stageTwoModel) return stageTwoChoices[i].label
+        return "Choose a refinement model"
+    }
+    readonly property var selectedStageTwoProfile: {
+        for (var i = 0; i < stageTwoChoices.length; ++i)
+            if (stageTwoChoices[i].model === stageTwoModel) return stageTwoChoices[i]
+        return ({})
+    }
+    readonly property var stageThreeChoices: [
+        {label:"ReActor · Inswapper", engine:"reactor_inswapper"},
+        {label:"ReActor · ReSwapper", engine:"reactor_reswapper"},
+        {label:"ReActor · HyperSwap", engine:"reactor_hyperswap"}
+    ]
+    readonly property string stageThreeLabel: {
+        for (var i = 0; i < stageThreeChoices.length; ++i)
+            if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
+        return "Choose an identity engine"
+    }
+    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneConfigured === true || row.stageOneEligible === true || row.runnable === true })
+    readonly property int stageOneChoiceIndex: {
+        for (var i = 0; i < stageOneChoices.length; ++i)
+            if (stageOneChoices[i].model === selectedGenerationProfile.model) return i
+        return -1
+    }
+    property int editingStage: 0
+    readonly property var stageChoices: editingStage === 0 ? stageOneChoices
+        : (editingStage === 1 ? stageTwoChoices : stageThreeChoices)
     property string stageThreeEngine: "reactor_inswapper"
     property bool useUpscale: false
 
@@ -233,8 +265,44 @@ ApplicationWindow {
         if (chosen.length) editSource = chosen
     }
 
+    function openStageModels(stage) {
+        if (genesisBridge.busy) return
+        editingStage = stage
+        stageModelPopup.open()
+    }
+
+    function selectStageChoice(index) {
+        var row = stageChoices[index]
+        if (!row || genesisBridge.busy) return
+        if (editingStage === 0) {
+            selectStageOneChoice(index)
+        } else if (editingStage === 1) {
+            stageTwoModel = row.model
+            if (row.remote === true || String(row.destination || "").indexOf("RUNPOD") >= 0)
+                backendBridge.prepareModelRoute(row.model)
+            genesisBridge.setStageTwoModel(row.model)
+            useStageTwo = true
+        } else {
+            stageThreeEngine = row.engine
+            genesisBridge.setStageThreeEngine(row.engine)
+            useStageThree = true
+        }
+        stageModelPopup.close()
+    }
+
+    function selectStageOneChoice(index) {
+        var row = stageOneChoices[index]
+        if (!row || genesisBridge.busy) return
+        for (var i = 0; i < generationModel.length; ++i)
+            if (generationModel[i].model === row.model) { selectGeneration(i); return }
+    }
+
     function selectGeneration(index) {
-        if (generationModel[index]) selectedModelName = generationModel[index].model
+        if (generationModel[index]) {
+            selectedModelName = generationModel[index].model
+            if (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0)
+                backendBridge.prepareModelRoute(generationModel[index].model)
+        }
         selectedGenerationIndex = index
         selectedLora = "None"
         selectedLoraTwo = "None"
@@ -243,7 +311,11 @@ ApplicationWindow {
         selectedLoraTwoStrength = 0.65
         selectedLoraThreeStrength = 0.65
 
-        var profile = selectedGenerationProfile
+        // Use the row selected by the user directly. Reading the bound
+        // selectedGenerationProfile here can briefly expose the previous row
+        // while selectedGenerationIndex is changing, which leaks old model
+        // defaults into the newly selected model.
+        var profile = generationModel[index]
         if (!profile) return
         if (profile.defaultWidth !== undefined) generationWidth = profile.defaultWidth
         if (profile.defaultHeight !== undefined) generationHeight = profile.defaultHeight
@@ -364,11 +436,71 @@ ApplicationWindow {
         }
     }
 
+    Popup {
+        id: stageModelPopup
+        objectName: "stageModelPopup"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(760, appRoot.width - 48)
+        height: Math.min(760, appRoot.height - 48)
+        modal: true
+        focus: true
+        padding: 20
+        background: Rectangle { color: appRoot.panel; radius: 8; border.color: appRoot.gold; border.width: 2 }
+        contentItem: ColumnLayout {
+            spacing: 14
+            Text { text: "STAGE " + (appRoot.editingStage + 1) + " · CHOOSE " + (appRoot.editingStage === 2 ? "IDENTITY ENGINE" : "MODEL"); color: appRoot.brightGold; font.pixelSize: 20; font.bold: true; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { Layout.fillWidth: true; text: appRoot.editingStage === 2 ? "Choose the configured identity engine. Its required weights are checked before generation." : "Choose a configured model · " + appRoot.stageChoices.length + " available/configured entries. Scroll to see the full list."; color: appRoot.textDim; font.pixelSize: 15; wrapMode: Text.Wrap }
+            ListView {
+                objectName: "stageModelChoiceList"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 8
+                model: appRoot.stageChoices
+                delegate: Button {
+                    objectName: "stageModelChoice" + index
+                    width: ListView.view.width
+                    implicitHeight: 64
+                    enabled: !genesisBridge.busy
+                    Accessible.name: modelData.label
+                    readonly property bool currentStageOneChoice: appRoot.editingStage === 0 && modelData.model === appRoot.selectedGenerationProfile.model
+                    contentItem: Column {
+                        spacing: 5
+                        Text { width: parent.width; text: modelData.label; color: parent.parent.currentStageOneChoice ? appRoot.brightGold : appRoot.textMain; font.pixelSize: 17; font.bold: true; elide: Text.ElideRight }
+                        Text {
+                            width: parent.width
+                            text: modelData.engine ? "Identity pass" : (parent.parent.currentStageOneChoice ? (modelData.routeReady || modelData.runnable ? "Selected · available" : "Selected · backend/model offline") : (modelData.routeReady || modelData.runnable ? "Available" : "Selectable · backend/model offline"))
+                            color: modelData.engine || modelData.runnable ? appRoot.success : appRoot.gold
+                            font.pixelSize: 14
+                            elide: Text.ElideRight
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 5
+                        color: parent.hovered ? appRoot.raised2 : appRoot.raised
+                        border.color: parent.currentStageOneChoice ? appRoot.brightGold : (parent.hovered ? appRoot.brightGold : appRoot.line)
+                        border.width: parent.currentStageOneChoice ? 2 : 1
+                    }
+                    onClicked: appRoot.selectStageChoice(index)
+                }
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
+            }
+            Text { visible: appRoot.stageChoices.length === 0; text: "No configured models for this stage. Connect RunPod and refresh."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            RowLayout {
+                Layout.fillWidth: true
+                CheckBox { visible: appRoot.editingStage > 0; text: "Use this stage"; checked: appRoot.editingStage === 1 ? appRoot.useStageTwo : appRoot.useStageThree; enabled: !genesisBridge.busy; onToggled: { if (appRoot.editingStage === 1) appRoot.useStageTwo = checked; else appRoot.useStageThree = checked } }
+                Item { Layout.fillWidth: true }
+                GButton { text: "Close"; onClicked: stageModelPopup.close() }
+            }
+        }
+    }
+
     component GButton: Button {
         id: button
         property bool active: false
         property bool premium: false
-        implicitHeight: 36
+        implicitHeight: appRoot.pageIndex === 0 ? 44 : 36
         implicitWidth: Math.max(58, contentItem.implicitWidth + 22)
         Layout.maximumWidth: 16777215
         activeFocusOnTab: true
@@ -377,7 +509,7 @@ ApplicationWindow {
         ToolTip.visible: hovered && text.length > 16
         ToolTip.text: text
         ToolTip.delay: 700
-        font.pixelSize: 13
+        font.pixelSize: appRoot.pageIndex === 0 ? 16 : 13
         font.weight: active || premium ? Font.Bold : Font.DemiBold
         contentItem: Text {
             text: button.text
@@ -391,14 +523,7 @@ ApplicationWindow {
         background: Item {
             // Supplied glass-button artwork provides the luminous rounded silhouette;
             // the overlays below keep the existing GENESIS state colors and focus cues.
-            BorderImage {
-                anchors.fill: parent
-                source: appRoot.glassButtonSource
-                border.left: 28; border.right: 28; border.top: 20; border.bottom: 20
-                horizontalTileMode: BorderImage.Stretch
-                verticalTileMode: BorderImage.Stretch
-                opacity: button.enabled ? (button.down ? 0.62 : (button.hovered || button.active || button.premium ? 0.94 : 0.78)) : 0.22
-            }
+
             // Deep lower lip gives the control its chunky machined 3D profile.
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
@@ -454,7 +579,7 @@ ApplicationWindow {
     component NavButton: Button {
         id: nav
         property bool active: false
-        implicitHeight: 44
+        implicitHeight: 36
         activeFocusOnTab: true
         Accessible.name: text
         Accessible.role: Accessible.Button
@@ -470,18 +595,10 @@ ApplicationWindow {
         }
         background: Rectangle {
             radius: 10
-            color: "transparent"
-            border.color: nav.active ? appRoot.gold : (nav.hovered ? appRoot.brightGold : "transparent")
-            border.width: nav.active || nav.hovered ? 1 : 0
-            BorderImage {
-                anchors.fill: parent
-                anchors.margins: 1
-                source: appRoot.glassButtonSource
-                border.left: 28; border.right: 28; border.top: 20; border.bottom: 20
-                horizontalTileMode: BorderImage.Stretch
-                verticalTileMode: BorderImage.Stretch
-                opacity: nav.active ? 0.9 : (nav.hovered ? 0.72 : 0.42)
-            }
+            color: nav.active ? "#21190d" : "#000000"
+            border.color: nav.active ? appRoot.gold : (nav.hovered ? appRoot.brightGold : "#352914")
+            border.width: 1
+
             Rectangle {
                 visible: nav.active
                 anchors.left: parent.left
@@ -496,7 +613,7 @@ ApplicationWindow {
 
     component SectionLabel: Text {
         color: appRoot.brightGold
-        font.pixelSize: 12
+        font.pixelSize: appRoot.pageIndex === 0 ? 14 : 12
         font.bold: true
         font.letterSpacing: 1.1
     }
@@ -637,15 +754,15 @@ ApplicationWindow {
         Panel {
             Layout.fillWidth: true
             objectName: "mainPageBanner"
-            Layout.preferredHeight: 180
-            visible: appRoot.pageIndex !== 8
+            Layout.preferredHeight: Math.round(width * 420 / 1800)
+            visible: appRoot.pageIndex !== 8 && appRoot.pageIndex !== 0
             clip: true
 
             Image {
                 anchors.fill: parent
-                source: "../assets/lunacy_banner/genesis-cockpit-banner-lunacy-latest.png"
-                fillMode: Image.PreserveAspectFit
-                verticalAlignment: Image.AlignVCenter
+                source: "../assets/lunacy_banner/genesis-banner-wide-lunacy.png"
+                fillMode: Image.PreserveAspectCrop
+                verticalAlignment: Image.AlignBottom
                 opacity: 1.0
                 visible: !privacyMode
             }
@@ -696,7 +813,7 @@ ApplicationWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(parent.width - 420, appRoot.compactNavigation ? 820 : 1080)
                     height: parent.height - 8
-                    source: "../assets/lunacy_banner/genesis_cockpit_wordmark_full.png"
+                    source: ""
                     sourceClipRect: Qt.rect(0, 28, 945, 317)
                     fillMode: Image.Stretch
                     mipmap: true
@@ -754,7 +871,9 @@ ApplicationWindow {
             spacing: 8
 
             Panel {
-                Layout.preferredWidth: appRoot.width < 1300 ? 190 : 245
+                gradient: null
+                color: "#000000"
+                Layout.preferredWidth: appRoot.width < 1300 ? 190 : 220
                 visible: appRoot.pageIndex !== 8
                 Layout.fillHeight: true
                 ColumnLayout {
@@ -763,9 +882,9 @@ ApplicationWindow {
                     spacing: 5
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: appRoot.compactNavigation ? 104 : 200
+                        Layout.preferredHeight: appRoot.compactNavigation ? 104 : 140
                         radius: 2
-                        color: appRoot.panel
+                        color: "#000000"
                         border.color: appRoot.line
                         Image {
                             anchors.fill: parent
@@ -843,7 +962,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         SectionLabel { text: "1 · SOURCE IMAGE" }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: appRoot.generationSource.toString().length ? "LOADED" : "SOURCE"; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.textDim; font.pixelSize: 9; font.bold: true }
+                                        Text { text: appRoot.generationSource.toString().length ? "LOADED" : "SOURCE"; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.textDim; font.pixelSize: 14; font.bold: true }
                                     }
                                     Rectangle {
                                         Layout.fillWidth: true
@@ -859,8 +978,8 @@ ApplicationWindow {
                                             visible: appRoot.generationSource.toString().length === 0
                                             spacing: 6
                                             Text { anchors.horizontalCenter: parent.horizontalCenter; text: "+"; color: appRoot.gold; font.pixelSize: 34 }
-                                            Text { text: "LOAD SOURCE IMAGE"; color: appRoot.textMain; font.pixelSize: 12; font.bold: true }
-                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: "PNG · JPG · WEBP"; color: appRoot.textDim; font.pixelSize: 10 }
+                                            Text { text: "LOAD SOURCE IMAGE"; color: appRoot.textMain; font.pixelSize: 14; font.bold: true }
+                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: "PNG · JPG · WEBP"; color: appRoot.textDim; font.pixelSize: 14 }
                                         }
                                         Text { anchors.centerIn: parent; text: "PRIVATE"; color: appRoot.gold; font.pixelSize: 18; visible: privacyMode && appRoot.generationSource.toString().length > 0 }
                                         DropArea { anchors.fill: parent; onDropped: function(drop) { if (drop.urls.length) appRoot.generationSource = drop.urls[0] } }
@@ -874,7 +993,7 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         SectionLabel { text: "2 · EASY PRESETS" }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: appRoot.filteredPresets().length + " shown"; color: appRoot.textDim; font.pixelSize: 10 }
+                                        Text { text: appRoot.filteredPresets().length + " shown"; color: appRoot.textDim; font.pixelSize: 14 }
                                     }
                                     TextField {
                                         Layout.fillWidth: true
@@ -903,9 +1022,9 @@ ApplicationWindow {
                                                 anchors.fill: parent
                                                 anchors.margins: 7
                                                 spacing: 2
-                                                Text { width: parent.width; text: modelData.label || modelData.name || "Preset"; color: appRoot.textMain; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
-                                                Text { width: parent.width; text: (modelData.collection || "Preset") + " · " + (modelData.category || "General"); color: appRoot.gold; font.pixelSize: 8; elide: Text.ElideRight }
-                                                Text { width: parent.width; text: modelData.prompt || ""; color: appRoot.textDim; font.pixelSize: 8; maximumLineCount: 1; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                                                Text { width: parent.width; text: modelData.label || modelData.name || "Preset"; color: appRoot.textMain; font.pixelSize: 14; font.bold: true; elide: Text.ElideRight }
+                                                Text { width: parent.width; text: (modelData.collection || "Preset") + " · " + (modelData.category || "General"); color: appRoot.gold; font.pixelSize: 14; elide: Text.ElideRight }
+                                                Text { width: parent.width; text: modelData.prompt || ""; color: appRoot.textDim; font.pixelSize: 14; maximumLineCount: 1; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                                             }
                                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appRoot.applyPreset(modelData) }
                                         }
@@ -925,16 +1044,17 @@ ApplicationWindow {
                                     spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: appRoot.compactNavigation ? 96 : 148
+                                        Layout.preferredHeight: 164
                                         Layout.minimumHeight: Layout.preferredHeight
                                         Layout.maximumHeight: Layout.preferredHeight
                                         objectName: "generationStageStrip"
                                         spacing: 10
                                         Repeater {
+                                            objectName: "generationStageRepeater"
                                             model: [
-                                                {title:"STAGE 1", name:"Phr00t / Qwen", detail:"Create the base image", enabled:true},
-                                                {title:"STAGE 2", name:"Aisha 9B / Klein 9B", detail:"Refine the previous output", enabled:appRoot.useStageTwo},
-                                                {title:"STAGE 3", name:"Identity engine", detail:"Apply the identity pass", enabled:appRoot.useStageThree}
+                                                {title:"STAGE 1", name:appRoot.selectedGenerationProfile.label || "Choose a model", detail:"Create the base image with your selected model", enabled:true},
+                                                {title:"STAGE 2", name:appRoot.stageTwoLabel, detail:"Refine the previous output", enabled:appRoot.useStageTwo},
+                                                {title:"STAGE 3", name:appRoot.stageThreeLabel, detail:"Apply the identity pass", enabled:appRoot.useStageThree}
                                             ]
                                             Rectangle {
                                                 objectName: "generationStageCard" + index
@@ -950,11 +1070,18 @@ ApplicationWindow {
                                                     anchors.fill: parent
                                                     anchors.margins: appRoot.compactNavigation ? 10 : 14
                                                     spacing: 5
-                                                    Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
-                                                    Text { Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: appRoot.compactNavigation ? 11 : 14; font.bold: true; wrapMode: Text.Wrap }
-                                                    Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                                    Text { Layout.fillWidth: true; text: modelData.title; color: modelData.enabled ? appRoot.brightGold : appRoot.textDim; font.pixelSize: 14; font.bold: true; font.letterSpacing: 1 }
+                                                    Text { objectName: "generationStageModel" + index; Layout.fillWidth: true; text: modelData.name; color: appRoot.textMain; font.pixelSize: 18; font.bold: true; maximumLineCount: 2; elide: Text.ElideRight; wrapMode: Text.Wrap }
+                                                    Text { Layout.fillWidth: true; visible: !appRoot.compactNavigation; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
                                                     Item { Layout.fillHeight: true }
-                                                    Text { text: modelData.enabled ? "ACTIVE" : "OPTIONAL"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 9; font.bold: true }
+                                                    Text { text: modelData.enabled ? "CLICK TO CHANGE" : "CLICK TO ENABLE"; color: modelData.enabled ? appRoot.gold : appRoot.textDim; font.pixelSize: 14; font.bold: true }
+                                                }
+                                                MouseArea {
+                                                    objectName: "stageModelBoxClick" + index
+                                                    anchors.fill: parent
+                                                    enabled: !genesisBridge.busy
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: appRoot.openStageModels(index)
                                                 }
                                             }
                                         }
@@ -983,8 +1110,8 @@ ApplicationWindow {
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: "Preset: " + appRoot.selectedPresetName; color: appRoot.gold; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
-                                        Text { text: "Pose reference: " + appRoot.selectedPoseName; color: appRoot.textDim; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight; horizontalAlignment: Text.AlignRight }
+                                        Text { text: "Preset: " + appRoot.selectedPresetName; color: appRoot.gold; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight }
+                                        Text { text: "Pose reference: " + appRoot.selectedPoseName; color: appRoot.textDim; font.pixelSize: 14; Layout.fillWidth: true; elide: Text.ElideRight; horizontalAlignment: Text.AlignRight }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -994,9 +1121,10 @@ ApplicationWindow {
                                             active: enabled
                                             text: genesisBridge.busy ? "GENERATING…" : "GENERATE"
                                             enabled: !genesisBridge.busy
-                                                && appRoot.selectedGenerationProfile.runnable
-                                                && (appRoot.generationPrompt.trim().length > 0 || appRoot.selectedPosePrompt.trim().length > 0)
-                                                && (!appRoot.selectedGenerationProfile.sourceRequired || appRoot.generationSource.toString().length > 0)
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: appRoot.selectedGenerationProfile.sourceRequired && appRoot.generationSource.toString().length === 0
+                                                ? "This model requires a source image. Click Generate for details."
+                                                : "Generate with the selected model and settings."
                                             onClicked: appRoot.generateCurrent()
                                         }
                                         GButton {
@@ -1017,7 +1145,7 @@ ApplicationWindow {
                                         indeterminate: genesisBridge.busy && genesisBridge.progress < 0
                                         visible: genesisBridge.busy || genesisBridge.progress >= 0 || genesisBridge.previewUrl.length > 0
                                     }
-                                    Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: genesisBridge.status; color: genesisBridge.busy ? appRoot.gold : appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
                                     SectionLabel { text: "RESULT" }
                                     Rectangle {
                                         Layout.fillWidth: true
@@ -1042,7 +1170,7 @@ ApplicationWindow {
                                             anchors.centerIn: parent
                                             text: privacyMode ? "PRIVATE" : "GENERATED RESULT"
                                             color: appRoot.textDim
-                                            font.pixelSize: 13
+                                            font.pixelSize: 14
                                             visible: privacyMode || genesisBridge.previewUrl.length === 0
                                         }
                                         MouseArea {
@@ -1060,7 +1188,7 @@ ApplicationWindow {
                                             GButton { text: "Output Folder"; onClicked: genesisBridge.openOutputFolder() }
                                         }
                                     }
-                                    Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 9; elide: Text.ElideMiddle }
+                                    Text { Layout.fillWidth: true; text: "Output: " + genesisBridge.outputFolder; color: appRoot.textDim; font.pixelSize: 14; elide: Text.ElideMiddle }
                                     RowLayout {
                                     Layout.fillWidth: true
                                     GButton { Layout.preferredWidth: implicitWidth; text: "Output location"; onClicked: genesisBridge.chooseOutputFolder() }
@@ -1089,14 +1217,14 @@ ApplicationWindow {
                                     width: generationSettings.availableWidth
                                     spacing: 8
                                     SectionLabel { text: "3 · MODEL / WORKFLOW" }
-                                    ComboBox {
+                                    ComboBox { implicitHeight: 44;
                                         Layout.fillWidth: true
                                         model: ["AUTO", "LOCAL", "RUNPOD"]
                                         currentIndex: model.indexOf(backendBridge.mode)
                                         enabled: !genesisBridge.busy
                                         onActivated: backendBridge.setMode(currentText)
                                     }
-                                    Text { Layout.fillWidth: true; text: backendBridge.message; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 11 }
+                                    Text { Layout.fillWidth: true; text: backendBridge.message; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 14 }
                                     TextField {
                                         id: runpodEndpoint
                                         Layout.fillWidth: true
@@ -1133,32 +1261,37 @@ ApplicationWindow {
                                             ? "RunPod connection active. Disconnect stops GENESIS remote polling."
                                             : "RunPod disconnected by default. GENESIS will not contact the saved endpoint until Connect RunPod is pressed."
                                         color: backendBridge.connected ? appRoot.gold : appRoot.textDim
-                                        font.pixelSize: 10
+                                        font.pixelSize: 14
                                         wrapMode: Text.Wrap
                                     }
                                     Text {
                                         Layout.fillWidth: true
                                         text: "Destination: " + (appRoot.selectedGenerationProfile.destination || "UNAVAILABLE")
-                                        color: appRoot.gold; font.pixelSize: 12; font.bold: true
+                                        color: appRoot.gold; font.pixelSize: 14; font.bold: true
                                     }
-                                    ComboBox {
+                                    SectionLabel { text: "STAGE 1 · MODEL" }
+                                    ComboBox { implicitHeight: 44;
+                                        objectName: "stageOneModelPicker"
                                         Layout.fillWidth: true
-                                        model: appRoot.generationModel
+                                        enabled: !genesisBridge.busy
+                                        model: appRoot.stageOneChoices
                                         textRole: "label"
-                                        currentIndex: appRoot.selectedGenerationIndex
-                                        onActivated: appRoot.selectGeneration(currentIndex)
+                                        currentIndex: appRoot.stageOneChoiceIndex
+                                        onActivated: appRoot.selectStageOneChoice(currentIndex)
                                     }
-                                    Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: appRoot.selectedGenerationProfile.note || ""; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: "MODEL PATH: " + (appRoot.selectedGenerationProfile.modelPath || appRoot.selectedGenerationProfile.model || "Unknown"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; text: "WORKFLOW: " + (appRoot.selectedGenerationProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
                                     SectionLabel { text: "COMPATIBLE LORA" }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        ComboBox {
+                                        ComboBox { implicitHeight: 44;
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
                                             currentIndex: Math.max(0, model.indexOf(appRoot.selectedLora))
                                             onActivated: appRoot.selectedLora = currentText
                                         }
-                                        SpinBox {
+                                        SpinBox { implicitHeight: 44;
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLora !== "None"
@@ -1170,12 +1303,13 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 1
-                                        ComboBox {
+                                        ComboBox { implicitHeight: 44;
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraTwo))
                                             onActivated: appRoot.selectedLoraTwo = currentText
                                         }
-                                        SpinBox {
+                                        SpinBox { implicitHeight: 44;
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraTwoStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLoraTwo !== "None"
@@ -1187,12 +1321,13 @@ ApplicationWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         visible: (appRoot.selectedGenerationProfile.maxLoras || 0) > 2
-                                        ComboBox {
+                                        ComboBox { implicitHeight: 44;
                                             Layout.fillWidth: true
                                             model: appRoot.selectedGenerationProfile.loras || ["None"]
+                                            currentIndex: Math.max(0, model.indexOf(appRoot.selectedLoraThree))
                                             onActivated: appRoot.selectedLoraThree = currentText
                                         }
-                                        SpinBox {
+                                        SpinBox { implicitHeight: 44;
                                             from: 0; to: 100; value: Math.round(appRoot.selectedLoraThreeStrength * 100)
                                             editable: true
                                             enabled: appRoot.selectedLoraThree !== "None"
@@ -1207,7 +1342,7 @@ ApplicationWindow {
                                         text: (appRoot.selectedGenerationProfile.experimentalLoras ? "EXPERIMENTAL · " : "")
                                             + "LoRAs run in picker order with independent strengths."
                                         color: appRoot.selectedGenerationProfile.experimentalLoras ? appRoot.gold : appRoot.textDim
-                                        font.pixelSize: 10
+                                        font.pixelSize: 14
                                         wrapMode: Text.Wrap
                                     }
                                     Text {
@@ -1215,7 +1350,7 @@ ApplicationWindow {
                                         visible: appRoot.selectedLoraTriggerText().length > 0
                                         text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()
                                         color: appRoot.brightGold
-                                        font.pixelSize: 10
+                                        font.pixelSize: 14
                                         wrapMode: Text.Wrap
                                     }
                                     SectionLabel { text: "QUALITY" }
@@ -1233,27 +1368,27 @@ ApplicationWindow {
                                         columns: 2
                                         columnSpacing: 8
                                         rowSpacing: 5
-                                        Text { text: "Width"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationWidth; editable: true; onValueModified: appRoot.generationWidth = value }
-                                        Text { text: "Height"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationHeight; editable: true; onValueModified: appRoot.generationHeight = value }
-                                        Text { text: "Steps"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 1; to: 100; value: appRoot.generationSteps; editable: true; onValueModified: appRoot.generationSteps = value }
-                                        Text { text: "CFG"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
-                                        Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
-                                        Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        SpinBox { Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
-                                        Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        ComboBox { Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
-                                        Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 10 }
-                                        ComboBox { Layout.fillWidth: true; model: ["beta", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
+                                        Text { text: "Width"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationWidth; editable: true; onValueModified: appRoot.generationWidth = value }
+                                        Text { text: "Height"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 256; to: (!!appRoot.selectedGenerationProfile.remote ? 4096 : 1536); stepSize: 64; value: appRoot.generationHeight; editable: true; onValueModified: appRoot.generationHeight = value }
+                                        Text { text: "Steps"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 1; to: 100; value: appRoot.generationSteps; editable: true; onValueModified: appRoot.generationSteps = value }
+                                        Text { text: "CFG"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 0; to: 3000; value: Math.round(appRoot.generationCfg * 100); editable: true; onValueModified: appRoot.generationCfg = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Seed"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: -1; to: 2147483647; value: appRoot.generationSeed; editable: true; onValueModified: appRoot.generationSeed = value }
+                                        Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
+                                        Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "dpmpp_2m", "dpmpp_2m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
+                                        Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 14 }
+                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; model: ["beta", "simple", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
                                     }
                                     SectionLabel { text: "PIPELINE" }
-                                    ComboBox {
+                                    ComboBox { implicitHeight: 44;
                                         Layout.fillWidth: true
-                                        model: ["Single model", "3-stage · Phr00t → Refine → Identity"]
+                                        model: ["Single model", "3-stage · Selected model → Refine → Identity"]
                                         currentIndex: (appRoot.useStageTwo && appRoot.useStageThree) ? 1 : 0
                                         onActivated: {
                                             var fullPipeline = currentIndex === 1
@@ -1264,52 +1399,21 @@ ApplicationWindow {
                                     Text {
                                         Layout.fillWidth: true
                                         text: appRoot.useStageTwo && appRoot.useStageThree
-                                            ? "Stage 1 Phr00t/Qwen → Stage 2 selectable Klein-family refine → Stage 3 identity lock"
+                                            ? "Stage 1 " + (appRoot.selectedGenerationProfile.label || "selected model") + " → Stage 2 refinement → Stage 3 identity lock"
                                             : "Single-model generation; stages can also be enabled individually below."
                                         color: appRoot.textDim
-                                        font.pixelSize: 10
+                                        font.pixelSize: 14
                                         wrapMode: Text.Wrap
                                     }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; onToggled: appRoot.useStageTwo = checked }
-                                        ComboBox {
-                                            Layout.fillWidth: true
-                                            visible: appRoot.selectedGenerationProfile.remote === true
-                                            enabled: !genesisBridge.busy
-                                            model: [
-                                                {label:"Aisha 9B v9.7", file:"aisha_nsfw_beta_v9_7_distilled_bf16.safetensors"},
-                                                {label:"Klein 9B", file:"flux-2-klein-9b.safetensors"},
-                                                {label:"Miracle v2 FP8", file:"miracleinNSFWGeneration_20FP8.safetensors"},
-                                                {label:"PornMaster v3 FP8", file:"pornmasterFlux2Klein_v3-fp8.safetensors"},
-                                                {label:"DarkBeast V2 BFS FP8", file:"darkBeast_DBKleinv2BFS.safetensors"}
-                                            ]
-                                            textRole: "label"
-                                            onActivated: genesisBridge.setStageTwoModel(model[currentIndex].file)
-                                        }
-                                    }
-                                    CheckBox { text: "Stage 3 · identity lock"; checked: appRoot.useStageThree; onToggled: appRoot.useStageThree = checked }
-                                    ComboBox {
-                                        Layout.fillWidth: true
-                                        enabled: appRoot.useStageThree
-                                        model: ["ReActor · Inswapper ✓", "ReActor · ReSwapper ✓", "ReActor · HyperSwap ✓", "PuLID FLUX.2 · pending"]
-                                        currentIndex: appRoot.stageThreeEngine === "reactor_reswapper" ? 1
-                                            : (appRoot.stageThreeEngine === "reactor_hyperswap" ? 2 : 0)
-                                        onActivated: {
-                                            if (currentIndex === 0) appRoot.stageThreeEngine = "reactor_inswapper"
-                                            else if (currentIndex === 1) appRoot.stageThreeEngine = "reactor_reswapper"
-                                            else if (currentIndex === 2) appRoot.stageThreeEngine = "reactor_hyperswap"
-                                            else {
-                                                currentIndex = appRoot.stageThreeEngine === "reactor_reswapper" ? 1
-                                                    : (appRoot.stageThreeEngine === "reactor_hyperswap" ? 2 : 0)
-                                                return
-                                            }
-                                            genesisBridge.setStageThreeEngine(appRoot.stageThreeEngine)
-                                        }
-                                    }
+                                    CheckBox { text: "Stage 2 · refine"; checked: appRoot.useStageTwo; enabled: !genesisBridge.busy; onToggled: appRoot.useStageTwo = checked }
+                                    GButton { Layout.fillWidth: true; text: appRoot.stageTwoLabel; enabled: !genesisBridge.busy; onClicked: appRoot.openStageModels(1) }
+                                    Text { Layout.fillWidth: true; visible: appRoot.useStageTwo; text: "MODEL PATH: " + (appRoot.selectedStageTwoProfile.modelPath || appRoot.stageTwoModel || "Unknown"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    Text { Layout.fillWidth: true; visible: appRoot.useStageTwo; text: "WORKFLOW: " + (appRoot.selectedStageTwoProfile.workflowPath || "Not mapped"); color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.WrapAnywhere }
+                                    CheckBox { text: "Stage 3 · identity lock"; checked: appRoot.useStageThree; enabled: !genesisBridge.busy; onToggled: appRoot.useStageThree = checked }
+                                    GButton { Layout.fillWidth: true; text: appRoot.stageThreeLabel; enabled: !genesisBridge.busy; onClicked: appRoot.openStageModels(2) }
                                     CheckBox { text: "Final upscale"; checked: appRoot.useUpscale; enabled: genesisBridge.upscaleAvailable; onToggled: appRoot.useUpscale = checked }
                                     Rectangle { Layout.fillWidth: true; height: 1; color: appRoot.line }
-                                    Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 11; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: appRoot.generationSource.toString().length ? "Source image stays loaded when you change presets, poses, models or LoRAs." : "Load a source image first for identity/source workflows."; color: appRoot.generationSource.toString().length ? appRoot.success : appRoot.gold; font.pixelSize: 14; wrapMode: Text.Wrap }
 
 
                                 }
@@ -1364,7 +1468,7 @@ ApplicationWindow {
                                         color: "#080808"
                                         border.color: appRoot.generationSource.toString().length ? appRoot.gold : appRoot.line
                                         Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.generationSource; fillMode: Image.PreserveAspectFit; visible: appRoot.generationSource.toString().length > 0 && !privacyMode }
-                                        Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 11 }
+                                        Text { anchors.centerIn: parent; text: appRoot.generationSource.toString().length ? (privacyMode ? "PRIVATE" : "") : "NO SOURCE LOADED"; color: appRoot.textDim; font.pixelSize: 14 }
                                     }
                                     SectionLabel { text: "SELECTED POSE" }
                                     GButton { objectName: "openSkeletonEditor"; Layout.fillWidth: true; text: "Edit Skeleton"; onClicked: skeletonBridge.openEditor(String(appRoot.selectedPoseSource)) }
@@ -1377,17 +1481,17 @@ ApplicationWindow {
                                             Layout.fillWidth: true; Layout.fillHeight: true
                                             radius: 2; color: "#080808"; border.color: appRoot.gold
                                             Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseThumbnail; fillMode: Image.PreserveAspectFit; asynchronous: true }
-                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "PREVIEW"; color: appRoot.brightGold; font.pixelSize: 8; font.bold: true }
+                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "PREVIEW"; color: appRoot.brightGold; font.pixelSize: 14; font.bold: true }
                                         }
                                         Rectangle {
                                             Layout.fillWidth: true; Layout.fillHeight: true
                                             radius: 2; color: "#080808"; border.color: appRoot.line
                                             Image { anchors.fill: parent; anchors.margins: 6; source: appRoot.selectedPoseSource; fillMode: Image.PreserveAspectFit; asynchronous: true }
-                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "SKELETON"; color: appRoot.textDim; font.pixelSize: 8; font.bold: true }
+                                            Text { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; text: "SKELETON"; color: appRoot.textDim; font.pixelSize: 14; font.bold: true }
                                         }
                                     }
-                                    Text { Layout.fillWidth: true; text: appRoot.selectedPoseName; color: appRoot.brightGold; font.pixelSize: 13; font.bold: true; wrapMode: Text.Wrap }
-                                    Text { Layout.fillWidth: true; text: appRoot.selectedPoseCategory; color: appRoot.textDim; font.pixelSize: 11 }
+                                    Text { Layout.fillWidth: true; text: appRoot.selectedPoseName; color: appRoot.brightGold; font.pixelSize: 14; font.bold: true; wrapMode: Text.Wrap }
+                                    Text { Layout.fillWidth: true; text: appRoot.selectedPoseCategory; color: appRoot.textDim; font.pixelSize: 14 }
                                     Item { Layout.fillHeight: true }
                                     GButton { Layout.preferredWidth: implicitWidth; text: "Use Pose in Create"; active: true; onClicked: { if (appRoot.selectedPosePrompt.length) appRoot.generationPrompt = appRoot.selectedPosePrompt; appRoot.pageIndex = 0 } }
                                 }
@@ -1418,8 +1522,8 @@ ApplicationWindow {
                                         Column {
                                             anchors.fill: parent
                                             anchors.margins: 6
-                                            Text { width: parent.width; text: modelData.name || "Pose"; color: appRoot.textMain; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
-                                            Text { width: parent.width; text: modelData.category || ""; color: appRoot.gold; font.pixelSize: 9; elide: Text.ElideRight }
+                                            Text { width: parent.width; text: modelData.name || "Pose"; color: appRoot.textMain; font.pixelSize: 14; font.bold: true; elide: Text.ElideRight }
+                                            Text { width: parent.width; text: modelData.category || ""; color: appRoot.gold; font.pixelSize: 14; elide: Text.ElideRight }
                                         }
                                     }
                                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: appRoot.applyPose(modelData) }
@@ -1450,7 +1554,7 @@ ApplicationWindow {
                             Layout.fillHeight: true
                             spacing: 10
                             Text { Layout.fillWidth: true; text: "COMFYUI NODE GRAPH IN GENESIS"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
-                            Text { Layout.fillWidth: true; text: workflowGraphBridge.status; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
+                            Text { Layout.fillWidth: true; text: workflowGraphBridge.status; color: appRoot.textDim; font.pixelSize: 14; wrapMode: Text.Wrap }
                             RowLayout {
                                 Layout.fillWidth: true
                                 GButton { text: "New graph"; onClicked: { workflowGraphBridge.openGraph(""); workflowGraphBridge.newGraph() } }
@@ -1478,9 +1582,10 @@ ApplicationWindow {
                                                 anchors.fill: parent
                                                 anchors.margins: 14
                                                 Text { text: modelData.name; color: appRoot.brightGold; font.pixelSize: 17; font.bold: true }
-                                                Text { Layout.fillWidth: true; text: modelData.file; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideMiddle }
+                                                Text { Layout.fillWidth: true; text: modelData.file; color: appRoot.textDim; font.pixelSize: 14; elide: Text.ElideMiddle }
+                                                Text { Layout.fillWidth: true; text: modelData.format || "Workflow"; color: modelData.visual ? appRoot.success : appRoot.gold; font.pixelSize: 13; font.bold: true }
                                                 Item { Layout.fillHeight: true }
-                                                GButton { text: "Edit node graph"; active: true; onClicked: workflowGraphBridge.openGraph(modelData.file) }
+                                                GButton { text: modelData.visual ? "Edit node graph" : "Show workflow status"; active: true; onClicked: workflowGraphBridge.openGraph(modelData.file) }
                                             }
                                         }
                                     }
@@ -1926,7 +2031,7 @@ ApplicationWindow {
                                     Text { anchors.centerIn:parent; text:privacyMode ? "PRIVATE" : "FACE SWAP RESULT"; color:appRoot.textDim; font.pixelSize:16; visible:privacyMode || genesisBridge.previewUrl.length===0 }
                                 }
                                 GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "RUN REACTOR"; active:true; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:appRoot.runFaceSwap() }
-                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : "FACEFUSION · LOCAL IMAGE"; enabled:!genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
+                                GButton { Layout.preferredWidth: implicitWidth; text:genesisBridge.busy ? "RUNNING…" : (genesisBridge.faceFusionAvailable ? "FACEFUSION · LOCAL IMAGE" : "FACEFUSION · NOT INSTALLED"); enabled:genesisBridge.faceFusionAvailable && !genesisBridge.busy && appRoot.faceSwapTarget.toString().length>0 && appRoot.faceSwapSource.toString().length>0; onClicked:genesisBridge.queueFaceFusion(appRoot.faceSwapTarget.toString(), appRoot.faceSwapSource.toString()) }
                                 GButton { Layout.preferredWidth: implicitWidth; text:"Open Full Size"; enabled:genesisBridge.previewUrl.length>0; onClicked:genesisBridge.openPreview() }
                             } }
                         }
@@ -1940,8 +2045,8 @@ ApplicationWindow {
                     objectName: "homeWorkspace"
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 14
-                        spacing: 18
+                        anchors.margins: 10
+                        spacing: 12
                         RowLayout {
                             Layout.fillWidth: true
                             ColumnLayout {
@@ -1955,16 +2060,16 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             columns: width < 1000 ? 2 : 3
-                            rowSpacing: 14; columnSpacing: 14
+                            rowSpacing: 12; columnSpacing: 12
                             Repeater {
                                 objectName: "homeCardRepeater"
                                 model: [
-                                    {title: "Image Generation", artwork: "../assets/home_buttons/image-swap_2026-08-22_22-36-37.jpg", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
-                                    {title: "GENESIS Mungbean", artwork: "../assets/home_buttons/t.png", icon: "✧", detail: "Open the Grok-style image and video studio", page: 13},
-                                    {title: "Canvas", artwork: "../assets/home_buttons/e7a0662e0c0a4c7e878c6d28827e813f.jpg", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
-                                    {title: "Media Tools", artwork: "../assets/home_buttons/r.png", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
-                                    {title: "Camera Hub", artwork: "../assets/home_buttons/Untitled-1.png", icon: "●", detail: "Open your cameras and live views", page: 5},
-                                    {title: "System Tools", artwork: "../assets/home_buttons/1248519.small.jpg", icon: "⚙", detail: "Check services, models and storage", page: 7}
+                                    {title: "Image Generation", artwork: "../assets/home_buttons/panel-06-duplicate-lab.jpg", icon: "▣", detail: "Create with your models, references and workflows", page: 0},
+                                    {title: "GENESIS Mungbean", artwork: "../assets/home_buttons/panel-03-face-studio.jpg", icon: "✧", detail: "Open the Grok-style image and video studio", page: 13},
+                                    {title: "Canvas", artwork: "../assets/home_buttons/genesis-cockpit-banner-left-poster.jpg", icon: "⤢", detail: "Arrange layers, resize images and prepare cutouts", page: 8},
+                                    {title: "Media Tools", artwork: "../assets/home_buttons/panel-05-photo-organiser.jpg", icon: "✦", detail: "Browse, organise and work with your media", page: 3},
+                                    {title: "Camera Hub", artwork: "../assets/home_buttons/panel-08-camera-hub.png", icon: "●", detail: "Open your cameras and live views", page: 5},
+                                    {title: "System Tools", artwork: "../assets/home_buttons/genesis-cockpit-banner-right-poster.jpg", icon: "⚙", detail: "Check services, models and storage", page: 7}
                                 ]
                                 Button {
                                     required property var modelData
@@ -1972,14 +2077,14 @@ ApplicationWindow {
                                     Layout.fillWidth: true; Layout.fillHeight: true
                                     Layout.minimumWidth: 220; Layout.minimumHeight: 120
                                     Layout.preferredWidth: 300; Layout.preferredHeight: 210
-                                    padding: 22
+                                    padding: 18
                                     Accessible.name: modelData.title
                                     onClicked: appRoot.pageIndex = modelData.page
                                     background: Rectangle {
                                         radius: 2
                                         color: parent.down ? "#342818" : parent.hovered ? "#231f18" : "#111111"
-                                        border.color: parent.hovered || parent.activeFocus ? appRoot.gold : "#4b3e29"
-                                        border.width: parent.activeFocus ? 2 : 1
+                                        border.color: parent.hovered || parent.activeFocus ? appRoot.brightGold : "#a17b3b"
+                                        border.width: parent.activeFocus ? 3 : 2
                                         clip: true
                                         Image {
                                             anchors.fill: parent
@@ -2004,10 +2109,14 @@ ApplicationWindow {
                                     }
                                     contentItem: ColumnLayout {
                                         spacing: 10
-                                        Text { text: modelData.icon; color: appRoot.gold; font.pixelSize: 30 }
-                                        Text { Layout.fillWidth: true; text: modelData.title; color: appRoot.brightGold; font.pixelSize: 21; font.bold: true; wrapMode: Text.Wrap }
-                                        Text { Layout.fillWidth: true; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap }
                                         Item { Layout.fillHeight: true }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+                                            Text { text: modelData.icon; color: appRoot.gold; font.pixelSize: 24; Layout.preferredWidth: 28 }
+                                            Text { Layout.fillWidth: true; text: modelData.title; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true; elide: Text.ElideRight }
+                                        }
+                                        Text { Layout.fillWidth: true; Layout.preferredHeight: 34; text: modelData.detail; color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
                                     }
                                 }
                             }
