@@ -95,15 +95,25 @@ class BackendBridge(QObject):
 
     @pyqtSlot(str)
     def prepareModelRoute(self, model):
-        """Move explicit LOCAL selection back to model-aware AUTO when needed.
+        """Use model-aware AUTO for an explicitly chosen model when needed.
 
-        This never starts or connects RunPod; it only prevents a RunPod-only
-        Stage-1/2 choice from remaining trapped behind LOCAL routing.
+        This never starts RunPod or changes a route during an active job.
+        A selected verified local model can use AUTO when RunPod is offline.
         """
         if self.generation.busy or not model:
             return
         local_runnable = {p['model'] for p in self._local if p.get('runnable')}
         if model in local_runnable:
+            # A deliberate selection of a verified local model may switch an
+            # offline RUNPOD-only picker to AUTO. Running jobs never silently
+            # fall back between backends.
+            if (self._mode == 'RUNPOD' and not self._remote_status.get('ready')
+                    and self._local_status.get('ready') and self._safe_local_model(model)):
+                self._mode = 'AUTO'
+                self.settings.setValue('backend/mode', 'AUTO')
+                self._message = 'AUTO selected for installed local model · RunPod remains offline'
+                self._publish()
+                self.changed.emit()
             return
         import qt_cockpit as cockpit
         configured = {p['model'] for p in cockpit.configured_stage_one_profiles()}
@@ -230,27 +240,29 @@ class BackendBridge(QObject):
             return Route('RUNPOD', self._endpoint)
         raise ValueError(f'{self._mode}: no ready safe backend for {operation}. Refresh backends in Create.')
 
-    def resolve(self, model):
+    def _safe_local_model(self, model):
         import qt_cockpit as cockpit
+        return self._local_safe and model in ({
+            cockpit.FOUR_B_MODEL, cockpit.QWEN_MODEL,
+            cockpit.REMOTE_PHR00T_V23_Q2_MODEL, cockpit.LOCAL_AISHA_9B_MODEL,
+            cockpit.LOCAL_MIRACLEIN_9B_MODEL, cockpit.LOCAL_PORNMASTER_9B_MODEL,
+        } | cockpit.REMOTE_SDXL_MODELS)
+
+    def resolve(self, model):
         return choose_route(self._mode, model,
             {p['model'] for p in self._local if p.get('runnable')},
             {p['model'] for p in self._remote if p.get('runnable')},
             self._local_status.get('ready', False), self._remote_status.get('ready', False),
-            self._endpoint, local_safe=model in {cockpit.FOUR_B_MODEL, cockpit.QWEN_MODEL, cockpit.REMOTE_PHR00T_V23_Q2_MODEL, cockpit.LOCAL_AISHA_9B_MODEL, cockpit.LOCAL_MIRACLEIN_9B_MODEL, cockpit.LOCAL_PORNMASTER_9B_MODEL} and self._local_safe)
+            self._endpoint, local_safe=BackendBridge._safe_local_model(self, model))
 
     @pyqtSlot()
     def _publish(self):
         if self.generation.busy:
             return
-        # Match the published catalog to the selected routing mode.
-        # LOCAL shows every installed/validated local profile, including profiles
-        # intentionally execution-blocked by the local GPU safety policy. AUTO shows
-        # both local and configured remote profiles. RUNPOD shows the remote catalog.
-        sources = (
-            [row for row in self._local if row.get('ready')] if self._mode == 'LOCAL'
-            else self._remote if self._mode == 'RUNPOD'
-            else self._local + self._remote
-        )
+        # Always publish local and configured Stage-1 profiles for discovery;
+        # the selected mode and route readiness govern execution separately.
+        sources = ([row for row in self._local if row.get('ready')]
+                   if self._mode == 'LOCAL' else self._local + self._remote)
         import qt_cockpit as cockpit
         configured_rows = {row['model']: row for row in cockpit.configured_stage_one_profiles()}
         merged_sources = []
@@ -274,9 +286,7 @@ class BackendBridge(QObject):
             else:
                 merged_sources.append(source)
         present = {row['model'] for row in merged_sources}
-        sources = merged_sources if self._mode == 'LOCAL' else (
-            merged_sources + [row for model, row in configured_rows.items() if model not in present]
-        )
+        sources = merged_sources + [row for model, row in configured_rows.items() if model not in present]
         models = list(dict.fromkeys(row['model'] for row in sources))
         rows = []
         for model in models:

@@ -64,8 +64,13 @@ ApplicationWindow {
     Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 7 }
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
 
+    // Show configured models even when the current backend is offline. Route
+    // readiness gates GENERATE, not visibility or choosing a model profile.
     property var generationModel: typeof generationProfiles !== "undefined"
-        ? generationProfiles.filter(function(row) { return row.runnable === true && row.selectable !== false && (!generationSource.toString().length || row.sourceSupported !== false) }) : []
+        ? generationProfiles.filter(function(row) {
+            return (row.runnable === true || row.stageOneConfigured === true)
+                && (!generationSource.toString().length || row.sourceSupported !== false)
+        }) : []
     property int selectedGenerationIndex: 0
     property bool modelDefaultsApplied: false
     property string selectedModelName: ""
@@ -76,12 +81,12 @@ ApplicationWindow {
                 if (generationModel[i].model === selectedModelName) { index = i; break }
             selectedGenerationIndex = index
             if (!modelDefaultsApplied || generationModel[index].model !== selectedModelName) {
-                selectGeneration(index)
+                selectGeneration(index, false)
                 modelDefaultsApplied = true
             }
         }
     }
-    Component.onCompleted: if (generationModel.length) { selectGeneration(0); modelDefaultsApplied = true }
+    Component.onCompleted: if (generationModel.length) { selectGeneration(0, false); modelDefaultsApplied = true }
     readonly property var selectedGenerationProfile: generationModel.length
         ? generationModel[Math.min(selectedGenerationIndex, generationModel.length - 1)]
         : ({label:"No model available", model:"", note:"Waiting for the backend model catalog", loras:["None"], runnable:false, sourceRequired:false})
@@ -140,8 +145,8 @@ ApplicationWindow {
             if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
         return "Choose an identity engine"
     }
-    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false && row.runnable === true && row.selectable !== false })
-    readonly property var stageOneSelectableChoices: stageOneChoices.filter(function(row) { return row.selectable !== false })
+    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false || row.stageOneConfigured === true })
+    readonly property var stageOneSelectableChoices: stageOneChoices
     readonly property int stageOneChoiceIndex: {
         for (var i = 0; i < stageOneSelectableChoices.length; ++i)
             if (stageOneSelectableChoices[i].model === selectedGenerationProfile.model) return i
@@ -295,7 +300,7 @@ ApplicationWindow {
 
     function selectStageChoice(index) {
         var row = stageChoices[index]
-        if (!row || genesisBridge.busy || row.selectable === false || row.available === false) return
+        if (!row || genesisBridge.busy || row.available === false || (editingStage !== 0 && row.selectable === false)) return
         if (editingStage === 0) {
             selectStageOneChoice(index)
         } else if (editingStage === 1) {
@@ -314,7 +319,7 @@ ApplicationWindow {
 
     function selectStageOneChoice(index) {
         var row = stageOneChoices[index]
-        if (!row || genesisBridge.busy || row.selectable === false) return
+        if (!row || genesisBridge.busy) return
         for (var i = 0; i < generationModel.length; ++i)
             if (generationModel[i].model === row.model) { selectGeneration(i); return }
     }
@@ -326,10 +331,10 @@ ApplicationWindow {
             if (generationModel[i].model === row.model) { selectGeneration(i); return }
     }
 
-    function selectGeneration(index) {
+    function selectGeneration(index, userChoseModel) {
         if (generationModel[index]) {
             selectedModelName = generationModel[index].model
-            if (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0)
+            if (userChoseModel !== false && (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0))
                 backendBridge.prepareModelRoute(generationModel[index].model)
         }
         selectedGenerationIndex = index
@@ -579,7 +584,7 @@ ApplicationWindow {
                     objectName: "stageModelChoice" + index
                     width: ListView.view.width
                     implicitHeight: 64
-                    enabled: !genesisBridge.busy && (modelData.engine ? modelData.available !== false : modelData.selectable !== false)
+                    enabled: !genesisBridge.busy && (modelData.engine ? modelData.available !== false : (appRoot.editingStage === 0 || modelData.selectable !== false))
                     Accessible.name: modelData.label
                     readonly property bool currentStageOneChoice: appRoot.editingStage === 0 && modelData.model === appRoot.selectedGenerationProfile.model
                     contentItem: Column {
@@ -589,10 +594,10 @@ ApplicationWindow {
                             width: parent.width
                             text: modelData.engine
                                 ? (modelData.available !== false ? "Identity pass · available" : "Unavailable · ReActor engine missing on current RunPod")
-                                : (modelData.selectable !== false
-                                    ? (parent.parent.currentStageOneChoice ? "Selected · available" : "Available")
-                                    : "Unavailable · not installed/runnable on current backend")
-                            color: (modelData.engine ? modelData.available !== false : modelData.selectable !== false) ? appRoot.success : appRoot.textDim
+                                : (modelData.routeReady === true && modelData.runnable === true
+                                    ? (parent.parent.currentStageOneChoice ? "Selected · ready to generate" : "Ready to generate")
+                                    : "Selectable · generation unavailable on current backend")
+                            color: (modelData.engine ? modelData.available !== false : (modelData.routeReady === true && modelData.runnable === true)) ? appRoot.success : appRoot.textDim
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }
@@ -607,7 +612,7 @@ ApplicationWindow {
                 }
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
             }
-            Text { visible: appRoot.stageChoices.length === 0; text: "No configured models for this stage. Connect RunPod and refresh."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { visible: appRoot.stageChoices.length === 0; text: "No compatible models found for this stage on the selected backend. Refresh to check again."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
             RowLayout {
                 Layout.fillWidth: true
                 CheckBox { visible: appRoot.editingStage > 0; text: "Use this stage"; checked: appRoot.editingStage === 1 ? appRoot.useStageTwo : appRoot.useStageThree; enabled: !genesisBridge.busy && (appRoot.editingStage === 1 ? appRoot.selectedStageTwoProfile.selectable !== false : appRoot.stageThreeReady); onToggled: { if (appRoot.editingStage === 1) appRoot.useStageTwo = checked; else appRoot.useStageThree = checked } }
@@ -1260,9 +1265,10 @@ ApplicationWindow {
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 44
                                             active: enabled
+                                            objectName: "generateButton"
                                             text: genesisBridge.busy ? "GENERATING…" : "GENERATE"
                                             enabled: !genesisBridge.busy
-                                                && appRoot.selectedGenerationProfile.runnable
+                                                && appRoot.selectedGenerationProfile.routeReady === true && appRoot.selectedGenerationProfile.runnable === true
                                                 && (appRoot.generationPrompt.trim().length > 0 || appRoot.selectedPosePrompt.trim().length > 0)
                                                 && (!appRoot.selectedGenerationProfile.sourceRequired || appRoot.generationSource.toString().length > 0)
                                             onClicked: appRoot.generateCurrent()
