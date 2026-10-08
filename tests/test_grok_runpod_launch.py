@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 import qt_cockpit as cockpit
@@ -16,9 +16,18 @@ def studio(monkeypatch, tmp_path):
     process.poll.return_value = None
     launch = Mock(return_value=process)
     monkeypatch.setattr(cockpit.subprocess, "Popen", launch)
+    # Port allocation is not the launch contract under test. Avoid opening a
+    # real socket, while verifying each new launch requests a loopback port.
+    listener = MagicMock()
+    listener.__enter__.return_value = listener
+    listener.getsockname.return_value = ("127.0.0.1", 43123)
+    monkeypatch.setattr("socket.socket", lambda: listener)
     bridge = cockpit.ModuleBridge()
     bridge.backend_router = SimpleNamespace(mode="RUNPOD", endpoint="https://chosen.example")
-    return bridge, launch
+    yield bridge, launch
+    assert listener.bind.call_count == launch.call_count
+    for call in listener.bind.call_args_list:
+        assert call.args == (("127.0.0.1", 0),)
 
 
 def test_grok_uses_selected_endpoint_instead_of_inherited_local_default(studio):
