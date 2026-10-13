@@ -126,7 +126,7 @@ ColumnLayout {
             }
         }
     }
-    CheckBox { id: adultReferenceMode; text: "Adult NSFW reference mode (18+ characters only)"; enabled: root.characterId.length > 0 && !root.bridge.busy }
+    CheckBox { id: adultReferenceMode; checked: true; text: "Adult NSFW reference mode (18+ characters only)"; enabled: root.characterId.length > 0 && !root.bridge.busy }
     Button {
         text: root.bridge && root.bridge.busy ? "Generating…" : "Generate reference set"
         enabled: root.characterId.length > 0 && root.builderModel.length > 0 && !root.bridge.busy
