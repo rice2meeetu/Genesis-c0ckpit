@@ -157,8 +157,10 @@ def test_section_selectors_hide_unusable_files_without_losing_runpod_models():
     expression = re.search(r'property var generationModel: (.*?)(?=\n    (?:readonly |property |on))', qml, re.S).group(1).strip()
     result = engine.evaluate('var generationModel = ' + expression)
     assert not result.isError(), result.toString()
-    assert engine.evaluate('generationModel.map(function(r) { return r.model }).join(",")').toString() == 'phr00t,klein'
-    for name, expected in [('stageOneChoices', 'phr00t,klein'), ('stageTwoChoices', 'klein')]:
+    # Configured Stage-1 entries stay selectable in the picker even while offline.
+    # Unsupported, unconfigured entries remain hidden.
+    assert engine.evaluate('generationModel.map(function(r) { return r.model }).join(",")').toString() == 'unavailable,phr00t,klein'
+    for name, expected in [('stageOneChoices', 'unavailable,phr00t,klein'), ('stageTwoChoices', 'klein')]:
         expression = re.search(r'property var ' + name + r': (.*)', qml).group(1)
         result = engine.evaluate('var choices = ' + expression)
         assert not result.isError(), result.toString()

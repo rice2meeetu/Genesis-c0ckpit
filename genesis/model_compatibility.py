@@ -28,6 +28,11 @@ KLEIN_4B_RUNTIME_VERIFIED_LORAS: set[str] = set()
 
 # Metadata-verified on the GENESIS machine as flux2_klein_9b.
 KLEIN_9B_LORAS = {
+    # Exact source hashes matched the 9B repositories on 2026-10-13;
+    # tensor projections are 4096 wide, matching Klein 9B rather than 4B.
+    "flux2klein_bj.safetensors",
+    "flux2klein_cowgirl.safetensors",
+    "f2k_9B_lcs_consist_20260415.safetensors",
     # Shared-volume safetensors metadata inspected on B2, 2026-10-05.
     "Flux2 Klein 9B Realistic Detail LoRA.safetensors",
     "Flux2-Klein-9B-consistency-V2.safetensors",
@@ -99,7 +104,16 @@ SDXL_LORAS = {
     "genshin impact pierro-V1.safetensors",
 }
 
+PONY_LORAS = {
+    'Realism_Lora_By_Stable_Yogi_Pony_V2.safetensors',
+    'Super_Skin_Detailer_By_Stable_Yogi_PD0_V1.safetensors',
+}
+
 KNOWN_MODELS = {
+    'ponyRealism_V23.safetensors': 'pony_sdxl',
+    'mopMixtureOfPerverts_instaV10DMD.safetensors': 'sdxl',
+    'epicrealismXL_vxviLastfameRealism.safetensors': 'sdxl',
+    'Realistic_Vision_V6.0_NV_B1.safetensors': 'sd15',
     "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf": "qwen_image",
     "Qwen-Rapid-NSFW-v23_Q2_K.gguf": "qwen_image",
     "aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors": "flux2_klein_4b",
@@ -174,6 +188,8 @@ def lora_family(name: str | None) -> str:
         return "krea2"
     if value in FLUX1_LORAS or base in {Path(item).name for item in FLUX1_LORAS}:
         return "flux1"
+    if value in PONY_LORAS or base in PONY_LORAS:
+        return 'pony_sdxl'
     if value in SDXL_LORAS or base in {Path(item).name for item in SDXL_LORAS}:
         return "sdxl"
     lowered = value.lower()
@@ -207,7 +223,7 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
 
 
 def compatible_loras(model: str | None, available: list[str]) -> list[str]:
-    return [name for name in available if is_compatible(model, name)]
+    return [name for name in available if not any(part.startswith(".") or "partial" in part.lower() for part in Path(name).parts) and is_compatible(model, name)]
 
 
 def lora_trigger(name: str | None) -> str:
@@ -229,6 +245,8 @@ def compatibility_note(model: str | None) -> str:
         "aisha_9b": "Aisha 9B · use only adapters verified specifically with Aisha",
         "flux1": "FLUX.1 · only FLUX.1 LoRAs",
         "sdxl": "SDXL · only SDXL LoRAs",
+        "pony_sdxl": "Pony · only Pony LoRAs",
+        "sd15": "SD 1.5 · only SD 1.5 LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
         "qwen_image_2_1": "Qwen Image 2.1 · LoRAs disabled until a 2.1-specific adapter is verified",
     }.get(family, "Unknown model family · workflow defaults only")

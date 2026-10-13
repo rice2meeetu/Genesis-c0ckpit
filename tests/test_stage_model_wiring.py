@@ -206,3 +206,24 @@ def test_miraclein_switch_preserves_connected_dimensions(monkeypatch, tmp_path, 
 @pytest.mark.parametrize('model', [cockpit.REMOTE_DONUTS_MODEL, cockpit.REMOTE_BIGLUSTY_DONUT_MODEL])
 def test_sdxl_models_map_to_shared_t2i_workflow(model):
     assert cockpit.remote_reference_workflow(model) == cockpit.REMOTE_SDXL_T2I_WORKFLOW
+
+
+@pytest.mark.parametrize("model", [cockpit.LOCAL_MIRACLEIN_9B_MODEL, cockpit.LOCAL_PORNMASTER_9B_MODEL])
+@pytest.mark.parametrize("destination", ["LOCAL", "RUNPOD"])
+def test_local_refinement_does_not_inherit_scene_replacement(monkeypatch, tmp_path, model, destination):
+    bridge = cockpit.GenerationBridge()
+    run = Mock(return_value=tmp_path / "refined.png")
+    monkeypatch.setattr(bridge, "_run_reference_stage", run)
+    current = tmp_path / "previous.png"
+    with use_route(Route(destination, "https://test-8189.proxy.runpod.net" if destination == "RUNPOD" else "")):
+        bridge._refine_result(Mock(), {}, current, model, "test", include_realism=False)
+    text = run.call_args.args[4]
+    assert run.call_args.args[3] == current
+    if destination == "LOCAL":
+        assert "Keep the existing background" in text
+        assert "do not add or replace content" in text
+        assert "Allow pose" not in text
+        assert "infer a coherent environment" not in text
+        assert "selected pose/control" not in text
+    else:
+        assert text == cockpit.adapt_prompt(cockpit.REFINE_INSTRUCTION, model, source_image=True, include_realism=False)

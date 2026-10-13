@@ -32,7 +32,7 @@ from genesis.pose_preset_payload import preset_payload, source_metadata, pose_pr
 from genesis.pose_prompt_profiles import PosePromptMap
 from genesis.generation_pipeline import (adapt_prompt, compatible_selection, refcontrol_prompt,
                                          REFCONTROL_DEFAULT_STRENGTH, REFCONTROL_LORA,
-                                         normalize_identity_instruction, uses_refcontrol)
+                                         normalize_identity_instruction, uses_refcontrol, realism_prompt)
 from genesis import integrations, workflow_lab
 from genesis.finishing import finishing_plan, run_finishing, REFINE_INSTRUCTION
 from genesis.character_library import add_reference, character_items, preferred_reference, save_character, update_reference, get_character, set_reference_details, reference_is_approved, reference_category
@@ -69,10 +69,11 @@ REMOTE_PHR00T_MODEL = "Qwen-Rapid-AIO-NSFW-v23.safetensors"
 REMOTE_PHR00T_V23_GGUF_MODEL = "Qwen-Rapid-NSFW-v23_Q8_0.gguf"
 REMOTE_PHR00T_V23_Q2_MODEL = "Qwen-Rapid-NSFW-v23_Q2_K.gguf"
 REMOTE_PHR00T_V23_MODELS = {REMOTE_PHR00T_MODEL}
-REMOTE_PHR00T_V23_CACHE_MODELS = {REMOTE_PHR00T_V23_GGUF_MODEL, REMOTE_PHR00T_V23_Q2_MODEL}
+REMOTE_PHR00T_V22_GGUF_MODEL = "Qwen-Rapid-NSFW-v22_Q8_0.gguf"
+REMOTE_PHR00T_V23_CACHE_MODELS = {REMOTE_PHR00T_V23_GGUF_MODEL, REMOTE_PHR00T_V23_Q2_MODEL, REMOTE_PHR00T_V22_GGUF_MODEL}
 REMOTE_PHR00T_V19_MODEL = "Qwen-Rapid-AIO-NSFW-v19.safetensors"
 REMOTE_PHR00T_V19_GGUF_MODEL = "Qwen-Rapid-AIO-NSFW-v19_Q8_0.gguf"
-REMOTE_PHR00T_MODELS = {*REMOTE_PHR00T_V23_MODELS, REMOTE_PHR00T_V23_GGUF_MODEL, REMOTE_PHR00T_V23_Q2_MODEL, REMOTE_PHR00T_V19_MODEL, REMOTE_PHR00T_V19_GGUF_MODEL}
+REMOTE_PHR00T_MODELS = {REMOTE_PHR00T_V22_GGUF_MODEL, *REMOTE_PHR00T_V23_MODELS, REMOTE_PHR00T_V23_GGUF_MODEL, REMOTE_PHR00T_V23_Q2_MODEL, REMOTE_PHR00T_V19_MODEL, REMOTE_PHR00T_V19_GGUF_MODEL}
 REMOTE_PHR00T_CLIP = "qwen_2.5_vl_7b_fp8_scaled.safetensors"
 REMOTE_PHR00T_GGUF_CLIP = "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
 REMOTE_PHR00T_CLIP_CANDIDATES = (REMOTE_PHR00T_CLIP, REMOTE_PHR00T_GGUF_CLIP)
@@ -85,7 +86,15 @@ REMOTE_PORNMASTER_9B_MODEL = "pornmasterFlux2Klein_v3-fp8.safetensors"
 REMOTE_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
 REMOTE_DONUTS_MODEL = "donutsdeliverymixV4_v41.safetensors"
 REMOTE_BIGLUSTY_DONUT_MODEL = "biglustydonutmixNSFW_v12.safetensors"
-REMOTE_SDXL_MODELS = {REMOTE_DONUTS_MODEL, REMOTE_BIGLUSTY_DONUT_MODEL}
+REMOTE_EPICREALISM_MODEL = 'epicrealismXL_vxviLastfameRealism.safetensors'
+REMOTE_REALISTIC_VISION_MODEL = 'Realistic_Vision_V6.0_NV_B1.safetensors'
+REMOTE_SDXL_MODELS = {REMOTE_DONUTS_MODEL, REMOTE_BIGLUSTY_DONUT_MODEL, REMOTE_EPICREALISM_MODEL}
+REMOTE_PONY_MODEL = 'ponyRealism_V23.safetensors'
+REMOTE_SDXL_MODELS.add(REMOTE_PONY_MODEL)
+REMOTE_MOP_MODEL = 'mopMixtureOfPerverts_instaV10DMD.safetensors'
+REMOTE_SDXL_MODELS.add(REMOTE_MOP_MODEL)
+REMOTE_SD15_MODELS = {REMOTE_REALISTIC_VISION_MODEL}
+REMOTE_CHECKPOINT_MODELS = REMOTE_SDXL_MODELS | REMOTE_SD15_MODELS
 REMOTE_DARKBEAST_9B_MODEL = "darkBeastMar0326Latest_dbkleinv2BFS.safetensors"
 LOCAL_AISHA_9B_MODEL = "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors"
 LOCAL_MIRACLEIN_9B_MODEL = "Miraclein NSFW v3.0 FP8 - Klein9B - 12steps,euler,cfg1.1.safetensors"
@@ -107,12 +116,12 @@ REMOTE_KLEIN9B_SOURCE_MODELS = {
 }
 KLEIN9B_REFERENCE_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | {REGULAR_9B_MODEL, LOCAL_AISHA_9B_MODEL}
 REMOTE_SOURCE_MODELS = {*REMOTE_PHR00T_MODELS, *KLEIN9B_REFERENCE_MODELS}
-REFINEMENT_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | REMOTE_SDXL_MODELS
-SOURCE_EDIT_MODELS = {QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_SDXL_MODELS
+REFINEMENT_MODELS = REMOTE_KLEIN9B_SOURCE_MODELS | REMOTE_CHECKPOINT_MODELS
+SOURCE_EDIT_MODELS = {QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_CHECKPOINT_MODELS
 
 SUPPORTED_CREATE_MODELS = {
     FOUR_B_MODEL, REGULAR_9B_MODEL, KV_9B_MODEL, QWEN_MODEL, QWEN21_MODEL, LOCAL_AISHA_9B_MODEL,
-    *REMOTE_SOURCE_MODELS, *REMOTE_SDXL_MODELS,
+    *REMOTE_SOURCE_MODELS, *REMOTE_CHECKPOINT_MODELS,
 }
 OUTPUT_DIR = Path.home() / "GENESIS-Exports"
 REFERENCE_WORKFLOW_ROOT = PROJECT_ROOT / "genesis" / "reference" / "pose_workflows"
@@ -143,7 +152,7 @@ UPSCALE_REQUIRED_ASSETS = {
 
 def model_lora_limit(model_name: str) -> int:
     """Use the same stacking limit in profiles and generation validation."""
-    return 3 if model_name in (REMOTE_KLEIN9B_SOURCE_MODELS | REMOTE_SDXL_MODELS | {REGULAR_9B_MODEL, FOUR_B_MODEL}) else 0
+    return 3 if model_name in (REMOTE_KLEIN9B_SOURCE_MODELS | REMOTE_CHECKPOINT_MODELS | {REGULAR_9B_MODEL, FOUR_B_MODEL}) else 0
 
 
 def model_generation_settings(model_name: str, *, source=False, remote=False) -> dict:
@@ -160,7 +169,10 @@ def model_generation_settings(model_name: str, *, source=False, remote=False) ->
     elif model_name == REGULAR_9B_MODEL:
         values.update(defaultSteps=50, defaultCfg=4.0)
     elif model_name == QWEN21_MODEL:
-        values.update(defaultSteps=25)
+        # Publisher full-quality baseline; callers can lower steps for drafts.
+        values.update(defaultSteps=40)
+        if source and not remote:
+            values.update(defaultWidth=768, defaultHeight=768)
     elif model_name == LOCAL_AISHA_9B_MODEL:
         values.update(defaultSteps=50, defaultCfg=4.0, defaultScheduler="Flux2Scheduler",
                       schedulerFixed=True, denoiseFixed=True)
@@ -184,10 +196,19 @@ def model_generation_settings(model_name: str, *, source=False, remote=False) ->
             values.update(defaultSteps=12, defaultCfg=1.1)
             if model_name == LOCAL_PORNMASTER_9B_MODEL:
                 values.update(defaultSteps=8, defaultCfg=1.5)
-    elif model_name in REMOTE_SDXL_MODELS:
+    elif model_name in REMOTE_CHECKPOINT_MODELS:
         values.update(defaultSteps=25, defaultCfg=4.0,
                       defaultSampler="dpmpp_sde" if model_name == REMOTE_DONUTS_MODEL else "dpmpp_3m_sde",
                       defaultScheduler="karras", defaultDenoise=0.65 if source else 1.0)
+    if model_name == REMOTE_PONY_MODEL:
+        values.update(defaultSteps=25, defaultCfg=6.0, defaultSampler='dpmpp_2m', defaultScheduler='karras')
+    if model_name == REMOTE_MOP_MODEL:
+        values.update(defaultSteps=10, defaultCfg=1.0, defaultSampler='lcm',
+                      defaultScheduler='ddim_uniform')
+    if model_name in REMOTE_SD15_MODELS:
+        values.update(defaultWidth=512, defaultHeight=512, defaultSteps=25,
+                      defaultCfg=7.0, defaultSampler='dpmpp_2m', defaultScheduler='karras',
+                      defaultDenoise=0.65 if source else 1.0)
     if source and model_name == REGULAR_9B_MODEL:
         values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True, denoiseFixed=True)
     return values
@@ -213,6 +234,8 @@ def model_profile_settings(model_name: str, *, remote=False) -> dict:
         "Quality": {"width": 1024, "height": 1024},
     }
     result["qualityNote"] = "Fast, Balanced and Quality restore this model's sampler, scheduler, steps, CFG and denoise defaults, then adjust resolution. Your seed and identity source stay selected."
+    if model_name == QWEN21_MODEL and not remote:
+        result["qualityNote"] += " With a source or pose, the smaller selected dimension controls reference detail; output keeps the first reference image's proportions. Balanced/768 is verified locally; Quality/1024 did not finish within an eight-minute test."
     if model_name in {REMOTE_MIRACLEIN_9B_MODEL, REMOTE_MIRACLEIN_V2_MODEL}:
         result["qualityPresets"] = {
             "Fast": {"width": 768, "height": 768},
@@ -383,7 +406,7 @@ def _remote_choice_values(info: dict, node_types: tuple[str, ...], input_name: s
     values: set[str] = set()
     for node_type in node_types:
         spec = (info.get(node_type, {}).get("input", {}).get("required", {}) or {}).get(input_name)
-        values.update(str(value) for value in workflow_lab._choice_values(spec) if value)
+        values.update(str(value) for value in workflow_lab._choice_values(spec) if value and not any(part.startswith(".") or "partial" in part.lower() for part in Path(str(value)).parts))
     return sorted(values, key=str.casefold)
 
 
@@ -398,6 +421,7 @@ def configured_stage_one_profiles() -> list[dict]:
         REMOTE_PHR00T_MODEL,
         REMOTE_PHR00T_V23_GGUF_MODEL,
         REMOTE_PHR00T_V23_Q2_MODEL,
+        REMOTE_PHR00T_V22_GGUF_MODEL,
         REMOTE_PHR00T_V19_MODEL,
         REMOTE_PHR00T_V19_GGUF_MODEL,
         REMOTE_AISHA_9B_MODEL,
@@ -415,7 +439,7 @@ def configured_stage_one_profiles() -> list[dict]:
         QWEN21_MODEL,
         LOCAL_AISHA_9B_MODEL,
         REMOTE_DONUTS_MODEL,
-        REMOTE_BIGLUSTY_DONUT_MODEL,
+        REMOTE_BIGLUSTY_DONUT_MODEL, REMOTE_EPICREALISM_MODEL, REMOTE_REALISTIC_VISION_MODEL, REMOTE_MOP_MODEL, REMOTE_PONY_MODEL,
     ]
     rows = build_remote_generation_profiles({
         "UNETLoader": {"input": {"required": {"unet_name": [names]}}},
@@ -452,7 +476,7 @@ def remote_reference_workflow(model_name: str) -> Path:
         return REMOTE_MIRACLEIN_EDIT_WORKFLOW
     if model_name == REMOTE_DARKBEAST_9B_MODEL:
         return REMOTE_DARKBEAST_IDENTITY_WORKFLOW
-    if model_name in REMOTE_SDXL_MODELS:
+    if model_name in REMOTE_CHECKPOINT_MODELS:
         return REMOTE_SDXL_T2I_WORKFLOW
     if model_name in KLEIN9B_REFERENCE_MODELS:
         return REMOTE_KLEIN9B_WORKFLOW
@@ -473,11 +497,12 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
         info, ("LoraLoader", "LoraLoaderModelOnly", "LoraLoaderBypass"), "lora_name"
     )
     pose_models = _remote_choice_values(info, ("ControlNetLoader",), "control_net_name")
-    models = list(dict.fromkeys([*checkpoints, *diffusion]))
+    models = list(dict.fromkeys(Path(name).name for name in [*checkpoints, *diffusion]))
     labels = {
         REMOTE_PHR00T_MODEL: "RunPod · Phr00t v23 · Prompt",
         REMOTE_PHR00T_V23_GGUF_MODEL: "RunPod · Phr00t v23 Q8",
         REMOTE_PHR00T_V23_Q2_MODEL: "RunPod · Phr00t v23 Q2",
+        REMOTE_PHR00T_V22_GGUF_MODEL: "RunPod · Phr00t v22 Q8",
         REMOTE_PHR00T_V19_MODEL: "Phr00t v19 · Consistency",
         REMOTE_PHR00T_V19_GGUF_MODEL: "RunPod · Phr00t v19 Q8",
         REMOTE_AISHA_BF16_MODEL: "RunPod · Aisha 9B v9.7 BF16",
@@ -496,9 +521,16 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
         KV_9B_MODEL: "RunPod · FLUX.2 Klein 9B-KV FP8",
         REMOTE_DONUTS_MODEL: "RunPod · DonutsDeliveryMix V4.1 · SDXL",
         REMOTE_BIGLUSTY_DONUT_MODEL: "RunPod · BigLustyDonutMix v1.2 · SDXL",
+        REMOTE_EPICREALISM_MODEL: "RunPod · EpicRealism XL XVI",
+        REMOTE_REALISTIC_VISION_MODEL: "RunPod · Realistic Vision 6 · SD 1.5",
+        REMOTE_MOP_MODEL: "RunPod · Mixture of Perverts Insta 1.0 DMD",
+        REMOTE_PONY_MODEL: "RunPod · Pony Realism v2.3",
     }
     rows: list[dict] = []
     for model_name in models:
+        # WAN is offered by the dedicated video workflow, not the still-image picker.
+        if model_name in {"wan2.2_ti2v_5B_fp16.safetensors", "wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors"}:
+            continue
         compatible = compatible_loras(model_name, loras)
         runnable = model_name in SUPPORTED_CREATE_MODELS
         route_error = ""
@@ -514,7 +546,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
                         raise workflow_lab.ComfyError(f"Workflow file missing: {workflow.name}")
                 elif model_name == QWEN21_MODEL and not QWEN21_T2I_WORKFLOW.is_file():
                     raise workflow_lab.ComfyError(f"Workflow file missing: {QWEN21_T2I_WORKFLOW.name}")
-                elif model_name in REMOTE_SDXL_MODELS and not REMOTE_SDXL_T2I_WORKFLOW.is_file():
+                elif model_name in REMOTE_CHECKPOINT_MODELS and not REMOTE_SDXL_T2I_WORKFLOW.is_file():
                     raise workflow_lab.ComfyError(f"Workflow file missing: {REMOTE_SDXL_T2I_WORKFLOW.name}")
             except (workflow_lab.ComfyError, OSError, KeyError, ValueError) as exc:
                 runnable = False
@@ -523,9 +555,9 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
             "label": labels.get(model_name, "RunPod · " + model_name),
             "model": model_name,
             "modelPath": "RunPod catalog · " + model_name,
-            "workflowPath": str((remote_reference_workflow(model_name) if model_name in REMOTE_SOURCE_MODELS or model_name == QWEN_MODEL else (QWEN21_T2I_WORKFLOW if model_name == QWEN21_MODEL else (REMOTE_SDXL_T2I_WORKFLOW if model_name in REMOTE_SDXL_MODELS else "")))),
-            "note": ((compatibility_note(model_name) + (" · SDXL OpenPose ready" if REMOTE_SDXL_POSE_CONTROLNET in pose_models else " · SDXL OpenPose asset missing"))
-                     if runnable and model_name in REMOTE_SDXL_MODELS else
+            "workflowPath": str((remote_reference_workflow(model_name) if model_name in REMOTE_SOURCE_MODELS or model_name == QWEN_MODEL else (QWEN21_T2I_WORKFLOW if model_name == QWEN21_MODEL else (REMOTE_SDXL_T2I_WORKFLOW if model_name in REMOTE_CHECKPOINT_MODELS else "")))),
+            "note": ((compatibility_note(model_name) + ((" · SDXL OpenPose ready" if REMOTE_SDXL_POSE_CONTROLNET in pose_models else " · SDXL OpenPose asset missing") if model_name in REMOTE_SDXL_MODELS else ""))
+                     if runnable and model_name in REMOTE_CHECKPOINT_MODELS else
                      (compatibility_note(model_name) if runnable else (route_error or "Remote model detected · workflow mapping pending"))),
             "loras": ["None", *compatible],
             "triggers": {
@@ -653,7 +685,21 @@ def validate_remote_workflow_assets(workflow: Path, info: dict, model_override=N
     validate_operation_prompt(prompt, info, f"Workflow {workflow.stem}")
 
 
+def reconcile_model_paths(prompt, info):
+    for node in prompt.values():
+        required = info.get(node.get('class_type'), {}).get('input', {}).get('required', {})
+        for field in ('ckpt_name', 'unet_name'):
+            name = node.get('inputs', {}).get(field)
+            choices = [str(v) for v in workflow_lab._choice_values(required.get(field))
+                       if not any(part.startswith('.') or 'partial' in part.lower() for part in Path(str(v)).parts)]
+            if isinstance(name, str) and name not in choices:
+                matches = [v for v in choices if Path(v).name == name]
+                if len(matches) == 1:
+                    node['inputs'][field] = matches[0]
+
+
 def validate_operation_prompt(prompt, info, label):
+    reconcile_model_paths(prompt, info)
     validation = workflow_lab.validate_prompt(prompt, info)
     problems = validation["missing_nodes"] + validation["missing_inputs"]
     asset_fields = {"ckpt_name", "unet_name", "clip_name", "vae_name", "lora_name",
@@ -793,7 +839,7 @@ def build_create_prompt(
     height = max(256, min(max_dimension, int(height)))
     loras = loras or []
 
-    if model_name in REMOTE_SDXL_MODELS:
+    if model_name in REMOTE_CHECKPOINT_MODELS:
         prompt = workflow_lab.workflow_to_prompt(REMOTE_SDXL_T2I_WORKFLOW, info)
         prompt["1"]["inputs"]["ckpt_name"] = model_name
         prompt["2"]["inputs"]["text"] = prompt_text
@@ -801,7 +847,7 @@ def build_create_prompt(
         defaults = model_generation_settings(model_name)
         prompt["5"]["inputs"].update(steps=defaults["defaultSteps"], cfg=defaults["defaultCfg"],
                                       sampler_name=defaults["defaultSampler"], scheduler=defaults["defaultScheduler"])
-        prompt["7"]["inputs"]["filename_prefix"] = "GENESIS-DonutsDelivery" if model_name == REMOTE_DONUTS_MODEL else "GENESIS-BigLustyDonut"
+        prompt["7"]["inputs"]["filename_prefix"] = "GENESIS-" + Path(model_name).stem
         insert_sdxl_loras(prompt, loras, lora_strengths)
     elif model_name == QWEN21_MODEL:
         selected = [name for name in loras if name and name != "None"]
@@ -930,17 +976,23 @@ def _pose_thumbnail_for(source: Path) -> Path:
 
 
 def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
-    """Return a varied, existing subset of the local Pose Maker library."""
+    """Return indexed local poses, preferring the bundled GENESIS library."""
+    bundled_root = PROJECT_ROOT / "genesis" / "reference" / "assets" / "pose_library"
     roots = (
         Path.home() / "AI" / "GENESIS_POSE_MAKER" / "assets" / "pose_library",
         Path.home() / "Downloads" / "GENESIS_POSE_MAKER_V15_USER_IMAGE_SLOTS(1)"
         / "GENESIS_POSE_MAKER" / "assets" / "pose_library",
     )
-    library_root = next((root for root in roots if root.is_dir()), None)
-    if library_root is None or not POSE_INDEX.is_file():
+    index_path = bundled_root / "index.json"
+    if index_path.is_file():
+        library_root = bundled_root
+    else:
+        library_root = next((root for root in roots if root.is_dir()), None)
+        index_path = POSE_INDEX
+    if library_root is None or not index_path.is_file():
         return []
     try:
-        indexed = json.loads(POSE_INDEX.read_text(encoding="utf-8"))
+        indexed = json.loads(index_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
 
@@ -1818,8 +1870,16 @@ class GenerationBridge(QObject):
         self._set_preview(url)
 
     def _refine_result(self, client, info, current, model, stamp, lora='None', strength=0.65, include_realism=True):
-        text = adapt_prompt(REFINE_INSTRUCTION, model, source_image=True, include_realism=include_realism)
-        if model in REMOTE_SDXL_MODELS:
+        if not remote_url() and model in {LOCAL_MIRACLEIN_9B_MODEL, LOCAL_PORNMASTER_9B_MODEL}:
+            # Refinement must not inherit Stage 1's scene/pose replacement instructions.
+            text = realism_prompt(
+                REFINE_INSTRUCTION + " Keep the existing background, clothing, objects, camera angle,"
+                " expression and lighting. Make only subtle detail corrections; do not add or replace content.",
+                include_realism=include_realism,
+            )
+        else:
+            text = adapt_prompt(REFINE_INSTRUCTION, model, source_image=True, include_realism=include_realism)
+        if model in REMOTE_CHECKPOINT_MODELS:
             graph = build_create_prompt(info, text, self._finish_width, self._finish_height, model, [lora], [strength])
             uploaded = client.upload_image(current)
             graph['finish_source'] = {'class_type': 'LoadImage', 'inputs': {'image': '/'.join(v for v in (uploaded.get('subfolder'), uploaded.get('name')) if v)}}
@@ -1879,8 +1939,34 @@ class GenerationBridge(QObject):
 
     @pyqtProperty('QVariantMap', notify=statusChanged)
     def wanAvailability(self):
-        from genesis.wan_video import availability
-        return availability(getattr(self, '_wan_info', {}))
+        from genesis.wan_video import availability, LORA_14B
+        return availability(getattr(self, '_wan_info', {}), self.wanModel,
+                            LORA_14B if self.wanAdapterEnabled else None)
+
+    @pyqtProperty(str, notify=statusChanged)
+    def wanModel(self):
+        from genesis.wan_video import MODEL
+        return getattr(self, '_wan_model', os.environ.get('GENESIS_WAN_MODEL', MODEL))
+
+    @pyqtProperty(bool, notify=statusChanged)
+    def wanAdapterEnabled(self):
+        from genesis.wan_video import MODEL_14B
+        return self.wanModel == MODEL_14B and getattr(self, '_wan_adapter_enabled', os.environ.get('GENESIS_WAN_14B_ADAPTER') == '1')
+
+    @pyqtSlot(str)
+    def setWanModel(self, model):
+        from genesis.wan_video import MODEL, MODEL_14B
+        if self._busy or model not in {MODEL, MODEL_14B}: return
+        self._wan_model = model
+        if model == MODEL: self._wan_adapter_enabled = False
+        self._set_status(self.wanAvailability['reason'])
+
+    @pyqtSlot(bool)
+    def setWanAdapter(self, enabled):
+        from genesis.wan_video import MODEL_14B
+        if self._busy: return
+        self._wan_adapter_enabled = bool(enabled) and self.wanModel == MODEL_14B
+        self._set_status(self.wanAvailability['reason'])
 
     @pyqtSlot()
     def refreshWan(self):
@@ -1908,14 +1994,16 @@ class GenerationBridge(QObject):
         self._set_busy(True); self._cancel_requested = False
         def execute():
             try:
-                from genesis.wan_video import availability, build_prompt
+                from genesis.wan_video import availability, build_prompt, MODEL_14B, LORA_14B
                 from genesis.comfy_client import ComfyClient
                 client = ComfyClient(url); info = client.object_info()
-                ready = availability(info)
+                selected_model = self.wanModel
+                selected_lora = LORA_14B if self.wanAdapterEnabled else None
+                ready = availability(info, selected_model, selected_lora)
                 if not ready['ready']: raise ValueError(ready['reason'])
                 uploaded = client.upload_image(source)
                 image = '/'.join(v for v in (uploaded.get('subfolder'), uploaded.get('name')) if v)
-                graph = build_prompt(image, motion, frames=frames, seed=seed if seed >= 0 else random.randrange(2**31))
+                graph = build_prompt(image, motion, width=832 if selected_model==MODEL_14B else 640, height=480 if selected_model==MODEL_14B else 384, frames=frames, seed=seed if seed >= 0 else random.randrange(2**31), model=selected_model, lora=selected_lora)
                 validate_operation_prompt(graph, info, 'Wan video')
                 self._set_status('Wan image-to-video running…')
                 result = client.wait(client.submit(graph), timeout=3600, abort_check=lambda: 'Cancelled by user' if self._cancel_requested else None)
@@ -2168,7 +2256,7 @@ class GenerationBridge(QObject):
         # directly makes the shared A100 do 4x/16x the pixel work. Preserve
         # the requested aspect ratio while constraining only SDXL.
         requested_width, requested_height = int(width), int(height)
-        if model_name in REMOTE_SDXL_MODELS and max(requested_width, requested_height) > 1536:
+        if model_name in REMOTE_CHECKPOINT_MODELS and max(requested_width, requested_height) > 1536:
             scale = (1024 * 1024 / float(requested_width * requested_height)) ** 0.5
             width = max(64, int(round(requested_width * scale / 64.0)) * 64)
             height = max(64, int(round(requested_height * scale / 64.0)) * 64)
@@ -2376,7 +2464,7 @@ class GenerationBridge(QObject):
         try:
             refcontrol_prompt(prompt_text, model_name, [lora_one, lora_two, lora_three],
                               has_pose=pose is not None, has_source=source is not None)
-            if pose is not None and model_name not in ({QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_SDXL_MODELS):
+            if pose is not None and model_name not in ({QWEN_MODEL, QWEN21_MODEL, FOUR_B_MODEL} | REMOTE_SOURCE_MODELS | REMOTE_CHECKPOINT_MODELS):
                 raise workflow_lab.ComfyError("This model has no separate pose/control workflow.")
             if model_name == FOUR_B_MODEL and not remote_url():
                 required_model = Path.home() / "AI/ComfyUI/models/diffusion_models" / FOUR_B_MODEL
@@ -2433,8 +2521,9 @@ class GenerationBridge(QObject):
                     client, info, QWEN21_REFERENCE_WORKFLOW, primary, qwen21_prompt,
                     stamp, "QwenImage21-Reference", secondary_image=secondary,
                     controls=generation_controls, model_override=QWEN21_MODEL,
+                    initialize_from_source=source is not None,
                 )
-            elif model_name in REMOTE_SDXL_MODELS:
+            elif model_name in REMOTE_CHECKPOINT_MODELS:
                 prompt = build_create_prompt(info, adapt_prompt(prompt_text, model_name, source_image=source is not None), width, height,
                                              model_name, [lora_one, lora_two, lora_three],
                                              [lora_one_strength, lora_two_strength, lora_three_strength])
@@ -2446,6 +2535,8 @@ class GenerationBridge(QObject):
                     prompt["genesis_source_encode"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["genesis_source_scale", 0], "vae": ["1", 2]}}
                     prompt["5"]["inputs"]["latent_image"] = ["genesis_source_encode", 0]
                 if pose is not None:
+                    if model_name not in REMOTE_SDXL_MODELS:
+                        raise workflow_lab.ComfyError('This SD 1.5 model has no installed pose ControlNet. Use a source image or text only.')
                     attach_sdxl_pose(prompt, info, client.upload_image(pose), width, height)
                 apply_create_controls(prompt, generation_controls or {})
                 validate_operation_prompt(prompt, info, "SDXL source/pose")
@@ -2523,7 +2614,7 @@ class GenerationBridge(QObject):
                     prompt["5"].setdefault("inputs", {})["negative_prompt"] = negative_prompt
                 elif model_name == LOCAL_AISHA_9B_MODEL and "4" in prompt:
                     prompt["4"].setdefault("inputs", {})["text"] = negative_prompt
-                elif model_name in REMOTE_SDXL_MODELS:
+                elif model_name in REMOTE_CHECKPOINT_MODELS:
                     prompt["3"]["inputs"]["text"] = negative_prompt
                 # The Klein/Phr00t create graphs intentionally ignore unsupported
                 # negative conditioning. Qwen 2.1 keeps the text for CFG > 1.
@@ -2679,10 +2770,20 @@ class GenerationBridge(QObject):
         prompt_text: str, stamp: str, stage: str, secondary_image: Path | None = None,
         controls: dict | None = None, model_override: str | None = None,
         loras: list[str] | None = None, lora_strengths: list[float] | None = None,
+        initialize_from_source: bool = False,
     ) -> Path:
         if not workflow.is_file():
             raise workflow_lab.ComfyError(f"{stage} workflow is unavailable.")
         prompt = remote_workflow_prompt(workflow, info) if remote_url() else workflow_lab.workflow_to_prompt(workflow, info)
+        if workflow == QWEN21_REFERENCE_WORKFLOW and not remote_url():
+            prompt["1"] = {
+                "class_type": "GenesisQwen21ReferenceUNETLoader",
+                "inputs": {"unet_name": QWEN21_MODEL},
+            }
+            prompt["3"] = {
+                "class_type": "GenesisQwen21ReferenceCLIPLoader",
+                "inputs": {"clip_name": QWEN21_CLIP},
+            }
         if workflow in REMOTE_KLEIN_REFERENCE_WORKFLOWS:
             _reconcile_remote_klein_clip(prompt, info)
             prompt_text = refcontrol_prompt(prompt_text, model_override or REMOTE_KLEIN_9B_MODEL,
@@ -2862,11 +2963,46 @@ class GenerationBridge(QObject):
                 if seed < 0:
                     seed = int(time.time_ns() & 0x7FFFFFFFFFFFFFFF)
                 prompt[str(target[0])]["inputs"][target[1]] = seed
+        if workflow == QWEN21_REFERENCE_WORKFLOW and not remote_url() and controls:
+            sizes = [int(controls[key]) for key in ("width", "height") if key in controls]
+            if sizes:
+                # Native reference edits preserve the first image's aspect ratio.
+                # Use the shorter selected dimension as the reference pixel budget.
+                prompt["7"]["inputs"]["resolution"] = max(32, min(4096, round(min(sizes) / 32) * 32))
+        if (workflow == QWEN21_REFERENCE_WORKFLOW and not remote_url()
+                and initialize_from_source and float(prompt["8"]["inputs"]["denoise"]) < 1.0):
+            resolution = int(prompt["7"]["inputs"]["resolution"])
+            prompt["__qwen21_source_scale__"] = {
+                "class_type": "ImageScaleToTotalPixels",
+                "inputs": {
+                    "image": ["5", 0], "upscale_method": "lanczos",
+                    "megapixels": (resolution / 1024) ** 2, "resolution_steps": 32,
+                },
+            }
+            prompt["__qwen21_source_latent__"] = {
+                "class_type": "VAEEncode",
+                "inputs": {"pixels": ["__qwen21_source_scale__", 0], "vae": ["4", 0]},
+            }
+            prompt["8"]["inputs"]["latent_image"] = ["__qwen21_source_latent__", 0]
         validation = workflow_lab.validate_prompt(prompt, info)
         if not validation["valid"]:
             missing = validation["missing_nodes"] + validation["missing_inputs"]
             raise workflow_lab.ComfyError(f"{stage} is not runnable: " + ", ".join(missing))
         validate_operation_prompt(prompt, info, stage)
+        if workflow == QWEN21_REFERENCE_WORKFLOW:
+            # V3 Autogrow inputs use flat API keys. A nested dictionary is
+            # silently discarded by ComfyUI and leaves the model without refs.
+            inputs = prompt["7"]["inputs"]
+            references = inputs.get("images")
+            expected = {f"image_{index + 1}": [node_id, 0]
+                        for index, node_id in enumerate(load_nodes[:len(images)])}
+            if prompt["7"]["class_type"] != "TextEncodeQwenImage21" or references != expected:
+                raise workflow_lab.ComfyError(
+                    "Local Qwen 2.1 reference connections are invalid; source/pose images would be lost or reordered."
+                )
+            inputs.pop("images")
+            for name, link in references.items():
+                inputs[f"images.{name}"] = link
         return self._submit_and_save(client, prompt, stamp, stage)
 
 

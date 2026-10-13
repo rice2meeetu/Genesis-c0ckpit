@@ -114,3 +114,13 @@ def test_local_catalog_preserves_lora_subdirectory_names(monkeypatch, tmp_path):
     row = c.load_generation_profiles()[0]
     assert row['loras'] == ['None', 'klein9b/refcontrol_v2_poses.safetensors']
     assert row['triggers']['klein9b/refcontrol_v2_poses.safetensors'] == ['refcontrol']
+
+
+def test_scheduler_picker_contains_all_editable_model_defaults():
+    qml = (c.PROJECT_ROOT / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    options = json.loads(re.search(r'\["beta", "simple"[^\]]+\]', qml).group())
+    for model in c.SUPPORTED_CREATE_MODELS:
+        for source in (False, True):
+            values = c.model_generation_settings(model, source=source)
+            if not values['schedulerFixed']:
+                assert values['defaultScheduler'] in options

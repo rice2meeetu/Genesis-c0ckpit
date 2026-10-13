@@ -12,6 +12,8 @@ export GENESIS_BACKEND_MODE="${GENESIS_BACKEND_MODE:-RUNPOD}"
 export GENESIS_RUNPOD_AUTOCONNECT="${GENESIS_RUNPOD_AUTOCONNECT:-1}"
 # Endpoint comes from GENESIS_RUNPOD_URL, GENESIS_COMFY_URL, or saved settings.
 if [[ -n "${GENESIS_RUNPOD_SSH_HOST:-}" ]]; then
-  bash "$SCRIPT_DIR/scripts/ensure-runpod-8189-tunnel.sh"
+  if ! bash "$SCRIPT_DIR/scripts/ensure-runpod-8189-tunnel.sh"; then
+    echo "GENESIS: RunPod tunnel unavailable; continuing to open Cockpit." >&2
+  fi
 fi
 exec "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/qt_cockpit_linux_premium.py" "$@"

@@ -67,8 +67,13 @@ ApplicationWindow {
     Shortcut { sequence: "Alt+4"; onActivated: appRoot.pageIndex = 7 }
     Shortcut { sequence: "Alt+,"; onActivated: appRoot.pageIndex = 10 }
 
+    // Show configured models even when the current backend is offline. Route
+    // readiness gates GENERATE, not visibility or choosing a model profile.
     property var generationModel: typeof generationProfiles !== "undefined"
-        ? generationProfiles.filter(function(row) { return row.runnable === true && row.selectable !== false && (!generationSource.toString().length || row.sourceSupported !== false) }) : []
+        ? generationProfiles.filter(function(row) {
+            return (row.runnable === true || row.stageOneConfigured === true)
+                && (!generationSource.toString().length || row.sourceSupported !== false)
+        }) : []
     property int selectedGenerationIndex: 0
     property bool modelDefaultsApplied: false
     property string selectedModelName: ""
@@ -79,12 +84,12 @@ ApplicationWindow {
                 if (generationModel[i].model === selectedModelName) { index = i; break }
             selectedGenerationIndex = index
             if (!modelDefaultsApplied || generationModel[index].model !== selectedModelName) {
-                selectGeneration(index)
+                selectGeneration(index, false)
                 modelDefaultsApplied = true
             }
         }
     }
-    Component.onCompleted: if (generationModel.length) { selectGeneration(0); modelDefaultsApplied = true }
+    Component.onCompleted: if (generationModel.length) { selectGeneration(0, false); modelDefaultsApplied = true }
     readonly property var selectedGenerationProfile: generationModel.length
         ? generationModel[Math.min(selectedGenerationIndex, generationModel.length - 1)]
         : ({label:"No model available", model:"", note:"Waiting for the backend model catalog", loras:["None"], runnable:false, sourceRequired:false})
@@ -143,8 +148,8 @@ ApplicationWindow {
             if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
         return "Choose an identity engine"
     }
-    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false && row.runnable === true && row.selectable !== false })
-    readonly property var stageOneSelectableChoices: stageOneChoices.filter(function(row) { return row.selectable !== false })
+    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false || row.stageOneConfigured === true })
+    readonly property var stageOneSelectableChoices: stageOneChoices
     readonly property int stageOneChoiceIndex: {
         for (var i = 0; i < stageOneSelectableChoices.length; ++i)
             if (stageOneSelectableChoices[i].model === selectedGenerationProfile.model) return i
@@ -298,7 +303,7 @@ ApplicationWindow {
 
     function selectStageChoice(index) {
         var row = stageChoices[index]
-        if (!row || genesisBridge.busy || row.selectable === false || row.available === false) return
+        if (!row || genesisBridge.busy || row.available === false || (editingStage !== 0 && row.selectable === false)) return
         if (editingStage === 0) {
             selectStageOneChoice(index)
         } else if (editingStage === 1) {
@@ -317,7 +322,7 @@ ApplicationWindow {
 
     function selectStageOneChoice(index) {
         var row = stageOneChoices[index]
-        if (!row || genesisBridge.busy || row.selectable === false) return
+        if (!row || genesisBridge.busy) return
         for (var i = 0; i < generationModel.length; ++i)
             if (generationModel[i].model === row.model) { selectGeneration(i); return }
     }
@@ -329,10 +334,10 @@ ApplicationWindow {
             if (generationModel[i].model === row.model) { selectGeneration(i); return }
     }
 
-    function selectGeneration(index) {
+    function selectGeneration(index, userChoseModel) {
         if (generationModel[index]) {
             selectedModelName = generationModel[index].model
-            if (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0)
+            if (userChoseModel !== false && (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0))
                 backendBridge.prepareModelRoute(generationModel[index].model)
         }
         selectedGenerationIndex = index
@@ -586,7 +591,7 @@ ApplicationWindow {
                     objectName: "stageModelChoice" + index
                     width: ListView.view.width
                     implicitHeight: 64
-                    enabled: !genesisBridge.busy && (modelData.engine ? modelData.available !== false : modelData.selectable !== false)
+                    enabled: !genesisBridge.busy && (modelData.engine ? modelData.available !== false : (appRoot.editingStage === 0 || modelData.selectable !== false))
                     Accessible.name: modelData.label
                     readonly property bool currentStageOneChoice: appRoot.editingStage === 0 && modelData.model === appRoot.selectedGenerationProfile.model
                     contentItem: Column {
@@ -596,10 +601,10 @@ ApplicationWindow {
                             width: parent.width
                             text: modelData.engine
                                 ? (modelData.available !== false ? "Identity pass · available" : "Unavailable · ReActor engine missing on current RunPod")
-                                : (modelData.selectable !== false
-                                    ? (parent.parent.currentStageOneChoice ? "Selected · available" : "Available")
-                                    : "Unavailable · not installed/runnable on current backend")
-                            color: (modelData.engine ? modelData.available !== false : modelData.selectable !== false) ? appRoot.success : appRoot.textDim
+                                : (modelData.routeReady === true && modelData.runnable === true
+                                    ? (parent.parent.currentStageOneChoice ? "Selected · ready to generate" : "Ready to generate")
+                                    : "Selectable · generation unavailable on current backend")
+                            color: (modelData.engine ? modelData.available !== false : (modelData.routeReady === true && modelData.runnable === true)) ? appRoot.success : appRoot.textDim
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }
@@ -614,7 +619,7 @@ ApplicationWindow {
                 }
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
             }
-            Text { visible: appRoot.stageChoices.length === 0; text: "No configured models for this stage. Connect RunPod and refresh."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Text { visible: appRoot.stageChoices.length === 0; text: "No compatible models found for this stage on the selected backend. Refresh to check again."; color: appRoot.gold; font.pixelSize: 16; Layout.fillWidth: true; wrapMode: Text.Wrap }
             RowLayout {
                 Layout.fillWidth: true
                 CheckBox { visible: appRoot.editingStage > 0; text: "Use this stage"; checked: appRoot.editingStage === 1 ? appRoot.useStageTwo : appRoot.useStageThree; enabled: !genesisBridge.busy && (appRoot.editingStage === 1 ? appRoot.selectedStageTwoProfile.selectable !== false : appRoot.stageThreeReady); onToggled: { if (appRoot.editingStage === 1) appRoot.useStageTwo = checked; else appRoot.useStageThree = checked } }
@@ -882,7 +887,7 @@ ApplicationWindow {
         Panel {
             Layout.fillWidth: true
             objectName: "mainPageBanner"
-            Layout.preferredHeight: Math.round(width * 420 / 1800)
+            Layout.preferredHeight: Math.min(120, Math.round(width * 420 / 1800))
             visible: appRoot.pageIndex !== 8 && appRoot.pageIndex !== 0
                 && !(appRoot.pageIndex === 3 && appRoot.mediaToolOpen && appRoot.mediaToolIsReview())
             clip: true
@@ -890,8 +895,10 @@ ApplicationWindow {
             Image {
                 anchors.fill: parent
                 source: "../assets/lunacy_banner/genesis-banner-wide-lunacy.png"
-                fillMode: Image.PreserveAspectCrop
-                verticalAlignment: Image.AlignBottom
+                fillMode: Image.PreserveAspectFit
+                verticalAlignment: Image.AlignVCenter
+                mipmap: true
+                smooth: true
                 opacity: 1.0
                 visible: !privacyMode
             }
@@ -1256,13 +1263,16 @@ ApplicationWindow {
                                         GButton {
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 44
+                                            objectName: "generateButton"
                                             active: enabled
                                             text: genesisBridge.busy ? "GENERATING…" : "GENERATE"
-                                            enabled: !genesisBridge.busy
+                                            enabled: !genesisBridge.busy && appRoot.selectedGenerationProfile.routeReady === true && appRoot.selectedGenerationProfile.runnable === true
                                             ToolTip.visible: hovered
-                                            ToolTip.text: appRoot.selectedGenerationProfile.sourceRequired && appRoot.generationSource.toString().length === 0
-                                                ? "This model requires a source image. Click Generate for details."
-                                                : "Generate with the selected model and settings."
+                                            ToolTip.text: !appRoot.selectedGenerationProfile.routeReady || !appRoot.selectedGenerationProfile.runnable
+                                                ? "Model selectable, but generation is unavailable on the current backend."
+                                                : (appRoot.selectedGenerationProfile.sourceRequired && appRoot.generationSource.toString().length === 0
+                                                    ? "This model requires a source image. Click Generate for details."
+                                                    : "Generate with the selected model and settings.")
                                             onClicked: appRoot.generateCurrent()
                                         }
                                         GButton {
@@ -1555,9 +1565,9 @@ ApplicationWindow {
                                         Text { text: "Denoise"; color: appRoot.textDim; font.pixelSize: 14 }
                                         SpinBox { implicitHeight: 44; Layout.fillWidth: true; from: 0; to: 100; value: Math.round(appRoot.generationDenoise * 100); enabled: !appRoot.activeGenerationDefaults.denoiseFixed; editable: true; onValueModified: appRoot.generationDenoise = value / 100.0; textFromValue: function(v) { return (v / 100.0).toFixed(2) }; valueFromText: function(t) { return Math.round(Number(t) * 100) } }
                                         Text { text: "Sampler"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde", "dpmpp_3m_sde"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
+                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; model: ["er_sde", "euler", "euler_ancestral", "res_multistep", "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_sde", "dpmpp_3m_sde", "lcm"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationSampler)); onActivated: appRoot.generationSampler = currentText }
                                         Text { text: "Scheduler"; color: appRoot.textDim; font.pixelSize: 14 }
-                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; enabled: !appRoot.activeGenerationDefaults.schedulerFixed; model: appRoot.activeGenerationDefaults.schedulerFixed ? ["Flux2Scheduler"] : ["beta", "simple", "normal", "karras", "sgm_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
+                                        ComboBox { implicitHeight: 44; Layout.fillWidth: true; enabled: !appRoot.activeGenerationDefaults.schedulerFixed; model: appRoot.activeGenerationDefaults.schedulerFixed ? ["Flux2Scheduler"] : ["beta", "simple", "normal", "karras", "sgm_uniform", "ddim_uniform"]; currentIndex: Math.max(0, model.indexOf(appRoot.generationScheduler)); onActivated: appRoot.generationScheduler = currentText }
                                     }
                                     SectionLabel { text: "PIPELINE" }
                                     ComboBox { implicitHeight: 44;
@@ -2345,11 +2355,28 @@ ApplicationWindow {
     Popup {
         id: wanVideoPopup
         anchors.centerIn: parent
-        width: 540; height: 420; modal: true
+        width: 600; height: 540; modal: true
         background: Rectangle { color: "#161616"; border.color: appRoot.gold }
         ColumnLayout {
             anchors.fill: parent; anchors.margins: 16; spacing: 12
-            Text { text: "WAN 2.2 · IMAGE TO VIDEO"; color: appRoot.textMain; font.pixelSize: 20 }
+            Text { text: "WAN · IMAGE TO VIDEO"; color: appRoot.textMain; font.pixelSize: 20 }
+            ComboBox {
+                id: wanModelPicker; objectName: "wanModelPicker"; Layout.fillWidth: true
+                textRole: "text"; valueRole: "value"
+                model: [
+                    {text: "WAN 2.2 · 5B", value: "wan2.2_ti2v_5B_fp16.safetensors"},
+                    {text: "WAN 2.1 · 14B", value: "wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors"}
+                ]
+                currentIndex: genesisBridge.wanModel === "wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors" ? 1 : 0
+                enabled: !genesisBridge.busy
+                onActivated: genesisBridge.setWanModel(currentValue)
+            }
+            CheckBox {
+                objectName: "wan14AdapterToggle"; text: "Use downloaded 14B adapter (experimental)"
+                visible: wanModelPicker.currentIndex === 1; enabled: !genesisBridge.busy
+                checked: genesisBridge.wanAdapterEnabled
+                onToggled: genesisBridge.setWanAdapter(checked)
+            }
             Text { text: "Animate the selected source. The original image stays unchanged."; color: appRoot.textDim; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Text { text: appRoot.generationSource.toString().length ? "Source image selected" : "Choose a source image in Create first."; color: appRoot.textMain }
             TextArea { id: wanMotion; Layout.fillWidth: true; Layout.fillHeight: true; placeholderText: "Describe movement, camera motion and what should remain consistent."; wrapMode: TextEdit.Wrap }

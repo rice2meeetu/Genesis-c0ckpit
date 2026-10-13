@@ -46,21 +46,23 @@ def test_route_is_job_scoped(monkeypatch):
     assert remote_url() == 'https://legacy.example'
 
 
-def test_verified_phr00t_is_local_but_still_obeys_fault_guard():
+@pytest.mark.parametrize("model_name", ["QWEN_MODEL", "QWEN21_MODEL"])
+def test_verified_qwen_is_local_but_still_obeys_fault_guard(model_name):
     import qt_cockpit
     from genesis.backend_bridge import BackendBridge
     bridge = object.__new__(type("RouteProbe", (), {"resolve": BackendBridge.resolve}))
+    model = getattr(qt_cockpit, model_name)
     bridge._mode = "LOCAL"
-    bridge._local = [{"model": qt_cockpit.QWEN_MODEL, "runnable": True}]
+    bridge._local = [{"model": model, "runnable": True}]
     bridge._remote = []
     bridge._local_status = {"ready": True}
     bridge._remote_status = {}
     bridge._endpoint = ""
     bridge._local_safe = True
-    assert bridge.resolve(qt_cockpit.QWEN_MODEL).destination == "LOCAL"
+    assert bridge.resolve(model).destination == "LOCAL"
     bridge._local_safe = False
     with pytest.raises(ValueError, match="safety"):
-        bridge.resolve(qt_cockpit.QWEN_MODEL)
+        bridge.resolve(model)
 
 
 @pytest.mark.parametrize('endpoint', ['http://127.0.0.1:18189',
@@ -87,3 +89,40 @@ def test_remote_identity_engines_require_advertised_swap_weights():
         'inswapper_128.onnx', 'hyperswap_1a_256.onnx'
     ]]}}}}
     assert remote_identity_engines(info) == ['reactor_inswapper', 'reactor_hyperswap']
+
+
+@pytest.mark.parametrize("ready, outcome, expected", [
+    (True, "installed", ["reactor_inswapper"]),
+    (True, "missing", []),
+    (True, "error", []),
+    (False, "installed", []),
+])
+def test_local_probe_publishes_identity_without_remote_contact(monkeypatch, ready, outcome, expected):
+    from types import SimpleNamespace
+    import qt_cockpit as cockpit
+    from genesis.backend_bridge import BackendBridge
+    rows = [{"model": "existing", "runnable": True}]
+    monkeypatch.setattr(cockpit, "load_generation_profiles", lambda: rows)
+    monkeypatch.setattr(cockpit, "load_runtime_status", lambda: {"ready": ready, "remote": False})
+    monkeypatch.setattr(cockpit.integrations, "gpu_kernel_preflight", lambda: (True, "safe"))
+    info = {"ReActorFaceSwap": {"input": {"required": {
+        "swap_model": [["inswapper_128.onnx"]]}}}} if outcome == "installed" else {}
+    client = Mock()
+    client.object_info.return_value = info
+    if outcome == "error":
+        client.object_info.side_effect = RuntimeError("catalog unavailable")
+    factory = Mock(return_value=client)
+    monkeypatch.setattr(cockpit.workflow_lab, "ComfyClient", factory)
+    received = Mock()
+    BackendBridge._probe(SimpleNamespace(_received=received), 7, "")
+    result = received.emit.call_args.args[0]
+    assert result["local"] == rows
+    assert result["local_status"]["ready"] == ready
+    assert result["local_status"]["identityEngines"] == expected
+    assert result["local_status"]["identityReady"] == bool(expected)
+    assert result["remote"] == []
+    if ready:
+        factory.assert_called_once_with(cockpit.workflow_lab.COMFY_URL, timeout=8)
+    else:
+        factory.assert_not_called()
+    assert ("identityError" in result["local_status"]) == (ready and outcome == "error")
