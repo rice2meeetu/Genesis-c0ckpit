@@ -1672,13 +1672,16 @@ class GenerationBridge(QObject):
         path = best_reference(character_id, instruction)
         return QUrl.fromLocalFile(path).toString() if path else ""
 
-    @pyqtSlot(str, str)
-    def queueCharacterReferenceSet(self, character_id, model):
+    @pyqtSlot(str, str, bool)
+    def queueCharacterReferenceSet(self, character_id, model, adult_nsfw=False):
         if self._busy:
             return
         character = get_character(character_id)
         if not character or model not in SOURCE_EDIT_MODELS or model not in SUPPORTED_CREATE_MODELS:
             self._set_status("Select a saved character and a supported source-image model in Create.")
+            return
+        if adult_nsfw and not character.get("adult_confirmed", False):
+            self._set_status("Adult NSFW reference mode requires a confirmed 18+ character.")
             return
         source = Path(character['primary_image'])
         if not source.is_file():
@@ -1695,9 +1698,9 @@ class GenerationBridge(QObject):
         self._finish_route = route
         self._set_busy(True)
         self._set_status("Preparing character reference set for review…")
-        threading.Thread(target=self._run_character_reference_set, args=(route, character_id, source, model), daemon=True).start()
+        threading.Thread(target=self._run_character_reference_set, args=(route, character_id, source, model, adult_nsfw), daemon=True).start()
 
-    def _run_character_reference_set(self, route, character_id, source, model):
+    def _run_character_reference_set(self, route, character_id, source, model, adult_nsfw=False):
         from genesis.character_library import REFERENCE_BUILD_REQUESTS
         from contextlib import nullcontext
         try:
@@ -1708,6 +1711,8 @@ class GenerationBridge(QObject):
                 candidates = []
                 for angle, category, instruction in REFERENCE_BUILD_REQUESTS:
                     self._check_cancelled()
+                    if adult_nsfw:
+                        instruction += " Adult 18+ character reference; mature nude anatomy permitted where supported by the selected model. Preserve identity, proportions, and neutral reference pose."
                     output = self._run_generate(instruction, "", defaults['defaultWidth'], defaults['defaultHeight'], model,
                         "None", "None", "None", 0, 0, 0, source, None, False, False, False, controls, release_busy=False)
                     if output is None:

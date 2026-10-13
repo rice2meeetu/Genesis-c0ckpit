@@ -126,10 +126,11 @@ ColumnLayout {
             }
         }
     }
+    CheckBox { id: adultReferenceMode; text: "Adult NSFW reference mode (18+ characters only)"; enabled: root.characterId.length > 0 && !root.bridge.busy }
     Button {
         text: root.bridge && root.bridge.busy ? "Generating…" : "Generate reference set"
         enabled: root.characterId.length > 0 && root.builderModel.length > 0 && !root.bridge.busy
-        onClicked: root.bridge.queueCharacterReferenceSet(root.characterId, root.builderModel)
+        onClicked: root.bridge.queueCharacterReferenceSet(root.characterId, root.builderModel, adultReferenceMode.checked)
     }
     Button { text: "Cancel generation"; visible: root.bridge && root.bridge.busy; onClicked: root.bridge.cancelGeneration() }
     Label { Layout.fillWidth: true; color: "#aaa"; wrapMode: Text.Wrap; text: "Uses the model selected in Create. Seven separate candidates are saved for review; nothing is approved automatically. Cancel remains available in Create." }
