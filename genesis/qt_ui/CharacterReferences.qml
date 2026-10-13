@@ -109,7 +109,11 @@ ColumnLayout {
         }
     }
     RowLayout {
-        ComboBox { id: category; model: ["face", "body", "pose", "ignore"] }
+        ComboBox {
+            id: category
+            model: ["face", "body", "pose", "ignore"]
+            currentIndex: Math.max(0, model.indexOf(root.selectedReference.category || "face"))
+        }
         Button { text: "Approve role"; enabled: !!root.selectedReference.path && !root.selectedReference.master && !root.bridge.busy; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, true) }
         Button { text: "Needs review"; enabled: !!root.selectedReference.path && !root.selectedReference.master && !root.bridge.busy; onClicked: root.bridge.setCharacterReferenceDetails(root.characterId, root.selectedReference.path, category.currentText, false) }
     }
