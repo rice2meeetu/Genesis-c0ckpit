@@ -2197,7 +2197,11 @@ class GenerationBridge(QObject):
             # catalog-based capability check for compatibility.
             local_identity_ready = bool(all(kind in info for kind in ('ReActorFaceSwapOpt','ReActorOptions'))
                                         and selected_swap in _remote_choice_values(info, ('ReActorFaceSwapOpt',), 'swap_model'))
-        result['identity'] = bool(master and Path(master).is_file() and local_identity_ready)
+        # FaceFusion is a standalone LOCAL processor, independent of local
+        # ComfyUI/ReActor node readiness (e.g. after a RunPod generation).
+        identity_ready = (self.faceFusionAvailable if self._stage_three_engine == "facefusion_nsfw"
+                          else local_identity_ready)
+        result['identity'] = bool(master and Path(master).is_file() and identity_ready)
         choices = _remote_choice_values(info, ('UpscaleModelLoader',), 'model_name')
         self._upscale_model = next((name for name in ('4x-UltraSharp.safetensors', '4x-UltraSharp.pth') if name in choices), '')
         result['upscale'] = bool(remote_finish_ready and scale in (2, 4)
@@ -2475,6 +2479,16 @@ class GenerationBridge(QObject):
     def _operation_route(self, operation):
         return self.backend_router.resolve_operation(operation) if self.backend_router else None
 
+    def _person_a_face_swap_route(self):
+        # NSFW FaceFusion is a standalone LOCAL process. It must never depend
+        # on RunPod or an online ComfyUI/ReActor server to handle face crops.
+        engine = self._active_stage_three_engine or self._stage_three_engine
+        if engine == "facefusion_nsfw":
+            if not self.faceFusionAvailable:
+                raise ValueError("Local NSFW FaceFusion runtime is unavailable.")
+            return Route("LOCAL", "")
+        return self._operation_route("face_swap") or Route("LOCAL", "")
+
     def _run_routed_operation(self, route, operation, *args):
         if route is None:
             return operation(*args)
@@ -2494,7 +2508,7 @@ class GenerationBridge(QObject):
             self._set_status("Choose both a target image and a source image.")
             return
         try:
-            route = self._operation_route('face_swap') or Route('LOCAL', '')
+            route = self._person_a_face_swap_route()
             if route.destination != 'LOCAL':
                 raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
         except ValueError as exc:
@@ -2541,7 +2555,7 @@ class GenerationBridge(QObject):
         try:
             if not target.is_file() or not source.is_file():
                 raise ValueError("saved output or original identity source is missing")
-            face_route = self._operation_route('face_swap') or Route('LOCAL', '')
+            face_route = self._person_a_face_swap_route()
             if face_route.destination != 'LOCAL':
                 raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
             self._set_status("Stage 3 · select Person A in the generated image…")
@@ -2594,6 +2608,59 @@ class GenerationBridge(QObject):
             self._check_cancelled()
             with tempfile.TemporaryDirectory(prefix="genesis-person-a-") as directory:
                 target_crop, source_crop = prepare_crops(target, source, regions, directory)
+                if (self._active_stage_three_engine or self._stage_three_engine) == "facefusion_nsfw":
+                    # Exact two confirmed Person A regions only; no remote
+                    # backend and no full-frame fallback, unlike manual bulk
+                    # face swaps. The input image is never overwritten.
+                    ff_root = integrations.FACEFUSION_ROOT
+                    ff_python = self._facefusion_python()
+                    ff_entry = ff_root / "facefusion.py"
+                    ff_config = ff_root / "facefusion.ini"
+                    if not all(path.is_file() for path in (ff_python, ff_entry, ff_config)):
+                        raise workflow_lab.ComfyError("Local NSFW FaceFusion runtime is unavailable.")
+                    provider = self._facefusion_provider
+                    if provider != "cpu":
+                        safe, detail = integrations.gpu_kernel_preflight()
+                        if not safe:
+                            raise workflow_lab.ComfyError(detail)
+                    swapped = Path(directory) / "facefusion-result.png"
+                    command = [
+                        str(ff_python), str(ff_entry), "headless-run",
+                        "--config-path", str(ff_config),
+                        "--source-paths", str(source_crop),
+                        "--target-path", str(target_crop),
+                        "--output-path", str(swapped),
+                        "--processors", "face_swapper",
+                        "--face-swapper-model", "inswapper_128",
+                        "--face-selector-mode", "one",
+                        "--execution-providers", provider,
+                    ]
+                    completed = subprocess.run(
+                        command, cwd=str(ff_root), stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, text=True, timeout=300,
+                        check=False,
+                    )
+                    if completed.returncode or not swapped.is_file():
+                        details = "\n".join((completed.stdout or "").splitlines()[-8:])
+                        raise workflow_lab.ComfyError(details or "Local NSFW FaceFusion did not save an image.")
+                    self._check_cancelled()
+                    self._output_dir.mkdir(parents=True, exist_ok=True)
+                    stamp = str(time.time_ns())
+                    current = composite_crop(
+                        target, regions[0], swapped,
+                        self._output_dir / f"GENESIS-FaceFusion-PersonA-{stamp}.png",
+                    )
+                    # Preserve the generation/refinement route on saved output;
+                    # only this local face correction has a local route.
+                    previous_preview = Path(QUrl(self._preview).toLocalFile()) if self._preview else None
+                    if not (self._finish_info and previous_preview == target):
+                        self._adopt_operation_result(current, {}, source)
+                    else:
+                        self._original_master = source
+                    self._record_finish("NSFW FaceFusion · Person A", current,
+                                        input_source=QUrl.fromLocalFile(str(target)).toString())
+                    self._set_status(f"Complete · {current.name} · reviewed Person A region only.")
+                    return
                 client, _ = self._connect_comfyui()
                 info = client.object_info()
                 required = ("ReActorFaceSwapOpt", "ReActorOptions")
@@ -2732,7 +2799,7 @@ class GenerationBridge(QObject):
         # The UI also disables this picker while busy.
         if self._busy:
             return
-        if engine in {"reactor_inswapper", "reactor_reswapper", "reactor_hyperswap"} and engine != self._stage_three_engine:
+        if engine in {"reactor_inswapper", "reactor_reswapper", "reactor_hyperswap", "facefusion_nsfw"} and engine != self._stage_three_engine:
             self._stage_three_engine = engine
             self.statusChanged.emit()
 

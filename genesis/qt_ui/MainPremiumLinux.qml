@@ -176,9 +176,11 @@ ApplicationWindow {
     readonly property var stageThreeChoices: [
         {label:"ReActor · Inswapper", engine:"reactor_inswapper", available:liveIdentityEngines.indexOf("reactor_inswapper") >= 0},
         {label:"ReActor · ReSwapper", engine:"reactor_reswapper", available:liveIdentityEngines.indexOf("reactor_reswapper") >= 0},
-        {label:"ReActor · HyperSwap", engine:"reactor_hyperswap", available:liveIdentityEngines.indexOf("reactor_hyperswap") >= 0}
+        {label:"ReActor · HyperSwap", engine:"reactor_hyperswap", available:liveIdentityEngines.indexOf("reactor_hyperswap") >= 0},
+        {label:"NSFW FaceFusion · Local", engine:"facefusion_nsfw", available:genesisBridge.faceFusionAvailable}
     ].filter(function(row) { return row.available === true })
     readonly property bool stageThreeReady: liveIdentityEngines.indexOf(stageThreeEngine) >= 0
+        || (stageThreeEngine === "facefusion_nsfw" && genesisBridge.faceFusionAvailable)
     readonly property string stageThreeLabel: {
         for (var i = 0; i < stageThreeChoices.length; ++i)
             if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
