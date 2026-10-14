@@ -4,7 +4,7 @@ This draft combines the post-PR10 `main` history with the model/identity/Phr00t 
 
 ## Verified without GPU load
 
-- Combined Linux Python/Qt tests: **745 passed, 3 skipped, 4 subtests passed** on the full local prototype, with the private pose pack still present locally but excluded from Git tracking.
+- Combined Linux Python/Qt tests: **745 passed, 3 skipped, 4 subtests passed** on the full local prototype, in both the isolated working prototype and a **fresh clean checkout** with no imported pose-library images.
 - The merged Qt Create interface, model selection, Phr00t source/reference controls and queue tests passed offscreen.
 - Fixes include duplicated QML `generateButton` ID and pytest configuration keys, undefined locals in FaceFusion, model/finishing GPU safety gates, local Qwen Image 2.1 route reconciliation, invalid RunPod endpoint port handling and fail-open SSH startup.
 - The existing distinct sampling presets and Phr00t speed work remain in the integrated code.
@@ -18,6 +18,6 @@ This draft combines the post-PR10 `main` history with the model/identity/Phr00t 
 ## Outstanding before main release
 
 1. Manually review overlapping backend/UI/identity/pose source changes; conflict preference in the draft merge is not proof of semantic correctness.
-2. Run fresh-checkout tests and platform CI; Linux unit tests do not validate Windows packaging.
+2. Run platform CI and Windows packaging checks; the fresh clean-checkout Linux suite passes but does not validate Windows packaging.
 3. GPU render/quality verification of provisional model Fast/Balanced step counts and identity/pose fidelity; RunPod 8189 is unverified while endpoint/credits are unavailable.
 4. Keep PRs #11 and #12 and the local working checkout unchanged until integration is approved; do not assume draft PRs are merged merely because this branch exists.
