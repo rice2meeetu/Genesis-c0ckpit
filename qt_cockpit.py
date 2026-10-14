@@ -1835,17 +1835,19 @@ class GenerationBridge(QObject):
             self._facefusion_provider = provider
             self.statusChanged.emit()
 
-    @pyqtProperty(bool, constant=True)
-    def faceFusionAvailable(self) -> bool:
-        ff_root = integrations.FACEFUSION_ROOT
-        ff_python = ff_root / ".venv/bin/python" if (ff_root / ".venv/bin/python").is_file() else Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
-        return ff_python.is_file() and (ff_root / "facefusion.py").is_file() and (ff_root / "facefusion.ini").is_file()
+    @staticmethod
+    def _facefusion_python() -> Path:
+        # Keep the availability indicator and launch path on the same runtime.
+        ff_venv = integrations.FACEFUSION_ROOT / ".venv/bin/python"
+        return (ff_venv if ff_venv.is_file()
+                else Path.home() / "miniforge3/envs/facefusion-rocm/bin/python")
 
     @pyqtProperty(bool, constant=True)
     def faceFusionAvailable(self) -> bool:
         ff_root = integrations.FACEFUSION_ROOT
-        ff_python = Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
-        return ff_python.is_file() and (ff_root / "facefusion.py").is_file() and (ff_root / "facefusion.ini").is_file()
+        return (self._facefusion_python().is_file()
+                and (ff_root / "facefusion.py").is_file()
+                and (ff_root / "facefusion.ini").is_file())
 
     @pyqtProperty(bool, constant=True)
     def upscaleAvailable(self) -> bool:
@@ -2634,7 +2636,7 @@ class GenerationBridge(QObject):
             self._set_status("FaceFusion is local image-only. Select LOCAL explicitly to run it; RunPod video is not connected.")
             return
         ff_root = integrations.FACEFUSION_ROOT
-        ff_python = ff_root / ".venv/bin/python" if (ff_root / ".venv/bin/python").is_file() else Path.home() / "miniforge3/envs/facefusion-rocm/bin/python"
+        ff_python = self._facefusion_python()
         ff_entry = ff_root / "facefusion.py"
         ff_config = ff_root / "facefusion.ini"
         if not ff_python.is_file() or not ff_entry.is_file() or not ff_config.is_file():
@@ -3062,15 +3064,24 @@ class GenerationBridge(QObject):
             QWEN21_MODEL: "Qwen Image 2.1",
         }.get(model_name, model_name)
         self._set_status(f"Preparing validated {engine} generation…")
-        threading.Thread(
-            target=self._run_routed_generate,
-            args=(route, prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
-                  lora_two, lora_three, float(lora_one_strength), float(lora_two_strength),
-                  float(lora_three_strength), source, pose,
-                  bool(use_stage_two), bool(use_stage_three),
-                  bool(use_upscale), generation_controls),
-            daemon=True,
-        ).start()
+        try:
+            threading.Thread(
+                target=self._run_routed_generate,
+                args=(route, prompt_text, negative_prompt, int(width), int(height), model_name, lora_one,
+                      lora_two, lora_three, float(lora_one_strength), float(lora_two_strength),
+                      float(lora_three_strength), source, pose,
+                      bool(use_stage_two), bool(use_stage_three),
+                      bool(use_upscale), generation_controls),
+                daemon=True,
+            ).start()
+        except Exception as exc:
+            # Busy was set before Thread.start(). If the thread did not start,
+            # there is no worker to clear it or advance queued jobs.
+            if not self._queue_active:
+                self._active_stage_three_engine = None
+            self._set_progress(-1.0)
+            self._set_status(f"Generation could not start · {exc}")
+            self._set_busy(False)
 
     @pyqtSlot(str, str, str, float)
     def queueInpaint(self, source_url: str, mask_url: str, prompt_text: str, strength: float) -> None:
