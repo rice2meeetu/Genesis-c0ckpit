@@ -1864,6 +1864,20 @@ class GenerationBridge(QObject):
         self._busy = value
         self.busyChanged.emit()
 
+    def _start_busy_worker(self, target, args=(), *, label: str) -> bool:
+        """Start an already-marked-Busy operation without leaving a stuck UI.
+
+        Thread creation and start can fail synchronously; no worker would then
+        exist to execute the normal busy cleanup in the operation's finally.
+        """
+        try:
+            threading.Thread(target=target, args=args, daemon=True).start()
+        except Exception as exc:
+            self._set_status(f"{label} could not start · {exc}")
+            self._set_busy(False)
+            return False
+        return True
+
     def _set_progress(self, value: float) -> None:
         self._progress = max(-1.0, min(1.0, float(value)))
         self.progressChanged.emit()
@@ -2035,7 +2049,9 @@ class GenerationBridge(QObject):
         self._finish_route = route
         self._set_busy(True)
         self._set_status("Preparing character reference set for review…")
-        threading.Thread(target=self._run_character_reference_set, args=(route, character_id, source, model, adult_nsfw), daemon=True).start()
+        self._start_busy_worker(self._run_character_reference_set,
+                                (route, character_id, source, model, adult_nsfw),
+                                label="Character reference set")
 
     def _run_character_reference_set(self, route, character_id, source, model, adult_nsfw=False):
         from genesis.character_library import REFERENCE_BUILD_REQUESTS
@@ -2220,7 +2236,9 @@ class GenerationBridge(QObject):
             return
         self._set_busy(True)
         self._cancel_requested = False
-        threading.Thread(target=self._run_finish, args=(selected, master, plan, scale, model, lora, strength), daemon=True).start()
+        self._start_busy_worker(self._run_finish,
+                                (selected, master, plan, scale, model, lora, strength),
+                                label="Finishing")
 
     def _adopt_operation_result(self, path, info=None, master=None):
         """Keep finishing attached to this output's backend and dimensions."""
@@ -2436,7 +2454,7 @@ class GenerationBridge(QObject):
                 self._set_status('Wan video saved · original source preserved.')
             except Exception as exc: self._set_status('Wan stopped · ' + str(exc))
             finally: self._set_busy(False)
-        threading.Thread(target=execute, daemon=True).start()
+        self._start_busy_worker(execute, label="Wan video")
 
     @pyqtSlot()
     def openWanVideo(self):
@@ -2497,11 +2515,10 @@ class GenerationBridge(QObject):
             return
         self._set_busy(True)
         self._set_status("Preparing verified Person A regions…")
-        threading.Thread(
-            target=self._run_routed_operation,
-            args=(route, self._run_face_swap, target, source, (target_region, source_region)),
-            daemon=True,
-        ).start()
+        self._start_busy_worker(self._run_routed_operation,
+                                (route, self._run_face_swap, target, source,
+                                 (target_region, source_region)),
+                                label="Face swap")
 
     @pyqtSlot(str, str)
     def _choose_stage_three_faces(self, target_path, source_path):
@@ -2650,11 +2667,9 @@ class GenerationBridge(QObject):
                 return
         self._set_busy(True)
         self._set_status("Preparing FaceFusion · local image swap…")
-        threading.Thread(
-            target=self._run_facefusion,
-            args=(target, source, ff_python, ff_entry, ff_config),
-            daemon=True,
-        ).start()
+        self._start_busy_worker(self._run_facefusion,
+                                (target, source, ff_python, ff_entry, ff_config),
+                                label="FaceFusion")
 
     def _run_facefusion(
         self, target: Path, source: Path, ff_python: Path, ff_entry: Path, ff_config: Path
@@ -3100,11 +3115,10 @@ class GenerationBridge(QObject):
             return
         self._set_busy(True)
         self._set_status("Preparing masked inpaint workflow…")
-        threading.Thread(
-            target=self._run_routed_operation,
-            args=(route, self._run_inpaint, source, mask, prompt_text, float(strength)),
-            daemon=True,
-        ).start()
+        self._start_busy_worker(self._run_routed_operation,
+                                (route, self._run_inpaint, source, mask,
+                                 prompt_text, float(strength)),
+                                label="Inpaint")
 
     @pyqtSlot(str, str, float)
     def queueEdit(self, source_url: str, prompt_text: str, strength: float) -> None:
@@ -3125,11 +3139,10 @@ class GenerationBridge(QObject):
             return
         self._set_busy(True)
         self._set_status("Preparing validated image-edit workflow…")
-        threading.Thread(
-            target=self._run_routed_operation,
-            args=(route, self._run_edit, source, prompt_text, float(strength)),
-            daemon=True,
-        ).start()
+        self._start_busy_worker(self._run_routed_operation,
+                                (route, self._run_edit, source,
+                                 prompt_text, float(strength)),
+                                label="Image edit")
 
     def _run_routed_generate(self, route, *args):
         self._finish_route = route
