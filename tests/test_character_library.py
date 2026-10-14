@@ -39,7 +39,7 @@ def test_preferred_reference_keeps_primary_identity(tmp_path):
     primary = tmp_path / "primary.png"; primary.write_bytes(b"p")
     generated = tmp_path / "approved-full.png"; generated.write_bytes(b"g")
     row = save_character("Nova", str(primary), adult_confirmed=True, path=index)
-    add_reference(row["id"], str(generated), role="full-body", path=index)
+    add_reference(row["id"], str(generated), role="full-body", category='body', approved=True, path=index)
     assert preferred_reference(row["id"], path=index) == str(primary.resolve())
     assert preferred_reference(row["id"], "full-body", path=index) == str(generated.resolve())
 
@@ -49,7 +49,7 @@ def test_reference_items_expose_roles(tmp_path):
     primary = tmp_path / "primary.png"; primary.write_bytes(b"p")
     side = tmp_path / "side.png"; side.write_bytes(b"s")
     row = save_character("Iris", str(primary), adult_confirmed=True, path=index)
-    add_reference(row["id"], str(side), role="side", path=index)
+    add_reference(row["id"], str(side), role="side", category='face', approved=True, path=index)
     item = character_items(index)[0]
     assert item["referenceItems"][0]["role"] == "primary"
     assert item["referenceItems"][1]["role"] == "side"

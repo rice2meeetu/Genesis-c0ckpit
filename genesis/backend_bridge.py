@@ -273,6 +273,12 @@ class BackendBridge(QObject):
         """
         if operation not in {'face_swap', 'edit', 'inpaint', 'upscale'}:
             raise ValueError('Unsupported routed operation: ' + operation)
+        # Identity photographs/crops for manual and Stage 3 face swapping
+        # never leave the local machine, regardless of selected Create mode.
+        if operation == 'face_swap':
+            if self._local_safe and self._local_status.get('ready'):
+                return Route('LOCAL', '')
+            raise ValueError('Face swapping is local-only; connect a safe local ComfyUI with ReActor.')
         if self._mode != 'RUNPOD' and self._local_safe and self._local_status.get('ready'):
             return Route('LOCAL', '')
         if self._mode != 'LOCAL' and self._connected and self._endpoint and self._remote_status.get('ready'):

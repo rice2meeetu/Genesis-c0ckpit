@@ -48,7 +48,7 @@ def save_character(name: str, primary_image: str, *, adult_confirmed: bool, path
     path.write_text(json.dumps({"version": 1, "characters": rows}, indent=2), encoding="utf-8")
     return row
 
-def add_reference(character_id: str, image: str, *, role: str = "anchor", category: str = "", approved: bool = True, path: Path = INDEX_PATH) -> dict:
+def add_reference(character_id: str, image: str, *, role: str = "anchor", category: str = "", approved: bool = False, path: Path = INDEX_PATH) -> dict:
     if category and category not in {"face", "body", "pose", "ignore"}:
         raise ValueError("Choose face, body, pose or ignore.")
     source = Path(image).expanduser().resolve()
@@ -62,11 +62,13 @@ def add_reference(character_id: str, image: str, *, role: str = "anchor", catego
         value = str(source)
         if value not in refs:
             refs.append(value)
+            # Newly imported images require review even when a category was
+            # not specified. Leave legacy references' existing flags alone.
+            row.setdefault("reference_approved", {})[value] = bool(approved)
         roles = row.setdefault("reference_roles", {})
         roles[value] = role.strip() or "anchor"
         if category:
             row.setdefault("reference_categories", {})[value] = category
-            row.setdefault("reference_approved", {})[value] = bool(approved)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"version": 1, "characters": rows}, indent=2), encoding="utf-8")
         return row
@@ -110,7 +112,7 @@ def character_items(path: Path = INDEX_PATH) -> list[dict]:
 
 REFERENCE_ANGLES = ("Primary/Front", "¾ Left", "¾ Right", "Profile", "Back", "Upper Body", "Full Body")
 
-def update_reference(character_id: str, old_image: str, new_image: str = "", *, role: str = "", path: Path = INDEX_PATH) -> dict:
+def update_reference(character_id: str, old_image: str, new_image: str = "", *, role: str = "", confirm_master: bool = False, path: Path = INDEX_PATH) -> dict:
     """Replace/delete a library link only; never modify either image file."""
     rows = load_characters(path)
     row = next((r for r in rows if r["id"] == character_id), None)
@@ -125,6 +127,8 @@ def update_reference(character_id: str, old_image: str, new_image: str = "", *, 
         raise ValueError("Replacement reference does not exist.")
     if old == row["primary_image"] and not new:
         raise ValueError("Replace the primary reference before removing it.")
+    if old == row["primary_image"] and new != old and not confirm_master:
+        raise ValueError("Replacing the identity master requires explicit confirmation.")
     if new and new != old and new in refs:
         raise ValueError("That reference is already stored.")
     index = refs.index(old)
@@ -135,7 +139,10 @@ def update_reference(character_id: str, old_image: str, new_image: str = "", *, 
         if old in metadata:
             value = metadata.pop(old)
             if new:
-                metadata[new] = value
+                metadata[new] = (False if key == "reference_approved" and new != old else value)
+    if new and new != old and old != row["primary_image"]:
+        # An approved old photo is not proof that its replacement is approved.
+        row.setdefault("reference_approved", {})[new] = False
     if new:
         refs[index] = new
         roles[new] = role.strip() or previous_role

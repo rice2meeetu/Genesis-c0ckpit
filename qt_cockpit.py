@@ -1757,6 +1757,8 @@ class GenerationBridge(QObject):
         self._finish_width, self._finish_height = 1024, 1024
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
         self._stage_three_engine = "reactor_inswapper"
+        # Job-scoped engine is separate from the selection shown in the UI.
+        self._active_stage_three_engine = None
         self._facefusion_provider = "migraphx"
         self._cancel_requested = False
         self._active_client = None
@@ -2415,13 +2417,16 @@ class GenerationBridge(QObject):
         """Run the isolated two-image ReActor route for ordinary images."""
         if self._busy:
             return
+        self._active_stage_three_engine = None  # manual swap uses current UI choice
         target = Path(QUrl(target_url).toLocalFile()) if target_url else Path()
         source = Path(QUrl(source_url).toLocalFile()) if source_url else Path()
         if not target.is_file() or not source.is_file():
             self._set_status("Choose both a target image and a source image.")
             return
         try:
-            route = self._operation_route('face_swap')
+            route = self._operation_route('face_swap') or Route('LOCAL', '')
+            if route.destination != 'LOCAL':
+                raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
         except ValueError as exc:
             self._set_status(str(exc))
             return
@@ -2451,8 +2456,8 @@ class GenerationBridge(QObject):
         """GUI-only Person A confirmation after the generation is saved.
 
         No automatic face index or scene-wide swap. The confirmation dialog
-        itself runs in the Qt event loop; the subsequent GPU operation runs
-        on the original backend in a separate thread.
+        runs in the Qt event loop. Swapping is local-only even if the image
+        was originally generated on a RunPod backend.
         """
         if not self._pending_stage_three:
             return
@@ -2467,6 +2472,9 @@ class GenerationBridge(QObject):
         try:
             if not target.is_file() or not source.is_file():
                 raise ValueError("saved output or original identity source is missing")
+            face_route = self._operation_route('face_swap') or Route('LOCAL', '')
+            if face_route.destination != 'LOCAL':
+                raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
             self._set_status("Stage 3 · select Person A in the generated image…")
             target_region = choose_face_region(target, "generated target · Person A")
             if self._cancel_requested:
@@ -2492,7 +2500,7 @@ class GenerationBridge(QObject):
             self._set_status("Stage 3 · correcting the reviewed Person A face only…")
             thread = threading.Thread(
                 target=self._run_routed_operation,
-                args=(self._finish_route, self._run_face_swap, target, source,
+                args=(face_route, self._run_face_swap, target, source,
                       (target_region, source_region)),
                 daemon=True,
             )
@@ -2508,6 +2516,9 @@ class GenerationBridge(QObject):
 
     def _run_face_swap(self, target: Path, source: Path, regions=None) -> None:
         try:
+            # Defense in depth: no caller can upload face crops over RunPod.
+            if remote_url():
+                raise workflow_lab.ComfyError('Face swapping is local-only; remote uploads are blocked.')
             import tempfile
             from genesis.person_a_targeting import prepare_crops, composite_crop
             # No fallback to full-frame index 0. Verify image digests before upload.
@@ -2521,7 +2532,8 @@ class GenerationBridge(QObject):
                     raise workflow_lab.ComfyError("Manual Person A swap requires ReActor Options on this backend.")
                 swap_model = {"reactor_inswapper": "inswapper_128.onnx",
                               "reactor_reswapper": "reswapper_256.onnx",
-                              "reactor_hyperswap": "hyperswap_1a_256.onnx"}.get(self._stage_three_engine)
+                              "reactor_hyperswap": "hyperswap_1a_256.onnx"}.get(
+                                  self._active_stage_three_engine or self._stage_three_engine)
                 if swap_model not in _remote_choice_values(info, ("ReActorFaceSwapOpt",), "swap_model"):
                     raise workflow_lab.ComfyError("Selected ReActor swap model is unavailable.")
                 def upload(path):
@@ -2649,7 +2661,10 @@ class GenerationBridge(QObject):
 
     @pyqtSlot(str)
     def setStageThreeEngine(self, engine: str) -> None:
-        # Only engines verified through live RunPod /object_info + smoke tests are selectable.
+        # Keep the engine fixed throughout generation and Person A confirmation.
+        # The UI also disables this picker while busy.
+        if self._busy:
+            return
         if engine in {"reactor_inswapper", "reactor_reswapper", "reactor_hyperswap"} and engine != self._stage_three_engine:
             self._stage_three_engine = engine
             self.statusChanged.emit()
@@ -2773,6 +2788,7 @@ class GenerationBridge(QObject):
              "extra_reference_url": self._extra_reference_url,
              "faceid": (bool(getattr(self,'_sdxl_faceid_enabled',False)),float(getattr(self,'_sdxl_faceid_strength',0.8))),
              "stage2": self._stage_two_model,
+             "stage3_engine": self._stage_three_engine,
              "route": pinned_route,
              "character_snapshot": self._snapshot_character_a(),
              "endpoint": (self.backend_router.mode,self.backend_router.endpoint) if self.backend_router else None}
@@ -2785,6 +2801,7 @@ class GenerationBridge(QObject):
     def _queue_busy_transition(self):
         if not self._busy:
             self._queue_active = False
+            self._active_stage_three_engine = None
             self._dispatch_next_generation()
 
     def _dispatch_next_generation(self):
@@ -2804,6 +2821,7 @@ class GenerationBridge(QObject):
             self._queue_active=True
             self._sdxl_faceid_enabled,self._sdxl_faceid_strength=job["faceid"]
             self._stage_two_model=job["stage2"]
+            self._active_stage_three_engine=job["stage3_engine"]
             self._output_target_long_edge=job["output"]
             self._source_reference_megapixels=job["source_reference_megapixels"]
             self._extra_reference_url=job["extra_reference_url"]
@@ -2817,6 +2835,7 @@ class GenerationBridge(QObject):
             if self._busy:
                 return
             self._queue_active=False
+            self._active_stage_three_engine=None
 
     @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool, int, float, int, float, str, str, str, float, float, float)
     @pyqtSlot(str, str, int, int, str, str, str, str, str, bool, bool, bool, int, float, int, float, str, str)
@@ -2956,6 +2975,8 @@ class GenerationBridge(QObject):
         generation_controls["stage2_model"] = self._stage_two_model
         generation_controls["negative_prompt"] = negative_prompt
         self._next_generation_controls = None
+        if not self._queue_active:
+            self._active_stage_three_engine = self._stage_three_engine
         self._cancel_requested = False
         self._set_progress(-1.0)
         self._set_busy(True)

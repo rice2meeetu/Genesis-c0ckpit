@@ -86,6 +86,9 @@ def test_stage3_manual_target_source_review_and_route(monkeypatch,tmp_path):
     bridge._choose_stage_three_faces(*signals[0])
     assert len(picked)==2 and picked[0][0]==result and picked[1][0]==source
     assert routed and routed[0][1]==bridge._run_face_swap
+    # Stage 3 remains LOCAL even when its Stage 1 image came from RunPod.
+    from genesis.backend_routing import Route
+    assert routed[0][0] == Route('LOCAL', '')
     target_region,source_region=routed[0][2][-1]
     assert target_region.checked_image(result) and source_region.checked_image(source)
     assert not bridge.busy
@@ -135,7 +138,7 @@ def test_manual_person_a_face_swap_preserves_all_pixels_outside_target_box(monke
         Image.new('RGB',(140,140),'red').save(cropped)
         return cropped
     monkeypatch.setattr(b,'_submit_and_save',fake_reactor)
-    with use_route(Route('RUNPOD','https://safe-8189.proxy.runpod.net')):
+    with use_route(Route('LOCAL', '')):
         b._run_face_swap(target,source,(region,srcregion))
     output=Path(__import__('PyQt6.QtCore',fromlist=['QUrl']).QUrl(b.previewUrl).toLocalFile())
     assert output.is_file(),b.status

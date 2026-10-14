@@ -297,6 +297,12 @@ def test_standalone_comfy_result_uses_its_captured_finishing_context(tmp_path, m
         operation = bridge._run_face_swap
         args = (source, source, (Mock(), Mock()))
     bridge._run_routed_operation(route, operation, *args)
+    if kind == "face_swap" and route.destination == "RUNPOD":
+        # Identity images never upload to remote, regardless of finishing route.
+        assert 'local-only' in bridge.status
+        client.upload_image.assert_not_called()
+        assert bridge._finish_route == Route("RUNPOD", "https://previous.example")
+        return
     assert bridge.status.startswith("Complete"), bridge.status
     assert bridge.previewUrl == QUrl.fromLocalFile(str(output)).toString()
     assert bridge._finish_route == route
