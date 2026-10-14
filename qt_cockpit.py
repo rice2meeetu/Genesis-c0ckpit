@@ -1259,17 +1259,16 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
         Path.home() / "Downloads" / "GENESIS_POSE_MAKER_V15_USER_IMAGE_SLOTS(1)"
         / "GENESIS_POSE_MAKER" / "assets" / "pose_library",
     )
-    index_path = bundled_root / "index.json"
-    if index_path.is_file():
-        library_root = bundled_root
-    else:
-        library_root = next((root for root in roots if root.is_dir()), None)
-        index_path = POSE_INDEX
-    if library_root is None or not index_path.is_file():
-        return []
-    try:
-        indexed = json.loads(index_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    # A bundled index alone is not proof its optional private images are
+    # installed. Fall back to the user's existing external pose import when
+    # no valid bundled controls are present.
+    bundles = []
+    bundled_index = bundled_root / "index.json"
+    if bundled_index.is_file():
+        bundles.append((bundled_root, bundled_index))
+    if POSE_INDEX.is_file():
+        bundles.extend((root, POSE_INDEX) for root in roots if root.is_dir())
+    if not bundles:
         return []
 
     try:
@@ -1278,11 +1277,22 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
         prompt_map = None
 
     categories: dict[str, list[dict]] = {}
-    for item in indexed if isinstance(indexed, list) else []:
-        if not isinstance(item, dict) or not item.get("path"):
+    for library_root, index_path in bundles:
+        try:
+            indexed = json.loads(index_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
             continue
-        source = library_root / str(item["path"])
-        if source.is_file():
+        if not isinstance(indexed, list):
+            continue
+        root_resolved = library_root.resolve()
+        for item in indexed:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                continue
+            # Never display or read an arbitrary local image through a
+            # user-imported pose manifest. This also blocks symlink escapes.
+            source = (root_resolved / item["path"]).resolve()
+            if not source.is_relative_to(root_resolved) or not source.is_file():
+                continue
             category = str(item.get("category", "Pose"))
             resolution = str(item.get("resolution", ""))
             raw_name = str(item.get("name", source.stem))
@@ -1300,6 +1310,8 @@ def load_pose_items(limit: int = 12) -> list[dict[str, str]]:
                 "promptTemplateId": record.prompt_template_id if record else "",
                 "promptMapped": bool(record),
             })
+        if categories:
+            break
 
     result: list[dict[str, str]] = []
     while len(result) < limit and any(categories.values()):
