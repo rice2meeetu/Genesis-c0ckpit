@@ -20,7 +20,13 @@ def remote_identity_engines(info: dict) -> list[str]:
     This keeps configured identity routes visible without claiming unavailable
     custom nodes or weights are usable on the current pod.
     """
-    node = info.get("ReActorFaceSwap") or {}
+    # Generation Stage 3 and manual Person A correction use the options-based
+    # ReActor graph, not the legacy ReActorFaceSwap node. Advertise readiness
+    # only when the exact nodes required by that graph are present.
+    required_nodes = ("ReActorFaceSwapOpt", "ReActorOptions", "LoadImage", "SaveImage")
+    if not all(name in info for name in required_nodes):
+        return []
+    node = info["ReActorFaceSwapOpt"] or {}
     inputs = node.get("input") or {}
     values: set[str] = set()
     for group in ("required", "optional"):

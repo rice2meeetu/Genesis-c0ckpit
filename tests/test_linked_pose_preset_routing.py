@@ -4,9 +4,23 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 import qt_cockpit as cockpit
 
+# This locally imported pose collection is deliberately not bundled in the
+# public repository. Assert full linked-pose behavior whenever it is installed.
+_OPTIONAL_PACK = (
+    cockpit.PROJECT_ROOT
+    / 'genesis/reference/assets/pose_library/NSFW_100Lewd_v20/poses/1.png'
+)
+requires_optional_pose_pack = pytest.mark.skipif(
+    not _OPTIONAL_PACK.is_file(),
+    reason='Optional imported 100Lewd pose assets are not installed',
+)
 
+
+@requires_optional_pose_pack
 def test_mapped_pose_prompts_are_real_bundled_skeletons():
     poses = cockpit.load_pose_items(limit=600)
     mapped = [p for p in cockpit.load_curated_pose_presets(pose_rows=poses) if p['collection']=='Linked Pose + JSON Prompt']
@@ -26,6 +40,7 @@ def test_mapped_pose_prompts_are_real_bundled_skeletons():
     assert not any('100Lewd' in p['category'] for p in mapped)
 
 
+@requires_optional_pose_pack
 def test_premium_linked_preset_selects_image_and_prompt_together(tmp_path):
     script=r'''
 import sys

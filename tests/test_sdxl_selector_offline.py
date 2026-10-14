@@ -65,7 +65,7 @@ import qt_cockpit_linux_premium as launcher
 
 launcher.load_pose_items = lambda **kwargs: []
 launcher.load_grok_preset_items = lambda: []
-launcher.load_curated_pose_presets = lambda: []
+launcher.load_curated_pose_presets = lambda **kwargs: []
 launcher.load_runtime_status = lambda **kwargs: {"identityEngines":[]}
 launcher.BackendBridge.start = lambda self: None
 engines = []

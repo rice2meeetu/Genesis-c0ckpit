@@ -83,7 +83,9 @@ def test_qwen21_reference_prunes_unused_second_image(monkeypatch, tmp_path):
 
 def test_aisha_base_workflow_uses_base_not_distilled_settings():
     graph = json.loads(cockpit.LOCAL_AISHA_9B_WORKFLOW.read_text())
-    assert graph['1']['inputs']['unet_name'] == cockpit.LOCAL_AISHA_9B_MODEL
+    # The saved template can be a distilled Aisha checkpoint; the builder
+    # selects the requested official base model explicitly at runtime.
+    assert graph['1']['inputs']['unet_name'] in (cockpit.LOCAL_AISHA_9B_MODEL, cockpit.REMOTE_AISHA_BF16_MODEL)
     assert graph['5']['inputs']['cfg'] == 4.0
     assert graph['7']['inputs']['sampler_name'] == 'euler'
     assert graph['8']['inputs']['steps'] == 50
@@ -220,3 +222,55 @@ def test_verified_local_source_default_does_not_change_t2i_or_remote():
     assert local['qualityPresets']['Quality'] == {'width': 1024, 'height': 1024}
     assert 'eight-minute' in local['qualityNote']
     assert 'eight-minute' not in cockpit.model_profile_settings(cockpit.QWEN21_MODEL, remote=True)['qualityNote']
+
+
+def test_qwen21_specific_adapter_is_selectable_but_older_qwen_adapter_stays_blocked():
+    from genesis.model_compatibility import is_compatible
+    matched='Qwen2.1_Anything2RealCharacters.safetensors'
+    old='NSFW Qwen by TheseAlpacas V2.safetensors'
+    assert is_compatible(cockpit.QWEN21_MODEL,matched)
+    assert not is_compatible(cockpit.QWEN21_MODEL,old)
+    assert not is_compatible(cockpit.QWEN_MODEL,matched)
+    assert cockpit.model_lora_limit(cockpit.QWEN21_MODEL)==3
+
+
+def test_qwen21_model_only_adapter_is_connected_before_cache(monkeypatch):
+    graph=json.loads(cockpit.QWEN21_T2I_WORKFLOW.read_text())
+    monkeypatch.setattr(cockpit.workflow_lab,'workflow_to_prompt',lambda *a:graph)
+    monkeypatch.setattr(cockpit.workflow_lab,'validate_prompt',lambda *a:{'valid':True,'missing_nodes':[],'missing_inputs':[]})
+    name='Qwen2.1_Anything2RealCharacters.safetensors'
+    result=cockpit.build_create_prompt({},'Adult person in an ordinary portrait',768,768,cockpit.QWEN21_MODEL,[name],[0.45])
+    assert result['genesis_lora_1']['inputs']=={'model':['1',0],'lora_name':name,'strength_model':0.45}
+    assert result['2']['inputs']['model']==['genesis_lora_1',0]
+    assert result['7']['inputs']['steps']==40
+
+
+def test_qwen21_reference_adapter_inserted_before_cache(monkeypatch,tmp_path):
+    monkeypatch.setattr(cockpit,'remote_url',lambda:'')
+    b=cockpit.GenerationBridge()
+    client=Mock();client.upload_image.return_value={'name':'source.png','subfolder':'genesis'}
+    monkeypatch.setattr(cockpit.workflow_lab,'validate_prompt',lambda *a:{'valid':True,'missing_nodes':[],'missing_inputs':[]})
+    monkeypatch.setattr(cockpit,'validate_operation_prompt',lambda *a:None)
+    captured={}
+    monkeypatch.setattr(b,'_submit_and_save',lambda _,graph,*args:captured.update(graph) or tmp_path/'done.png')
+    model='Qwen2.1_Anything2RealCharacters.safetensors'
+    b._run_reference_stage(client,{},cockpit.QWEN21_REFERENCE_WORKFLOW,tmp_path/'source.png','Ordinary portrait', 'stamp','Qwen21',model_override=cockpit.QWEN21_MODEL, loras=[model],lora_strengths=[0.5])
+    assert captured['2']['inputs']['model']==['genesis_lora_1',0]
+    assert captured['genesis_lora_1']['inputs']['lora_name']==model
+
+
+def test_aisha_base_builder_explicitly_overrides_distilled_template(monkeypatch):
+    template=json.loads(cockpit.LOCAL_AISHA_9B_WORKFLOW.read_text())
+    monkeypatch.setattr(cockpit.workflow_lab,'workflow_to_prompt',lambda *a:template)
+    monkeypatch.setattr(cockpit.workflow_lab,'validate_prompt',lambda *a:{'valid':True,'missing_nodes':[],'missing_inputs':[]})
+    graph=cockpit.build_create_prompt({},'Adult subject portrait',512,512,cockpit.LOCAL_AISHA_9B_MODEL,[],[])
+    assert graph['1']['inputs']['unet_name']==cockpit.LOCAL_AISHA_9B_MODEL
+
+
+def test_phr00t_pose_catalog_reports_image2_method_not_sdxl_controlnet():
+    info={'CheckpointLoaderSimple':{'input':{'required':{'ckpt_name':[[cockpit.REMOTE_PHR00T_V19_MODEL]]}}}}
+    rows=cockpit.build_remote_generation_profiles(info)
+    row=next(r for r in rows if r['model']==cockpit.REMOTE_PHR00T_V19_MODEL)
+    assert row['poseReady']
+    assert row['poseMethod'].startswith('Image-2')
+    assert 'NOT OpenPoseXL2' in row['note']

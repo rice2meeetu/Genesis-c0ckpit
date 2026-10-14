@@ -31,7 +31,9 @@ def test_model_quality_not_smaller_than_model_native_baseline():
     p=c.model_profile_settings(c.REMOTE_MIRACLEIN_9B_MODEL,remote=True)
     assert p['sourceQualityPresets']['Quality']=={'width':1920,'height':1520}
     p=c.model_profile_settings(c.REMOTE_PHR00T_V23_GGUF_MODEL,remote=True)
-    assert p['sourceQualityPresets']['Quality']=={'width':2264,'height':1360}
+    assert (p['sourceQualityPresets']['Quality']['width'],p['sourceQualityPresets']['Quality']['height']) == (2264,1360)
+    assert p['sourceQualityPresets']['Quality']['cfg'] == 1.2
+    assert p['sourceQualityPresets']['Balanced']['cfg'] == 1.0
 
 
 def test_quality_and_2k_4k_buttons_keep_dimensions_and_model_defaults():
@@ -115,3 +117,24 @@ def test_upscale_generates_exact_target_without_rerunning_sampler(monkeypatch,tm
     assert graphs[-1]['4']['inputs']['width']==expected[0]
     assert graphs[-1]['4']['inputs']['height']==expected[1]
     assert not any(v['class_type']=='KSampler' for v in graphs[-1].values())
+
+
+def test_queued_phr00t_references_are_snapshotted_independently(monkeypatch):
+    QCoreApplication.instance() or QCoreApplication([])
+    bridge = c.GenerationBridge()
+    runs=[]
+    def capture(*args):
+        runs.append((args[0],bridge._extra_reference_url))
+        bridge._set_busy(True)
+    monkeypatch.setattr(bridge,'queueGenerateAdvanced',capture)
+    for i in range(3):
+        bridge.setExtraReferenceSource(f'file:///tmp/reference-{i}.png')
+        bridge.enqueueGenerateAdvanced(*job(model=c.REMOTE_PHR00T_V23_Q2_MODEL,prompt=f'prompt {i}'))
+    assert len(runs)==1 and runs[0]==('prompt 0','file:///tmp/reference-0.png')
+    bridge.setExtraReferenceSource('file:///tmp/different.png')
+    bridge._set_busy(False)
+    QCoreApplication.processEvents()
+    assert runs[-1]==('prompt 1','file:///tmp/reference-1.png')
+    bridge._set_busy(False)
+    QCoreApplication.processEvents()
+    assert runs[-1]==('prompt 2','file:///tmp/reference-2.png')

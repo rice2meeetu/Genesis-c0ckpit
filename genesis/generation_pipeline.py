@@ -138,12 +138,22 @@ def adapt_prompt(prompt: str, model: str, *, source_image: bool = False,
         return "Create the requested image with coherent anatomy and composition. Instruction: " + text
     if family == "qwen_image":
         if source_image:
-            identity = "Preserve the same person and facial identity from image1 for Person A only. " + IDENTITY_INSTRUCTION + " "
-            pose = ("Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. "
+            # Qwen's image encoder labels visual tokens "Picture 1", "Picture 2", etc.
+            # Don't force human-specific anatomy/skin/hair realism onto inanimate
+            # source images: that caused unwanted people in object-edit workflows.
+            source = ("Use Picture 1 (image1) as the primary source. Keep its subject "
+                      "and distinguishing appearance consistent with Picture 1. "
+                      "If the subject is a person, preserve the same person and facial "
+                      "identity (Person A only); do not copy that face onto Person B. "
+                      "If it is an object, preserve its recognizable shape and material. "
+                      "Do not invent additional people or replace the main subject "
+                      "unless the instruction explicitly requests it. ")
+            pose = ("Use Picture 2 (image2) only for pose, body arrangement, and "
+                    "composition; do not copy its face or identity. "
                     if pose_image else "")
-            result = (identity + pose + "Allow the body pose, body position, framing, composition, viewpoint, expression and lighting to change naturally according to the instruction. "
-                      + "Edit instruction: " + text)
-            return realism_prompt(result, include_realism=include_realism)
+            # The edit instruction remains the user's text. They can explicitly
+            # request skin/realism detail; it isn't injected into every edit.
+            return source + pose + "Edit instruction: " + text
         return "Create one coherent subject with stable identity. Instruction: " + text
     if family in {"flux2_klein_4b", "flux2_klein_9b_base", "flux2_klein_9b_kv", "aisha_9b"}:
         if source_image:

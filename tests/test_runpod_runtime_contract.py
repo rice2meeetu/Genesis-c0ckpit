@@ -138,14 +138,13 @@ def test_runpod_pipeline_hands_results_forward_and_keeps_original_identity(monke
     bridge._run_generate("a neutral portrait", "", 512, 512, qt_cockpit.REMOTE_PHR00T_MODEL,
                          "None", "None", "None", 0.0, 0.0, 0.0,
                          source, pose, True, True, False, {"seed": 42})
-    first, second, third = run.call_args_list
+    first, second = run.call_args_list
     assert first.args[2:4] == (qt_cockpit.REMOTE_PHR00T_WORKFLOW, source)
     assert first.kwargs["secondary_image"] == pose
     assert second.args[2:4] == (qt_cockpit.REMOTE_KLEIN9B_WORKFLOW, stage1)
     assert second.kwargs["model_override"] == qt_cockpit.REMOTE_AISHA_9B_MODEL
-    assert third.args[2:4] == (qt_cockpit.STAGE_3_WORKFLOW, stage2)
-    assert third.kwargs["secondary_image"] == source
-    assert bridge.status.startswith("Complete")
+    assert run.call_count == 2  # ReActor never auto-swaps unconfirmed faces.
+    assert "Stage 3 skipped" in bridge.status  # fixture intentionally has no images
 
 
 def test_v19_workflow_uses_aio_checkpoint_outputs():
@@ -195,7 +194,11 @@ def test_live_cache_profile_aliases_are_available_in_genesis():
              qt_cockpit.REMOTE_AISHA_BF16_MODEL, qt_cockpit.REMOTE_MIRACLEIN_V2_MODEL]
     info = {'UnetLoaderGGUF': {'input': {'required': {'unet_name': [names]}}}}
     profiles = qt_cockpit.build_remote_generation_profiles(info)
-    assert all(profile['runnable'] and profile['sourceRequired'] for profile in profiles)
+    assert all(profile['runnable'] for profile in profiles)
+    required = {profile['model'] for profile in profiles if profile['sourceRequired']}
+    assert required == set()  # Phr00t can generate without images
+    # Aisha and Miraclein have a saved Klein-family T2I route; don't
+    # incorrectly require a source photograph in the model picker.
 
 
 def test_runpod_launcher_can_load_machine_local_current_endpoint():

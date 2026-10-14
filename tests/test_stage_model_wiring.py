@@ -104,7 +104,7 @@ def test_shared_v23_q8_uses_gguf_route_and_selected_asset(monkeypatch, tmp_path,
     samplers = [n for n in prompt.values() if n['class_type'] == 'KSampler']
     assert samplers[0]['inputs']['steps'] == 4
     row = next(r for r in cockpit.build_remote_generation_profiles(catalog) if r['model'] == model)
-    assert row['runnable'] and row['sourceRequired']
+    assert row['runnable'] and not row['sourceRequired']  # native no-reference T2I
     assert row['loras'] == ['None']
 
 
@@ -227,3 +227,188 @@ def test_local_refinement_does_not_inherit_scene_replacement(monkeypatch, tmp_pa
         assert "selected pose/control" not in text
     else:
         assert text == cockpit.adapt_prompt(cockpit.REFINE_INSTRUCTION, model, source_image=True, include_realism=False)
+
+
+@pytest.mark.parametrize('workflow,model,encoder', [
+    (cockpit.STAGE_1_WORKFLOW, cockpit.REMOTE_PHR00T_V19_GGUF_MODEL, '4'),
+    (cockpit.REMOTE_PHR00T_V19_WORKFLOW, cockpit.REMOTE_PHR00T_V19_MODEL, '4'),
+    (cockpit.REMOTE_PHR00T_WORKFLOW, cockpit.REMOTE_PHR00T_MODEL, '5'),
+])
+def test_phr00t_true_text_to_image_uses_zero_input_images(monkeypatch, tmp_path, catalog, workflow, model, encoder):
+    client = Mock()
+    monkeypatch.setattr(cockpit, 'validate_operation_prompt', lambda *args: None)
+    bridge = cockpit.GenerationBridge()
+    graph = {}
+    monkeypatch.setattr(bridge, '_submit_and_save', lambda c, p, *args: graph.update(p) or tmp_path/'result.png')
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
+        result = bridge._run_reference_stage(client, catalog, workflow, None,
+            'A ceramic vase on a sunlit table', 'stamp', 'Phr00t-TextToImage',
+            model_override=model, controls={'width':1024,'height':640,'steps':4,'cfg':1.0})
+    assert result == tmp_path/'result.png'
+    client.upload_image.assert_not_called()
+    assert not any(n['class_type'] == 'LoadImage' for n in graph.values())
+    assert not any(key.startswith('image') for key in graph[encoder]['inputs'])
+    assert graph[encoder]['inputs']['prompt'] == 'A ceramic vase on a sunlit table'
+    assert graph['1']['inputs'].get('unet_name',graph['1']['inputs'].get('ckpt_name')) == model
+    sampler = next(n for n in graph.values() if n['class_type']=='KSampler')
+    assert sampler['inputs']['steps'] == 4 and sampler['inputs']['cfg'] == 1.0
+    assert any(n['class_type']=='EmptyLatentImage' for n in graph.values())
+
+
+@pytest.mark.parametrize('with_pose,field', [(False,'image2'),(True,'image3')])
+def test_phr00t_explicit_extra_reference_keeps_image_order(monkeypatch, tmp_path, catalog, with_pose, field):
+    source = tmp_path/'person.png';source.write_bytes(b'person')
+    extra = tmp_path/'appearance.png';extra.write_bytes(b'appearance')
+    pose = tmp_path/'pose.png';pose.write_bytes(b'pose')
+    client = Mock(); client.upload_image.side_effect=lambda p: {'name':p.name, 'subfolder':''}
+    bridge = cockpit.GenerationBridge()
+    monkeypatch.setattr(cockpit, 'validate_operation_prompt', lambda *args:None)
+    graph = {}
+    monkeypatch.setattr(bridge, '_submit_and_save', lambda c,p,*args:graph.update(p) or tmp_path/'result.png')
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
+        bridge._run_reference_stage(client,catalog,cockpit.STAGE_1_WORKFLOW,source,
+            'Photograph on a tabletop','stamp','Phr00t-v19-GGUF',
+            secondary_image=pose if with_pose else None,
+            controls={'extra_reference_url':extra.as_uri()},
+            model_override=cockpit.REMOTE_PHR00T_V19_GGUF_MODEL)
+    assert graph['4']['inputs']['image1'] == ['2',0]
+    if with_pose: assert graph['4']['inputs']['image2'] == ['3',0]
+    assert graph['4']['inputs'][field] == ['__genesis_extra_reference__',0]
+    assert graph['__genesis_extra_reference__']['inputs']['image']=='appearance.png'
+    assert graph['4']['inputs']['prompt'].endswith(
+        'as an additional visual reference, not a replacement for the main subject in Picture 1.')
+    assert 'Picture '+('3' if with_pose else '2') in graph['4']['inputs']['prompt']
+    assert client.upload_image.call_count == 3 if with_pose else client.upload_image.call_count == 2
+
+
+@pytest.mark.parametrize('pixel_size,optimized', [((768,512), True),((1344,832),True),((2264,1360),False)])
+def test_phr00t_isolated_framing_encoder_opt_in_and_quality_fallback(monkeypatch,tmp_path,catalog,pixel_size,optimized):
+    model=cockpit.REMOTE_PHR00T_V23_Q2_MODEL
+    cat=dict(catalog)
+    cat['GenesisQwenImageEditFraming']={'input':{'required':{'clip':['CLIP'],
+        'prompt':['STRING']},'optional':{'target_latent':['LATENT'],
+        'image1':['IMAGE'],'image2':['IMAGE'],'image3':['IMAGE'],'image4':['IMAGE'],
+        'vae':['VAE']}}}
+    client=Mock()
+    client.upload_image.return_value={'name':'source.png','subfolder':''}
+    bridge=cockpit.GenerationBridge()
+    graph={}
+    # This synthetic catalog only exercises graph wiring; real node-schema
+    # validation runs separately against local ComfyUI /object_info.
+    monkeypatch.setattr(cockpit.workflow_lab, 'validate_prompt', lambda *a: {
+        'valid':True,'missing_nodes':[],'missing_inputs':[]})
+    monkeypatch.setattr(cockpit,'validate_operation_prompt',lambda *a:None)
+    monkeypatch.setattr(bridge,'_submit_and_save',lambda c,p,*a:graph.update(p) or tmp_path/'saved.png')
+    with use_route(Route('LOCAL','')):
+        bridge._run_reference_stage(client,cat,cockpit.STAGE_1_WORKFLOW,tmp_path/'source.png',
+            'Change the teapot colour','stamp','Phr00t-v23-GGUF',
+            model_override=model,controls={'width':pixel_size[0],'height':pixel_size[1]})
+    encoder=graph['4']
+    assert encoder['class_type']==('GenesisQwenImageEditFraming' if optimized else 'TextEncodeQwenImageEditPlus')
+    assert ('target_latent' in encoder['inputs']) is optimized
+    if optimized: assert encoder['inputs']['target_latent']==graph['7']['inputs']['latent_image']
+    assert graph['6']['inputs']['width']==pixel_size[0]
+    assert graph['6']['inputs']['height']==pixel_size[1]
+
+
+def test_phr00t_framing_fallback_when_node_absent(monkeypatch,tmp_path,catalog):
+    bridge=cockpit.GenerationBridge()
+    client=Mock();client.upload_image.return_value={'name':'source.png'}
+    graph={}
+    monkeypatch.setattr(cockpit.workflow_lab,'validate_prompt',lambda *a: {
+        'valid':True,'missing_nodes':[],'missing_inputs':[]})
+    monkeypatch.setattr(cockpit,'validate_operation_prompt',lambda *a:None)
+    monkeypatch.setattr(bridge,'_submit_and_save',lambda c,p,*a:graph.update(p) or tmp_path/'saved.png')
+    with use_route(Route('LOCAL','')):
+        bridge._run_reference_stage(client,catalog,cockpit.STAGE_1_WORKFLOW,tmp_path/'source.png',
+            'A red teapot','stamp','Phr00t-GGUF',model_override=cockpit.QWEN_MODEL)
+    assert graph['4']['class_type']=='TextEncodeQwenImageEditPlus'
+    assert 'target_latent' not in graph['4']['inputs']
+
+
+def test_isolated_genesis_framing_node_does_not_replace_comfy_qwen_core():
+    source=(cockpit.PROJECT_ROOT/'genesis/reference/comfy_nodes/genesis_qwen_framing/__init__.py').read_text()
+    assert 'node_id="GenesisQwenImageEditFraming"' in source
+    assert 'node_id="TextEncodeQwenImageEditPlus"' not in source
+    assert 'async def comfy_entrypoint()' in source
+    assert 'target_latent' in source
+
+
+@pytest.mark.parametrize('model,tiled', [
+    (cockpit.QWEN_MODEL, True),
+    (cockpit.REMOTE_PHR00T_V23_Q2_MODEL, False),
+])
+@pytest.mark.parametrize('has_source', [False, True])
+def test_local_v19_q4_uses_tiled_vae_decode_without_changing_output_links(
+        monkeypatch, tmp_path, catalog, model, tiled, has_source):
+    info = dict(catalog)
+    info['VAEDecodeTiled'] = {'input': {'required': {
+        'samples': ['LATENT'], 'vae': ['VAE'],
+        'tile_size': ['INT'], 'overlap': ['INT'],
+        'temporal_size': ['INT'], 'temporal_overlap': ['INT'],
+    }}}
+    source = tmp_path / 'teapot.png' if has_source else None
+    client = Mock()
+    client.upload_image.return_value = {'name': 'teapot.png', 'subfolder': ''}
+    graph = {}
+    bridge = cockpit.GenerationBridge()
+    monkeypatch.setattr(cockpit.workflow_lab, 'validate_prompt', lambda *a: {
+        'valid': True, 'missing_nodes': [], 'missing_inputs': []})
+    monkeypatch.setattr(cockpit, 'validate_operation_prompt', lambda *a: None)
+    monkeypatch.setattr(bridge, '_submit_and_save',
+                        lambda cli, prompt, *a: graph.update(prompt) or tmp_path / 'out.png')
+    with use_route(Route('LOCAL', '')):
+        bridge._run_reference_stage(client, info, cockpit.STAGE_1_WORKFLOW,
+            source, 'A red teapot', 'stamp', 'Stage1',
+            controls={'width': 512, 'height': 704, 'steps': 4, 'cfg': 1.0},
+            model_override=model)
+    decoder = graph['8']
+    assert decoder['class_type'] == ('VAEDecodeTiled' if tiled else 'VAEDecode')
+    if tiled:
+        assert decoder['inputs'] == {
+            'samples': ['7', 0], 'vae': ['32', 0],
+            'tile_size': 256, 'overlap': 64,
+            'temporal_size': 64, 'temporal_overlap': 8,
+        }
+    else:
+        assert 'tile_size' not in decoder['inputs']
+    assert graph['9']['inputs']['images'] == ['8', 0]
+    assert graph['10']['inputs']['images'] == ['8', 0]
+
+
+def test_v19_q4_no_tiled_node_preserves_existing_comfy_oom_fallback(
+        monkeypatch, tmp_path, catalog):
+    client = Mock()
+    bridge = cockpit.GenerationBridge()
+    graph = {}
+    monkeypatch.setattr(cockpit.workflow_lab, 'validate_prompt', lambda *a: {
+        'valid': True, 'missing_nodes': [], 'missing_inputs': []})
+    monkeypatch.setattr(cockpit, 'validate_operation_prompt', lambda *a: None)
+    monkeypatch.setattr(bridge, '_submit_and_save',
+                        lambda cli, prompt, *a: graph.update(prompt) or tmp_path / 'out.png')
+    with use_route(Route('LOCAL', '')):
+        bridge._run_reference_stage(client, catalog, cockpit.STAGE_1_WORKFLOW,
+            None, 'A red teapot', 'stamp', 'Stage1',
+            model_override=cockpit.QWEN_MODEL)
+    assert graph['8']['class_type'] == 'VAEDecode'
+    assert 'tile_size' not in graph['8']['inputs']
+
+
+def test_runpod_v19_q4_never_uses_local_tiled_vae(monkeypatch, tmp_path, catalog):
+    info = dict(catalog)
+    info['VAEDecodeTiled'] = {'input': {'required': {
+        'samples': ['LATENT'], 'vae': ['VAE'],
+        'tile_size': ['INT'], 'overlap': ['INT'],
+        'temporal_size': ['INT'], 'temporal_overlap': ['INT'],
+    }}}
+    client = Mock()
+    bridge = cockpit.GenerationBridge()
+    graph = {}
+    monkeypatch.setattr(cockpit, 'validate_operation_prompt', lambda *a: None)
+    monkeypatch.setattr(bridge, '_submit_and_save',
+                        lambda cli, prompt, *a: graph.update(prompt) or tmp_path / 'out.png')
+    with use_route(Route('RUNPOD', 'https://test-8189.proxy.runpod.net')):
+        bridge._run_reference_stage(client, info, cockpit.STAGE_1_WORKFLOW,
+            None, 'A red teapot', 'stamp', 'Stage1',
+            model_override=cockpit.QWEN_MODEL)
+    assert graph['8']['class_type'] == 'VAEDecode'

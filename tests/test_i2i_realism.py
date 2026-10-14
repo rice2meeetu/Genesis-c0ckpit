@@ -12,10 +12,19 @@ from genesis.generation_pipeline import (adapt_prompt, realism_prompt,
 def test_i2i_realism_baseline_and_flexible_identity(model):
     result = adapt_prompt('Stand beside a chair with realistic skin texture, realistic anatomy.',
                           model, source_image=True, pose_image=True)
-    for phrase, _ in REALISM_COMPONENTS:
-        assert result.lower().count(phrase) == 1
-    assert 'distinguishing features' in result
-    assert 'expression' in result and 'viewpoint' in result
+    if model in {c.REMOTE_PHR00T_V19_MODEL,c.REMOTE_PHR00T_MODEL,c.REMOTE_PHR00T_V23_Q2_MODEL}:
+        # Phr00t is an image editor: it preserves the user's words without
+        # silently adding unrelated skin/hair/anatomy terms to object edits.
+        assert 'Picture 1 (image1)' in result and 'Picture 2 (image2)' in result
+        assert 'realistic skin texture' in result and 'realistic anatomy' in result
+        assert 'natural realistic skin texture' not in result
+        assert 'fine hair and detail' not in result
+        assert 'Do not invent additional people' in result
+    else:
+        for phrase, _ in REALISM_COMPONENTS:
+            assert result.lower().count(phrase) == 1
+        assert 'distinguishing features' in result
+        assert 'expression' in result and 'viewpoint' in result
     assert REFCONTROL_TRIGGER not in result
     assert 'pixel-perfect' not in result
 
@@ -28,7 +37,8 @@ def test_realism_deduplication_and_refinement_inheritance():
     second = adapt_prompt(first, c.REMOTE_PHR00T_MODEL,
                           source_image=True, include_realism=False)
     assert 'Stand beside a chair' in second
-    assert all(phrase not in second for phrase, _ in REALISM_COMPONENTS)
+    # "No auto-realism" should not remove deliberately supplied styling.
+    assert all(second.count(phrase) == 1 for phrase, _ in REALISM_COMPONENTS)
 
 
 def test_universal_rigid_rules_removed_without_losing_pose():

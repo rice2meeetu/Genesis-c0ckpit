@@ -260,8 +260,10 @@ def upscale_enhance(
             model_name = UPSCALE_MODEL.name
             if remote_url:
                 info = client.object_info()
-                models = info.get("UpscaleModelLoader", {}).get("input", {}).get("required", {}).get("model_name", [[]])[0]
-                model_name = next((m for m in models if "ultrasharp" in m.lower()), "")
+                from genesis.workflow_lab import _choice_values
+                spec = info.get("UpscaleModelLoader", {}).get("input", {}).get("required", {}).get("model_name", [])
+                models = _choice_values(spec)
+                model_name = next((str(m) for m in models if "ultrasharp" in str(m).lower()), "")
                 if not model_name:
                     raise ComfyError("The active RunPod has no UltraSharp upscaler")
             uploaded = client.upload_image(source, subfolder="genesis_media")

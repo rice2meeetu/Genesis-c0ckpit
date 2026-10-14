@@ -64,11 +64,11 @@ def test_generate_uses_typed_prompt_or_pose_prompt():
     import re
     from PyQt6.QtQml import QJSEngine
     qml = (c.UI_ROOT/'MainPremiumLinux.qml').read_text()
-    fn = re.search(r'    function generateCurrent\(\).*?\n    }', qml, re.S).group()
+    fn = re.search(r'    function generateCurrent\([^)]*\).*?\n    }', qml, re.S).group()
     engine = QJSEngine()
-    engine.evaluate('var captured; var genesisBridge={queueGenerateAdvanced:function(p){captured=p}}; var generationPrompt="", selectedPosePrompt="pose description", generationNegativePrompt="", generationWidth=1024,generationHeight=1024,selectedGenerationProfile={model:"sdxl"},selectedLora="None",selectedLoraTwo="None",generationSource="source",selectedPoseSource="pose",useStageTwo=false,useStageThree=false,useUpscale=false,generationSteps=25,generationCfg=4,generationSeed=1,generationDenoise=.65,generationSampler="euler",generationScheduler="karras",selectedLoraThree="None",selectedLoraStrength=0,selectedLoraTwoStrength=0,selectedLoraThreeStrength=0;')
+    engine.evaluate('var modeInputsReady=true, activeSourceImage=true; var captured; var genesisBridge={queueGenerateAdvanced:function(p){captured=p},setSdxlFaceID:function(){},setSourceReferenceMegapixels:function(){}}; var generationReferenceMegapixels=0; var sdxlFaceIDActive=false, sdxlFaceIDStrength=0.8; var generationPrompt="", selectedPosePrompt="pose description", generationNegativePrompt="", generationWidth=1024,generationHeight=1024,selectedGenerationProfile={model:"sdxl"},selectedLora="None",selectedLoraTwo="None",generationSource="source",selectedPoseSource="pose",useStageTwo=false,useStageThree=false,useUpscale=false,generationSteps=25,generationCfg=4,generationSeed=1,generationDenoise=.65,generationSampler="euler",generationScheduler="karras",selectedLoraThree="None",selectedLoraStrength=0,selectedLoraTwoStrength=0,selectedLoraThreeStrength=0;')
     assert not engine.evaluate(fn).isError()
-    engine.evaluate('generateCurrent()')
+    assert not engine.evaluate('generateCurrent()').isError()
     assert engine.evaluate('captured').toString() == 'pose description'
     engine.evaluate('generationPrompt="custom instruction"; generateCurrent()')
     assert engine.evaluate('captured').toString() == 'custom instruction'
@@ -153,9 +153,10 @@ def test_local_face_finishing_respects_selected_swap_engine(monkeypatch,tmp_path
     client=Mock();client.upload_image.return_value={'name':'image.png'}
     submit=Mock(return_value=tmp_path/'output');monkeypatch.setattr(b,'_submit_and_save',submit)
     with use_route(Route('LOCAL','')):
-        b._run_reference_stage(client,{},c.STAGE_3_WORKFLOW,tmp_path/'target','', 'stamp','FaceLock',secondary_image=tmp_path/'source')
-    actual=submit.call_args.args[1]
-    assert actual['3']['inputs']['swap_model']=='hyperswap_1a_256.onnx'
+        with pytest.raises(c.workflow_lab.ComfyError, match='target is unverified'):
+            b._run_reference_stage(client,{},c.STAGE_3_WORKFLOW,tmp_path/'target','', 'stamp','FaceLock',secondary_image=tmp_path/'source')
+    submit.assert_not_called()  # old unreviewed image-level face swap is forbidden
+    assert b._stage_three_engine == 'reactor_hyperswap'  # custom choice is retained
 
 
 def test_facefusion_gpu_failure_does_not_launch_cpu_fallback(monkeypatch,tmp_path):

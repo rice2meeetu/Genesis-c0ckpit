@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 import qt_cockpit as cockpit
 
 
@@ -33,6 +35,13 @@ def test_legacy_library_fallback(tmp_path, monkeypatch):
     assert cockpit.load_pose_items()[0]['source'] == (legacy / 'control.png').as_uri()
 
 
+@pytest.mark.skipif(
+    not (
+        cockpit.PROJECT_ROOT
+        / 'genesis/reference/assets/pose_library/NSFW_100Lewd_v20/poses/1.png'
+    ).is_file(),
+    reason='Optional imported 100Lewd pose assets are not installed',
+)
 def test_imported_collection_in_premium_ui(tmp_path):
     script = r'''
 import sys

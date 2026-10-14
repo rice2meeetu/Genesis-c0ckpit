@@ -38,7 +38,7 @@ class QtGenerationProfileTests(unittest.TestCase):
         self.assertFalse(profiles[0]["runnable"])  # local 9B render verification pending
         self.assertFalse(profiles[1]["runnable"])  # local 9B render verification pending
 
-    def test_phroot_is_runnable_but_explicitly_requires_source(self):
+    def test_phroot_is_runnable_with_optional_source(self):
         report = {"profiles": [{
             "name": "Phr00t / QwenRapid AIO",
             "ready": True,
@@ -46,7 +46,7 @@ class QtGenerationProfileTests(unittest.TestCase):
         }]}
         profile = build_generation_profiles(report, [])[0]
         self.assertTrue(profile["runnable"])
-        self.assertTrue(profile["sourceRequired"])
+        self.assertFalse(profile["sourceRequired"])
 
     def test_unavailable_models_are_not_exposed(self):
         report = {"profiles": [{"name": "Missing", "ready": False, "evidence": {"MODEL": None}}]}
@@ -259,37 +259,16 @@ class QtGenerationProfileTests(unittest.TestCase):
                 GenerationBridge._connect_comfyui(object())
         start.assert_not_called()
 
-    def test_verified_reactor_stage3_engine_selects_inswapper_model(self):
+    def test_old_reactor_stage3_requires_manual_review(self):
         from qt_cockpit import GenerationBridge, STAGE_3_WORKFLOW
-
         bridge = GenerationBridge()
         bridge.setStageThreeEngine("reactor_inswapper")
+        self.assertEqual(bridge._stage_three_engine, "reactor_inswapper")
         client = Mock()
-        client.upload_image.return_value = {"subfolder": "", "name": "target.png"}
-        prompt = {
-            "1": {"class_type": "LoadImage", "inputs": {"image": ""}},
-            "3": {"class_type": "ReActorFaceSwap", "inputs": {
-                "swap_model": "inswapper_128.onnx",
-                "face_restore_model": "none",
-                "codeformer_weight": 0.5,
-            }},
-        }
-        with patch("qt_cockpit.remote_url", return_value="http://runpod"), \
-             patch("qt_cockpit.workflow_lab.workflow_to_prompt", return_value=prompt), \
-             patch("qt_cockpit.workflow_lab.validate_prompt", return_value={
-                 "valid": True, "missing_nodes": [], "missing_inputs": []
-             }), patch("qt_cockpit.validate_operation_prompt"), \
-             patch.object(bridge, "_submit_and_save", return_value=Path("/tmp/out.png")) as submit:
-            bridge._run_reference_stage(
-                client, {}, STAGE_3_WORKFLOW, Path("/tmp/target.png"),
-                "", "stamp", "Stage3",
-            )
-        sent = submit.call_args.args[1]
-        self.assertEqual(sent["3"]["inputs"]["swap_model"], "inswapper_128.onnx")
-        self.assertEqual(
-            sent["3"]["inputs"]["face_restore_model"], "codeformer-v0.1.0.pth"
-        )
-        self.assertEqual(sent["3"]["inputs"]["codeformer_weight"], 0.40)
+        with self.assertRaisesRegex(Exception, "target is unverified"):
+            bridge._run_reference_stage(client, {}, STAGE_3_WORKFLOW,
+                                        Path("/tmp/target.png"), "", "stamp", "Stage3")
+        client.upload_image.assert_not_called()
 
     def test_pending_stage3_engine_is_not_accepted(self):
         from qt_cockpit import GenerationBridge

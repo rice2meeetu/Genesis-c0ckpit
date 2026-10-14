@@ -55,8 +55,9 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert 'text: "COMPATIBLE LORA"' in qml
     assert 'text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()' in qml
     assert 'text: "Stage 2 · refine"' in qml
-    assert 'text: "Stage 3 · identity lock"' in qml
-    assert 'model: ["Single model", "3-stage · Selected model → Refine → Identity"]' in qml
+    assert 'text: "Stage 3 · review Person A face after generation"' in qml
+    assert 'model: appRoot.stageTwoReady && appRoot.stageThreeReady && appRoot.activeSourceImage' in qml
+    assert '? ["Single model", "3-stage · Selected model → Refine → Identity"] : ["Single model"]' in qml
     assert "appRoot.useStageTwo = fullPipeline" in qml
     assert "appRoot.useStageThree = fullPipeline" in qml
     assert '"ReActor · Inswapper"' in qml

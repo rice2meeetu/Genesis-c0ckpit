@@ -29,8 +29,32 @@ class GenerationPipelineTests(unittest.TestCase):
 
     def test_qwen_adapter_prioritises_identity_for_source_edits(self):
         result = adapt_prompt("turn toward camera", "Qwen-Rapid-AIO-NSFW-v19.safetensors", source_image=True)
-        self.assertIn("Preserve the same person", result)
+        self.assertIn("preserve the same person and facial identity", result)
+        self.assertIn("Picture 1", result)
         self.assertIn("turn toward camera", result)
+
+    def test_phr00t_object_edit_does_not_force_skin_hair_or_people(self):
+        result = adapt_prompt("Change the glaze of the ceramic teapot to blue",
+                              "Qwen-Rapid-NSFW-v23_Q2_K.gguf", source_image=True)
+        self.assertIn("Picture 1", result)
+        self.assertIn("glaze of the ceramic teapot to blue", result)
+        self.assertIn("Do not invent additional people", result)
+        self.assertNotIn("Realism:", result)
+        self.assertNotIn("skin texture", result)
+        self.assertNotIn("fine hair", result)
+        self.assertNotIn("natural body proportions", result)
+        self.assertNotIn("Picture 2", result)
+
+    def test_phr00t_pose_uses_qwen_picture_order_without_copying_face(self):
+        result = adapt_prompt("Make Person A standing in the reference pose",
+                              "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf",
+                              source_image=True, pose_image=True)
+        self.assertIn("Picture 1 (image1)", result)
+        self.assertIn("Picture 2 (image2) only for pose", result)
+        self.assertIn("do not copy its face or identity", result)
+        self.assertIn("Person B", result)
+        self.assertIn("Edit instruction: Make Person A standing", result)
+        self.assertNotIn("Realism:", result)
 
     def test_incompatible_lora_is_blocked(self):
         with self.assertRaisesRegex(ValueError, "Incompatible"):
