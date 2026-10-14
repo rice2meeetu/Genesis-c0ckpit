@@ -2592,7 +2592,9 @@ class GenerationBridge(QObject):
             )
             thread.start()
             started = True
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, RuntimeError) as exc:
+            # Thread.start() can raise RuntimeError before any worker exists;
+            # keep the saved image and release Busy for later queued jobs.
             self._set_status("Generation saved · Stage 3 selection failed · " + str(exc))
         finally:
             self._pending_stage_three = False
@@ -3467,7 +3469,10 @@ class GenerationBridge(QObject):
                     self._set_status("Generation saved · Stage 3 skipped: original Person A image missing.")
                 else:
                     try:
-                        face_route = self._operation_route('face_swap') or Route('LOCAL', '')
+                        # Route Stage 3 with the snapshotted identity engine.
+                        # Standalone NSFW FaceFusion must not depend on online
+                        # local ComfyUI/ReActor after a successful generation.
+                        face_route = self._person_a_face_swap_route()
                         if face_route.destination != 'LOCAL':
                             raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
                     except ValueError as exc:
