@@ -62,7 +62,11 @@ def test_queued_operations_capture_route_before_thread_start(tmp_path, monkeypat
     monkeypatch.setattr(bridge, '_run_' + operation, worker)
     thread = Mock()
     monkeypatch.setattr(cockpit.threading, 'Thread', thread)
-    if operation == 'face_swap': bridge.queueFaceSwap(uri, uri)
+    if operation == 'face_swap':
+        # This test checks route capture, not the dialog. User selection is
+        # exercised in test_face_region_dialog_ui.py (accept and cancel).
+        monkeypatch.setattr('genesis.person_a_targeting.choose_face_region', lambda *_: Mock())
+        bridge.queueFaceSwap(uri, uri)
     elif operation == 'edit': bridge.queueEdit(uri, 'neutral mug', 0.5)
     else: bridge.queueInpaint(uri, uri, 'neutral mug', 0.5)
     bridge.backend_router.resolve_operation.assert_called_once_with(operation)

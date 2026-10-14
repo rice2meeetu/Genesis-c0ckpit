@@ -156,13 +156,14 @@ class AssistantBridge(QObject):
         return self.localModel
 
     def _cloud_base_url(self) -> str:
-        return os.environ.get("GENESIS_CLOUD_BASE_URL", "").strip().rstrip("/")
+        value = (os.environ.get("GENESIS_BRAIN_URL") or os.environ.get("GENESIS_CLOUD_BASE_URL", "")).strip().rstrip("/")
+        return value[:-3] if value.endswith("/v1") else value
 
     def _cloud_api_key(self) -> str:
         return os.environ.get("GENESIS_CLOUD_API_KEY", "").strip()
 
     def _cloud_model(self) -> str:
-        return os.environ.get("GENESIS_CLOUD_MODEL", "").strip()
+        return (os.environ.get("GENESIS_BRAIN_MODEL") or os.environ.get("GENESIS_CLOUD_MODEL", "")).strip()
 
     def _set_status(self, value: str) -> None:
         self._status = value

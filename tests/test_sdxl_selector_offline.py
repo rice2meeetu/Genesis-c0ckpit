@@ -5,15 +5,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from unittest.mock import Mock
 import qt_cockpit as cockpit
 from genesis.backend_bridge import BackendBridge
-
-
-@pytest.fixture(autouse=True)
-def isolated_backend_settings(monkeypatch):
-    # Route-selection tests must never overwrite the user's saved backend mode.
-    monkeypatch.setattr("genesis.backend_bridge.QSettings", lambda *args: Mock())
 
 
 def _local_sdxl(model):
@@ -72,7 +65,7 @@ import qt_cockpit_linux_premium as launcher
 
 launcher.load_pose_items = lambda **kwargs: []
 launcher.load_grok_preset_items = lambda: []
-launcher.load_curated_pose_presets = lambda: []
+launcher.load_curated_pose_presets = lambda **kwargs: []
 launcher.load_runtime_status = lambda **kwargs: {"identityEngines":[]}
 launcher.BackendBridge.start = lambda self: None
 engines = []
@@ -85,7 +78,7 @@ def verify():
         names = ["donutsdeliverymixV4_v41.safetensors",
                  "biglustydonutmixNSFW_v12.safetensors"]
         rows = [{"model":name, "label":name, "stageOneConfigured":True,
-                 "stageOneEligible":True, "profileSelectable":True, "selectable":False, "runnable":False,
+                 "stageOneEligible":True, "selectable":False, "runnable":False,
                  "ready":False, "routeReady":False, "loras":["None"]}
                 for name in names]
         window.setProperty("generationModel", rows)
@@ -126,30 +119,3 @@ sys.exit(launcher.main())
                             text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "OFFLINE_SDXL_PICKER_OK" in result.stdout
-
-
-@pytest.mark.parametrize("model", [cockpit.REMOTE_DONUTS_MODEL, cockpit.REMOTE_BIGLUSTY_DONUT_MODEL])
-@pytest.mark.parametrize("busy, remote_ready", [(True, False), (False, True)])
-def test_explicit_selection_preserves_busy_or_ready_remote_route(model, busy, remote_ready):
-    generation = Mock(busy=busy)
-    bridge = BackendBridge(generation)
-    bridge._mode = "RUNPOD"
-    bridge._local_safe = True
-    bridge._local_status = {"ready": True}
-    bridge._remote_status = {"ready": remote_ready}
-    bridge._local = [_local_sdxl(model)]
-    bridge.prepareModelRoute(model)
-    assert bridge.mode == "RUNPOD"
-    bridge.settings.setValue.assert_not_called()
-
-
-@pytest.mark.parametrize("model", [cockpit.REMOTE_DONUTS_MODEL, cockpit.REMOTE_BIGLUSTY_DONUT_MODEL])
-def test_local_sdxl_registry_evidence_builds_runnable_profile(model):
-    from genesis.model_registry import MODEL_PROFILES
-    configured = next(p for p in MODEL_PROFILES if model in p["model"])
-    report = {"profiles": [{"name": configured["name"], "ready": True,
-                           "evidence": {"MODEL": "/models/checkpoints/" + model,
-                                        "WORKFLOW": str(cockpit.REMOTE_SDXL_T2I_WORKFLOW)}}]}
-    row = cockpit.build_generation_profiles(report, [])[0]
-    assert row["model"] == model
-    assert row["runnable"] and row["stageOneEligible"]

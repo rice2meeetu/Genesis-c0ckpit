@@ -409,27 +409,25 @@ def pose_library_index() -> list[dict]:
         return []
 
     if isinstance(data, list):
-        return [
-            x for x in data
-            if isinstance(x, dict)
-        ]
+        entries = data
+    elif isinstance(data, dict):
+        entries = next((data[key] for key in ("poses", "items", "library", "entries")
+                        if isinstance(data.get(key), list)), [])
+    else:
+        return []
 
-    if isinstance(data, dict):
-        for key in (
-            "poses",
-            "items",
-            "library",
-            "entries",
-        ):
-            value = data.get(key)
-
-            if isinstance(value, list):
-                return [
-                    x for x in value
-                    if isinstance(x, dict)
-                ]
-
-    return []
+    # The versioned index may describe privately installed images.  Never
+    # advertise a pose if its file is absent, and never resolve a manifest
+    # path outside the user's installed pose-library directory.
+    library_root = (REFERENCE_DIR / "assets" / "pose_library").resolve()
+    available = []
+    for item in entries:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            continue
+        candidate = (library_root / item["path"]).resolve()
+        if candidate.is_relative_to(library_root) and candidate.is_file():
+            available.append(item)
+    return available
 
 
 def pose_library_categories() -> list[str]:

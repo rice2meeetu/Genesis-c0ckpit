@@ -63,6 +63,7 @@ PAGE_INDEXES = {
     "face-swap": 12,
     "grok": 13,
     "home": 14,
+    "characters": 15,
 }
 
 AI_NAV_MARKER = '        {icon:"☷", label:"Settings", page:10}'
@@ -84,7 +85,7 @@ GROK_PAGE_QML = r"""
                                 spacing: 10
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Text { Layout.fillWidth: true; text: "GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
+                                    Text { Layout.fillWidth: true; text: "MUNGBEAN"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
                                     Text { text: backendBridge.message; color: appRoot.textDim; font.pixelSize: 10; elide: Text.ElideRight; Layout.maximumWidth: 520 }
                                 }
                                 Text {
@@ -105,22 +106,15 @@ GROK_PAGE_QML = r"""
                                         onEditingFinished: backendBridge.setEndpoint(text)
                                     }
                                     GButton { text: backendBridge.checking ? "Checking…" : "Refresh backend"; enabled: !backendBridge.checking; onClicked: backendBridge.refresh() }
-                                    GButton { text: "Open Grok UI"; active: true; onClicked: moduleBridge.triggerAction("grok imagine") }
+                                    GButton { text: "Open Mungbean"; active: true; onClicked: moduleBridge.triggerAction("grok imagine") }
                                 }
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    color: "#070707"
-                                    radius: 2
-                                    border.color: appRoot.line
-                                    Column {
-                                        anchors.centerIn: parent
-                                        spacing: 8
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "MUNGBEAN GROK IMAGINE"; color: appRoot.brightGold; font.pixelSize: 20; font.bold: true }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Auto · Klein 9B · Aisha · Qwen Edit · WAN Fast · WAN Quality"; color: appRoot.textDim; font.pixelSize: 11 }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Use Open Grok UI for the full canvas, reference-image, history and video interface."; color: appRoot.textDim; font.pixelSize: 11 }
-                                    }
+                                Loader {
+                                    Layout.fillWidth: true; Layout.fillHeight: true
+                                    active: moduleBridge.studioUrl.length > 0 && appRoot.pageIndex === 13 && !privacyMode
+                                    sourceComponent: Component { WebEngineView { url: moduleBridge.studioUrl; backgroundColor: "#070707" } }
                                 }
+                                Text { visible: moduleBridge.studioUrl.length === 0; text: "Open Mungbean to load its full image/video workspace."; color: appRoot.textDim }
+
                             }
                         }
                     }
@@ -188,9 +182,10 @@ def main() -> int:
     context = engine.rootContext()
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
-    context.setContextProperty("poseItems", load_pose_items(limit=600))
+    pose_rows = load_pose_items(limit=600)
+    context.setContextProperty("poseItems", pose_rows)
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
-    context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
+    context.setContextProperty("curatedPosePresets", load_curated_pose_presets(pose_rows=pose_rows))
     context.setContextProperty("generationProfiles", [])
     context.setContextProperty("runtimeStatus", load_runtime_status(probe_remote=False))
 
@@ -238,6 +233,32 @@ def main() -> int:
 
     window = engine.rootObjects()[0]
     window.setProperty("pageIndex", PAGE_INDEXES[args.page])
+    from genesis.pose_workbench import POSE_WORKBENCH_HANDOFF_FILE, consume_pose_workbench_handoff
+    def accept_pose_handoff():
+        if generation_bridge.busy or not POSE_WORKBENCH_HANDOFF_FILE.is_file():
+            return
+        try:
+            source = window.property("generationSource").toLocalFile()
+            pose = window.property("selectedPoseSource").toLocalFile()
+            next_source, next_pose, _ = consume_pose_workbench_handoff(source, pose, "skeleton", POSE_WORKBENCH_HANDOFF_FILE)
+            if next_source != source:
+                window.setProperty("generationSource", QUrl.fromLocalFile(next_source))
+            if next_source:
+                # A source-bearing handoff is an explicit request to use it.
+                window.setProperty("useSourceImageMode", True)
+            if next_pose != pose:
+                window.setProperty("selectedPoseSource", QUrl.fromLocalFile(next_pose))
+                window.setProperty("selectedPoseThumbnail", QUrl.fromLocalFile(next_pose))
+                window.setProperty("selectedPoseName", Path(next_pose).stem)
+            window.setProperty("pageIndex", 1)
+            generation_bridge._set_status("Pose handoff loaded · source and pose remain separate.")
+        except ValueError as exc:
+            generation_bridge._set_status(str(exc))
+    if not args.screenshot:
+        pose_handoff_timer = QTimer(app)
+        pose_handoff_timer.timeout.connect(accept_pose_handoff)
+        pose_handoff_timer.start(1000)
+        accept_pose_handoff()
     if args.screenshot and args.review_image:
         review_image = Path(args.review_image).expanduser().resolve()
         if not review_image.is_file():

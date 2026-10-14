@@ -113,9 +113,9 @@ def test_preset_binding_keeps_uploaded_source_and_refreshes_model_payload():
     for name in ('applyPose','applyGenerationDefaults','applyPresetPayload'):
         function=re.search(r'    function '+name+r'\(.*?\n    }',qml,re.S).group()
         assert not engine.evaluate(function).isError()
-    engine.evaluate('''var generationSource="untouched-master.png", selectedGenerationProfile={model:"v19"}, activeGenerationDefaults={};
-    var selectedPresetPayload=null, selectedPoseSource, selectedPoseThumbnail, selectedPoseName, selectedPoseCategory, selectedPosePrompt, selectedPresetName, generationPrompt, generationNegativePrompt, presetAttribution, presetSettingsNote, generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationSeed;
-    var moduleBridge={posePresetPayload:function(row,model){return {prompt:model+" original",negativePrompt:"",attribution:"Pack",settings:{steps:model==="v19"?6:4},settingsNote:"Tested"}}};''')
+    engine.evaluate('''var generationSource="untouched-master.png", selectedGenerationProfile={model:"v19"}, activeGenerationDefaults={}, activeSourceImage=true, sdxlFaceIDEnabled=false;
+    var selectedPresetPayload=null, selectedPoseSource, selectedPoseThumbnail, selectedPoseName, selectedPoseCategory, selectedPosePrompt, selectedPresetName, selectedPresetId, generationPrompt, generationNegativePrompt, presetAttribution, presetSettingsNote, generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationSeed;
+    var genesisBridge={posePresetPayload:function(row,model){return {prompt:model+" original",negativePrompt:"",attribution:"Pack",settings:{steps:model==="v19"?6:4},settingsNote:"Tested"}}};''')
     assert not engine.evaluate('applyPose({source:"control.png",prompt:"fallback"})').isError()
     assert engine.evaluate('generationSource').toString()=='untouched-master.png'
     assert engine.evaluate('selectedPoseSource').toString()=='control.png'
@@ -133,11 +133,13 @@ def test_phr00t_gguf_uses_installed_matching_encoder_without_other_family_fallba
     loader=info['CLIPLoaderGGUF']['input']['required']
     loader['clip_name']=[[c.REMOTE_PHR00T_CLIP]]
     graph=c.remote_workflow_prompt(c.STAGE_1_WORKFLOW,info)
-    node=next(n for n in graph.values() if n['class_type']=='CLIPLoaderGGUF')
+    node=next(n for n in graph.values() if 'CLIPLoader' in n['class_type'])
+    # Scaled FP8 safetensors must use the regular loader; GGUF loader rejects it at runtime.
+    assert node['class_type']=='CLIPLoader'
     assert node['inputs']['clip_name']==c.REMOTE_PHR00T_CLIP
     loader['clip_name']=[['qwen_3_8b_fp8mixed.safetensors']]
     graph=c.remote_workflow_prompt(c.STAGE_1_WORKFLOW,info)
-    node=next(n for n in graph.values() if n['class_type']=='CLIPLoaderGGUF')
+    node=next(n for n in graph.values() if 'CLIPLoader' in n['class_type'])
     assert node['inputs'].get('clip_name')!='qwen_3_8b_fp8mixed.safetensors'
 
 
@@ -160,3 +162,16 @@ def test_edit_adapter_does_not_leak_unvalidated_refcontrol_phrase(model):
     p=adapt_prompt(REFCONTROL_TRIGGER+'. Turn left',model,source_image=True,pose_image=True)
     assert REFCONTROL_TRIGGER not in p
     assert 'Turn left' in p
+
+
+def test_generation_bridge_exposes_payload_to_qml():
+    import qt_cockpit as cockpit
+    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtQml import QJSEngine
+    app = QApplication.instance() or QApplication([])
+    bridge = cockpit.GenerationBridge()
+    engine = QJSEngine()
+    engine.globalObject().setProperty('genesisBridge', engine.newQObject(bridge))
+    result = engine.evaluate('genesisBridge.posePresetPayload({prompt: "Change the pose naturally"}, "Qwen-Rapid-AIO-NSFW-v19_Q8_0.gguf").prompt')
+    assert not result.isError(), result.toString()
+    assert result.toString() == 'Change the pose naturally'

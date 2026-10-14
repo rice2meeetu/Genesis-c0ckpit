@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QTimer, Qt, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, QSettings, QTimer, Qt, QUrl, pyqtProperty, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
 from genesis.qt_media_picker import FilePicker as QFileDialog
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineUrlRequestInterceptor
@@ -12,14 +13,35 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 WORKFLOWS = Path(__file__).resolve().parent / "reference/pose_workflows"
 USER_WORKFLOWS = Path.home() / "AI/ComfyUI/user/default/workflows"
-LOCAL_COMFY = QUrl("http://127.0.0.1:8188/")
-GRAPH_NAMES = (
-    "GENESIS_MIRACLEIN_9B_T2I.json",
-    "GENESIS_MIRACLEIN_9B_EDIT.json",
-    "GENESIS_PORNMASTER_9B_T2I.json",
-    "GENESIS_PORNMASTER_9B_EDIT.json",
-    "GENESIS_DARKBEAST_9B_IDENTITY.json",
-)
+LOCAL_COMFY = "http://127.0.0.1:8188"
+
+
+def bundled_workflows() -> tuple[tuple[str, bool], ...]:
+    """Return every bundled workflow and whether it contains a visual ComfyUI graph."""
+    rows = []
+    for path in sorted(WORKFLOWS.glob("*.json"), key=lambda item: item.name.casefold()):
+        try:
+            graph = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        visual = isinstance(graph, dict) and isinstance(graph.get("nodes"), list) and isinstance(graph.get("links"), list)
+        if isinstance(graph, dict):
+            rows.append((path.name, visual))
+    return tuple(rows)
+
+
+def visual_graph_names() -> tuple[str, ...]:
+    return tuple(name for name, visual in bundled_workflows() if visual)
+
+
+def graph_service_url() -> QUrl:
+    """Use the same ComfyUI backend as GENESIS so remote-only nodes are available in the editor."""
+    settings = QSettings("GENESIS", "c0ckpit")
+    mode = (os.environ.get("GENESIS_BACKEND_MODE") or str(settings.value("backend/mode", "AUTO"))).upper()
+    explicit = (os.environ.get("GENESIS_RUNPOD_URL") or os.environ.get("GENESIS_COMFY_URL") or "").strip()
+    saved = str(settings.value("backend/runpod_url", "") or "").strip()
+    endpoint = explicit or (saved if mode == "RUNPOD" else "") or LOCAL_COMFY
+    return QUrl(endpoint.rstrip("/") + "/")
 
 
 class GraphRequestGuard(QWebEngineUrlRequestInterceptor):
@@ -52,7 +74,10 @@ class WorkflowGraphBridge(QObject):
         self._guard = None
         self._pending = None
         self._loaded = False
-        self._status = "Open a saved graph to edit its nodes and connections. GPU queue is blocked here."
+        self._workflow_rows = bundled_workflows()
+        self._graph_names = tuple(name for name, _visual in self._workflow_rows)
+        self._service_url = graph_service_url()
+        self._status = "Open a saved graph to edit its complete nodes and connections. GPU queue is blocked here."
 
     @pyqtProperty(str, notify=statusChanged)
     def status(self):
@@ -61,7 +86,9 @@ class WorkflowGraphBridge(QObject):
     @pyqtProperty("QVariantList", constant=True)
     def workflows(self):
         return [{"name": name.removesuffix(".json").replace("GENESIS_", "").replace("_", " "),
-                 "file": name} for name in GRAPH_NAMES]
+                 "file": name, "visual": visual,
+                 "format": "Visual graph" if visual else "Executable API workflow"}
+                for name, visual in self._workflow_rows]
 
     def _set_status(self, status):
         self._status = status
@@ -95,7 +122,7 @@ class WorkflowGraphBridge(QObject):
         layout.addWidget(self._view, 1)
         window.setCentralWidget(container)
         self._window = window
-        self._view.setUrl(LOCAL_COMFY)
+        self._view.setUrl(self._service_url)
         QTimer.singleShot(10000, self._loading_timeout)
 
     def _loading_timeout(self):
@@ -106,17 +133,18 @@ class WorkflowGraphBridge(QObject):
     def reconnect(self):
         if self._view:
             self._loaded = False
-            self._set_status("Connecting to local ComfyUI graph service…")
-            self._view.setUrl(LOCAL_COMFY)
+            self._service_url = graph_service_url()
+            self._set_status("Connecting to ComfyUI graph service at " + self._service_url.toString())
+            self._view.setUrl(self._service_url)
             QTimer.singleShot(10000, self._loading_timeout)
 
     def _on_loaded(self, success):
         if not success:
             self._loaded = False
-            self._set_status("Local ComfyUI is offline · use Reconnect after starting it")
+            self._set_status("ComfyUI graph service is offline at " + self._service_url.toString() + " · use Reconnect")
             return
         self._loaded = True
-        self._set_status("Graph editor ready · prompt queue blocked")
+        self._set_status("Graph editor ready at " + self._service_url.toString() + " · full UI graph preserved · prompt queue blocked")
         if self._pending:
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(900, self._load_pending)
@@ -144,13 +172,22 @@ class WorkflowGraphBridge(QObject):
 
     @pyqtSlot(str)
     def openGraph(self, name=""):
-        if name and name not in GRAPH_NAMES:
+        if name and name not in self._graph_names:
             self._set_status("Unknown GENESIS workflow")
             return
         if name:
             self._pending = WORKFLOWS / name
             if not self._pending.is_file():
                 self._set_status("Workflow file is missing: " + name)
+                return
+            try:
+                graph = json.loads(self._pending.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                self._set_status("Workflow could not be read: " + str(exc))
+                return
+            if not (isinstance(graph.get("nodes"), list) and isinstance(graph.get("links"), list)):
+                self._set_status(name + " is an executable API workflow. It is used by Image Gen but has no saved visual node layout.")
+                self._pending = None
                 return
         if self._window is None:
             self._create_window()

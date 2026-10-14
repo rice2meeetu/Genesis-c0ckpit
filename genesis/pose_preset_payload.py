@@ -31,6 +31,52 @@ def source_metadata(row, source_path=None):
     return {}
 
 
+# Family wording for the preserved authored pose descriptions. These are
+# architectural instruction styles, NOT claims that every pose has been
+# rendered on every checkpoint. Sampling defaults come from each model profile.
+_POSE_MODEL_INSTRUCTIONS = {
+    "qwen_image": "Body and viewpoint: {pose}. Give clear instructions for the requested arrangement; preserve each person's distinct appearance when identity references are supplied.",
+    "qwen_image_2_1": "Body positions, camera and composition: {pose}. Keep the subjects distinct and their visible limbs coherent; follow any provided image references in order.",
+    "sdxl": "{pose}. Photorealistic scene, readable limb geometry, consistent body proportions, distinct people. If an OpenPose control image is selected, use its skeleton for positioning rather than copying the source photograph's body pose.",
+    "pony_sdxl": "{pose}. Clearly defined body arrangement, coherent perspective, distinct subjects, balanced composition. Use a selected pose skeleton for body positioning.",
+    "sd15": "{pose}. Coherent framing and recognizable body arrangement; distinguish people and avoid duplicate limbs.",
+    "flux2_klein_4b": "Body pose: {pose}. Composition: plausible anatomy and clear relative positions. Keep the face reference separate from pose control, if provided.",
+    "flux2_klein_9b_base": "Body pose: {pose}. Composition: precise geometry and spatial relationship of each subject. Treat the separate pose and identity references as distinct inputs, when supplied.",
+    "flux2_klein_9b_kv": "Body pose: {pose}. Composition: precise geometry and spatial relationship of each subject. Keep identity distinct from any separately supplied pose reference.",
+    "aisha_9b": "Pose instruction: {pose}. Maintain coherent anatomy and distinguish individual subjects; retain a supplied identity reference separately from body pose.",
+}
+
+
+def _authored_family_prompt(row, model):
+    """Keep the authored pose and apply the selected architecture's instruction style."""
+    preset_id = str(row.get("id", ""))
+    if not preset_id.startswith(("full70:", "curated18:")):
+        return ""
+    family = model_family(model)
+    template = _POSE_MODEL_INSTRUCTIONS.get(family)
+    if not template:
+        return ""
+    text = str(row.get("prompt") or "")
+    if preset_id.startswith("full70:"):
+        match = re.search(r"(?im)^\s*Pose:\s*(.+?)\s*$", text)
+        if not match:
+            return ""  # fail closed, no fabricated pose meaning
+        pose = match.group(1).strip().rstrip(".")
+    else:
+        # This import's image1 directive belongs to its old Qwen route.
+        # Identity behavior now comes from the selected executable workflow.
+        pose = re.sub(r"(?i)\bPreserve\s+<?image1>?(?:'s)?\s+identity[.\s]*", "", text).strip().rstrip(".")
+    if not pose:
+        return ""
+    if family == "qwen_image":
+        stem = str(model).lower()
+        if "v19" in stem:
+            template += " Prioritize consistency with the original Person A image over unnecessary appearance changes."
+        elif "v22" in stem or "v23" in stem:
+            template += " Follow the edit instruction explicitly without merging multiple people into one identity."
+    return template.format(pose=pose)
+
+
 def preset_payload(row, model):
     """Prefer suitable original text, without combining it with the Grok fallback.
 
@@ -60,7 +106,10 @@ def preset_payload(row, model):
     suitable = not targets or matched
     chosen = {**original, **variant} if suitable else dict(variant)
     source_prompt = str(chosen.get("prompt") or "").strip()
-    text = source_prompt or str(row.get("prompt") or "").strip()
+    family_prompt = _authored_family_prompt(row, model) if not source_prompt else ""
+    text = source_prompt or family_prompt or str(row.get("prompt") or "").strip()
+    if str(row.get("id", "")).startswith("curated18:") and family in {"sdxl", "pony_sdxl", "sd15"}:
+        text = re.sub(r"(?i)\bPreserve\s+<?image1>?(?:'s)?\s+identity[.\s]*", "", text).strip()
     # Image ordering syntax belongs to the executable RefControl route alone.
     text = re.sub(re.escape(REFCONTROL_TRIGGER) + r"[.\s]*", "", text, flags=re.I)
     scoped = bool(variant) or matched
@@ -96,14 +145,20 @@ def preset_payload(row, model):
         }.items():
             if values.get(key) in allowed:
                 settings[key] = values[key]
-    attribution = chosen.get("attribution", original.get("attribution", "")) if source_prompt or settings or triggers else row.get("promptSource", "Grok fallback")
+    attribution = ("GENESIS family adaptation of the authored pose description (not a model-author benchmark)"
+                   if family_prompt else
+                   (chosen.get("attribution", original.get("attribution", "")) if source_prompt or settings or triggers
+                    else row.get("promptSource", "Grok fallback")))
     if isinstance(attribution, dict):
         attribution = " · ".join(str(attribution[k]) for k in ("author", "title", "url") if attribution.get(k))
     return {"prompt": normalize_identity_instruction(text), "negativePrompt": negative,
-            "settings": settings, "promptSource": "SOURCE_PACK" if source_prompt else row.get("promptSource", "GROK_FALLBACK"),
+            "settings": settings, "promptSource": ("SOURCE_PACK" if source_prompt else
+                "GENESIS_FAMILY_ADAPTED" if family_prompt else row.get("promptSource", "GROK_FALLBACK")),
             "attribution": str(attribution),
             "settingsSource": "SOURCE_PACK" if settings else "MODEL_DEFAULT",
-            "settingsNote": "Pack settings applied for this model." if settings else "Using this model’s defaults; no matching tested pack settings."}
+            "settingsNote": "Pack settings applied for this model." if settings else
+                ("Family-specific wording; steps, CFG, sampler and scheduler from the selected model profile."
+                 if family_prompt else "Using this model’s defaults; no matching tested pack settings.")}
 
 
 def pose_preset_references(rows):

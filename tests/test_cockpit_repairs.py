@@ -261,23 +261,7 @@ class CockpitRepairTests(unittest.TestCase):
         )
 
     def test_workbench_consumes_pose_and_source_roles_without_touching_stage_outputs(self):
-        pose_app = Path.home() / "AI/GENESIS_POSE_MAKER/app.py"
-        if not pose_app.is_file():
-            self.skipTest("External Pose Maker is not installed; its handoff consumer remains unverified.")
-        tree = ast.parse(pose_app.read_text(encoding="utf-8"))
-        function = next(
-            node
-            for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-            and node.name == "consume_pose_workbench_handoff"
-        )
-        namespace = {
-            "Path": Path,
-            "json": __import__("json"),
-            "POSE_WORKBENCH_HANDOFF_FILE": Path("unused-test-handoff.json"),
-        }
-        exec(compile(ast.Module([function], type_ignores=[]), str(pose_app), "exec"), namespace)
-        consume = namespace["consume_pose_workbench_handoff"]
+        from genesis.pose_workbench import consume_pose_workbench_handoff as consume
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

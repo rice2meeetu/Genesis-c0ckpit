@@ -20,7 +20,13 @@ def remote_identity_engines(info: dict) -> list[str]:
     This keeps configured identity routes visible without claiming unavailable
     custom nodes or weights are usable on the current pod.
     """
-    node = info.get("ReActorFaceSwap") or {}
+    # Generation Stage 3 and manual Person A correction use the options-based
+    # ReActor graph, not the legacy ReActorFaceSwap node. Advertise readiness
+    # only when the exact nodes required by that graph are present.
+    required_nodes = ("ReActorFaceSwapOpt", "ReActorOptions", "LoadImage", "SaveImage")
+    if not all(name in info for name in required_nodes):
+        return []
+    node = info["ReActorFaceSwapOpt"] or {}
     inputs = node.get("input") or {}
     values: set[str] = set()
     for group in ("required", "optional"):
@@ -59,8 +65,8 @@ class BackendBridge(QObject):
         self._local_status = {'ready': False, 'comfyOnline': False, 'remote': False}
         self._remote_status = {'ready': False, 'comfyOnline': False, 'remote': True}
         self._running = False
-        # RunPod is deliberately opt-in per app session. A saved endpoint is
-        # configuration only; it must never cause background remote polling.
+        # A saved endpoint alone never causes polling. Connection requires
+        # Connect or the explicit GENESIS_RUNPOD_AUTOCONNECT startup option.
         self._connected = False
         self._local_safe = False
         self._revision = 0
@@ -174,8 +180,11 @@ class BackendBridge(QObject):
         self._publish()
 
     def start(self):
-        # Probe local state once. RunPod remains untouched until Connect.
-        self.refresh()
+        requested = os.environ.get('GENESIS_RUNPOD_AUTOCONNECT', '').lower() in {'1', 'true', 'yes'}
+        if requested and self._mode == 'RUNPOD' and self._endpoint:
+            self.connectRemote()
+        else:
+            self.refresh()
 
     @pyqtSlot()
     def refresh(self):
@@ -194,6 +203,36 @@ class BackendBridge(QObject):
                 result['local'] = cockpit.load_generation_profiles()
                 result['local_status'] = cockpit.load_runtime_status()
                 result['local_safe'] = bool(cockpit.integrations.gpu_kernel_preflight()[0])
+                status = result['local_status']
+                status['identityEngines'] = []
+                status['identityReady'] = False
+                if status.get('ready'):
+                    # A connected backend must confirm its pose graph. Keep
+                    # filesystem discovery for explicit LOCAL cold starts.
+                    for row in result['local']:
+                        row['upscaleReady'] = False
+                        row['outputUpscaleReady'] = False
+                        if row['model'] in cockpit.REMOTE_SDXL_MODELS:
+                            row['poseReady'] = False
+                    try:
+                        client = cockpit.workflow_lab.ComfyClient(
+                            cockpit.workflow_lab.COMFY_URL, timeout=8)
+                        info = client.object_info()
+                        pose_models = cockpit._remote_choice_values(info, ("ControlNetLoader",), "control_net_name")
+                        upscale_ready, output_upscale_ready = cockpit.upscale_catalog_readiness(info)
+                        for row in result['local']:
+                            row['upscaleReady'] = upscale_ready
+                            row['outputUpscaleReady'] = output_upscale_ready
+                            if row['model'] in cockpit.REMOTE_SDXL_MODELS:
+                                row['poseReady'] = bool(row.get('ready') and
+                                    cockpit.REMOTE_SDXL_POSE_CONTROLNET in pose_models and
+                                    all(node in info for node in ("LoadImage", "ImageScale", "ControlNetApplyAdvanced")))
+                        engines = remote_identity_engines(info)
+                        status['identityEngines'] = engines
+                        status['identityReady'] = bool(engines)
+                    except Exception as exc:
+                        # A failed identity probe must not hide working generators.
+                        status['identityError'] = str(exc)
         except Exception:
             result['local'] = []
             result['local_status'] = {'ready': False, 'comfyOnline': False, 'remote': False}
@@ -320,9 +359,6 @@ class BackendBridge(QObject):
                 row = dict(source, runnable=False, routeReady=route_ready, selectable=False,
                            destination=destination, note=note)
             row['label'] = row['label'].removeprefix('RunPod · ')
-            # Choosing an offline configured profile is separate from permission
-            # to execute it. Never let unavailable/unvalidated rows opt in by accident.
-            row['profileSelectable'] = bool(source.get('stageOneConfigured'))
             if not row['label'].endswith(' · ' + row['destination']):
                 row['label'] += ' · ' + row['destination']
             rows.append(row)
