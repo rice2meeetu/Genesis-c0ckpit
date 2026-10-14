@@ -2124,10 +2124,14 @@ class GenerationBridge(QObject):
         result = dict(refine=False, identity=False, upscale=False, reason='Generate a result first.')
         if not self._preview or not Path(QUrl(self._preview).toLocalFile()).is_file() or not self._finish_info:
             return result
+        # Remote refinement and upscaling require the original endpoint, but
+        # local Person A correction must remain available on a saved image even
+        # if RunPod disconnects after generation.
+        remote_finish_ready = True
         if self._finish_route and self._finish_route.destination == "RUNPOD" and self.backend_router:
-            if not self.backend_router._connected or not self.backend_router._remote_status.get("ready") or self.backend_router._endpoint != self._finish_route.url:
-                result['reason'] = 'Reconnect the generation backend before finishing.'
-                return result
+            remote_finish_ready = bool(self.backend_router._connected
+                                       and self.backend_router._remote_status.get("ready")
+                                       and self.backend_router._endpoint == self._finish_route.url)
         info = self._finish_info
         def available(workflow, override=None):
             try:
@@ -2135,19 +2139,31 @@ class GenerationBridge(QObject):
                 return True
             except (ValueError, OSError, workflow_lab.ComfyError):
                 return False
-        result['refine'] = model in REFINEMENT_MODELS and available(remote_reference_workflow(model), model)
+        result['refine'] = bool(remote_finish_ready and model in REFINEMENT_MODELS
+                                and available(remote_reference_workflow(model), model))
         master = self._identity_master(master_url)
         # The target is confirmed AFTER generation/finishing by the user.
         # Do not advertise availability using the unsafe legacy face-index graph.
         selected_swap = {"reactor_inswapper": "inswapper_128.onnx",
                          "reactor_reswapper": "reswapper_256.onnx",
                          "reactor_hyperswap": "hyperswap_1a_256.onnx"}.get(self._stage_three_engine)
-        result['identity'] = bool(master and Path(master).is_file() and
-                                  all(kind in info for kind in ('ReActorFaceSwapOpt','ReActorOptions')) and
-                                  selected_swap in _remote_choice_values(info, ('ReActorFaceSwapOpt',), 'swap_model'))
+        if self.backend_router is not None:
+            # Face Lock runs locally even when refinement/generation is remote.
+            local_status = getattr(self.backend_router, '_local_status', {})
+            local_identity_ready = bool(getattr(self.backend_router, '_local_safe', False)
+                                        and local_status.get('ready')
+                                        and self._stage_three_engine in local_status.get('identityEngines', []))
+        else:
+            # Direct backend callers without a router retain the old local
+            # catalog-based capability check for compatibility.
+            local_identity_ready = bool(all(kind in info for kind in ('ReActorFaceSwapOpt','ReActorOptions'))
+                                        and selected_swap in _remote_choice_values(info, ('ReActorFaceSwapOpt',), 'swap_model'))
+        result['identity'] = bool(master and Path(master).is_file() and local_identity_ready)
         choices = _remote_choice_values(info, ('UpscaleModelLoader',), 'model_name')
         self._upscale_model = next((name for name in ('4x-UltraSharp.safetensors', '4x-UltraSharp.pth') if name in choices), '')
-        result['upscale'] = scale in (2, 4) and all(n in info for n in ('LoadImage', 'UpscaleModelLoader', 'ImageUpscaleWithModel', 'ImageScaleBy', 'SaveImage')) and bool(self._upscale_model)
+        result['upscale'] = bool(remote_finish_ready and scale in (2, 4)
+                                  and all(n in info for n in ('LoadImage', 'UpscaleModelLoader', 'ImageUpscaleWithModel', 'ImageScaleBy', 'SaveImage'))
+                                  and self._upscale_model)
         notes = []
         if not result['refine']:
             notes.append('Refine: selected compatible model or required nodes/assets unavailable.')
@@ -2244,6 +2260,19 @@ class GenerationBridge(QObject):
     def _run_finish(self, selected, master, plan, scale, model, lora, strength):
         try:
             self._original_master = master
+            if list(plan) == ['identity']:
+                # No remote client or image upload is required for an identity-
+                # only finish. The saved result is passed to local Person A
+                # selection; the local ReActor worker runs only after review.
+                capabilities = self.finishingAvailability(model, '', scale or 2)
+                if not capabilities['identity']:
+                    raise ValueError(capabilities['reason'])
+                if not (master and Path(master).is_file()):
+                    raise ValueError('Person A source image is missing.')
+                self._pending_stage_three = True
+                self._set_status('Finishing saved · confirm Person A for local Face Lock…')
+                self.stageThreeSelectionRequired.emit(str(selected), str(master))
+                return
             with use_route(self._finish_route):
                 if 'refine' in plan and not remote_url() and model not in LOCAL_SAFE_CREATE_MODELS:
                     raise ValueError('Local refinement is blocked; GPU/memory verification is pending. Choose RunPod.')
@@ -3299,13 +3328,21 @@ class GenerationBridge(QObject):
             self._set_progress(1.0)
             if use_stage_three:
                 identity_source = self._original_master or source
-                if identity_source is not None and identity_source.is_file() and all(
-                    kind in info for kind in ('ReActorFaceSwapOpt', 'ReActorOptions')):
-                    self._pending_stage_three = True
-                    self._set_status("Generation saved · confirm Person A for Stage 3…")
-                    self.stageThreeSelectionRequired.emit(str(current), str(identity_source))
+                if identity_source is None or not identity_source.is_file():
+                    self._set_status("Generation saved · Stage 3 skipped: original Person A image missing.")
                 else:
-                    self._set_status("Generation saved · Stage 3 skipped: original source or ReActor Options missing.")
+                    try:
+                        face_route = self._operation_route('face_swap') or Route('LOCAL', '')
+                        if face_route.destination != 'LOCAL':
+                            raise ValueError('Face swapping is local-only; RunPod cannot be selected.')
+                    except ValueError as exc:
+                        self._set_status(f"Generation saved · Stage 3 skipped: {exc}")
+                    else:
+                        # ReActor availability belongs to local ComfyUI. The
+                        # generation backend may not contain ReActor at all.
+                        self._pending_stage_three = True
+                        self._set_status("Generation saved · confirm Person A for Stage 3…")
+                        self.stageThreeSelectionRequired.emit(str(current), str(identity_source))
             else:
                 self._set_status(f"Complete · {current.name}")
             return current

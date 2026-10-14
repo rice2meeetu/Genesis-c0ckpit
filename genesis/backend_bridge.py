@@ -373,6 +373,14 @@ class BackendBridge(QObject):
         remote = ('ready' if self._remote_status.get('ready') else 'offline') if self._connected else ('disconnected' if self._endpoint else 'not configured')
         self._message = f'Local {local} · RunPod {remote}'
         status = dict(self._remote_status if self._mode == 'RUNPOD' else self._local_status)
+        # Only local ReActor is eligible for Stage 3. Preserve the generator's
+        # catalog separately so selecting RunPod cannot advertise its swap
+        # models as local face-swap capabilities.
+        status['generationIdentityEngines'] = list(status.get('identityEngines') or [])
+        local_engines = (self._local_status.get('identityEngines') or []) if (
+            self._local_safe and self._local_status.get('ready')) else []
+        status['identityEngines'] = list(local_engines)
+        status['identityReady'] = bool(local_engines)
         status['routingSummary'] = self._message
         self.statusReady.emit(status)
         self.changed.emit()

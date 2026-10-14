@@ -160,3 +160,66 @@ def test_existing_legacy_references_still_readable_without_modifying_flags(tmp_p
     saved = get_character(row['id'], idx)
     assert reference_is_approved(saved, str(legacy))
     assert not reference_is_approved(saved, str(new))
+
+
+def test_runpod_mode_advertises_only_locally_usable_stage_three_engines():
+    backend = BackendBridge(c.GenerationBridge())
+    backend._mode = 'RUNPOD'
+    backend._local_safe = True
+    backend._local_status = {'ready': True, 'identityEngines': ['reactor_inswapper']}
+    backend._remote_status = {'ready': True, 'identityEngines': ['reactor_hyperswap']}
+    published = []
+    backend.statusReady.connect(lambda status: published.append(status))
+    backend._publish()
+    assert published[-1]['identityEngines'] == ['reactor_inswapper']
+    assert published[-1]['generationIdentityEngines'] == ['reactor_hyperswap']
+    backend._local_safe = False
+    backend._publish()
+    assert published[-1]['identityEngines'] == []
+    assert not published[-1]['identityReady']
+
+
+def test_remote_result_identity_availability_checks_local_comfy_not_remote_graph(tmp_path):
+    b = c.GenerationBridge()
+    image(tmp_path, 'master.png')
+    b._original_master = tmp_path / 'master.png'
+    b._set_preview(QUrl.fromLocalFile(str(image(tmp_path, 'result.png'))).toString())
+    b._finish_info = {'remote-model-nodes-but-no-reactor': {}}
+    b.backend_router = SimpleNamespace(_local_safe=True,
+        _local_status={'ready': True, 'identityEngines': ['reactor_inswapper']})
+    b._stage_three_engine = 'reactor_inswapper'
+    assert b.finishingAvailability(c.REMOTE_DONUTS_MODEL, '', 2)['identity']
+    b.backend_router._local_status['identityEngines'] = []
+    assert not b.finishingAvailability(c.REMOTE_DONUTS_MODEL, '', 2)['identity']
+
+
+def test_saved_remote_result_can_be_face_locked_locally_while_runpod_offline(tmp_path, monkeypatch):
+    b = c.GenerationBridge()
+    master = image(tmp_path, 'master.png')
+    saved = image(tmp_path, 'saved-generated.png')
+    b._original_master = master
+    b._set_preview(QUrl.fromLocalFile(str(saved)).toString())
+    b._finish_info = {'RunPod model data': {}}
+    b._finish_route = Route('RUNPOD', 'https://offline-8189.proxy.runpod.net')
+    b._stage_three_engine = 'reactor_inswapper'
+    b.backend_router = SimpleNamespace(
+        _local_safe=True,
+        _local_status={'ready': True, 'identityEngines': ['reactor_inswapper']},
+        _connected=False,
+        _remote_status={'ready': False},
+        _endpoint='https://offline-8189.proxy.runpod.net',
+        resolve_operation=lambda op: Route('LOCAL', ''))
+    capability = b.finishingAvailability(c.REMOTE_DONUTS_MODEL, '', 2)
+    assert capability['identity']
+    assert not capability['refine'] and not capability['upscale']
+    remote_connect = Mock(side_effect=AssertionError('RunPod must not reconnect'))
+    monkeypatch.setattr(b, '_connect_comfyui', remote_connect)
+    b.stageThreeSelectionRequired.disconnect(b._choose_stage_three_faces)
+    requests = []
+    b.stageThreeSelectionRequired.connect(lambda target, source: requests.append((target, source)))
+    b._set_busy(True)
+    b._run_finish(saved, master, ['identity'], 0, c.REMOTE_DONUTS_MODEL, 'None', 0.5)
+    assert requests == [(str(saved), str(master))]
+    assert b._pending_stage_three and b.busy
+    assert saved.is_file()
+    remote_connect.assert_not_called()

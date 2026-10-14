@@ -7,6 +7,12 @@ Four reproduced defects from GitHub review #5522485587 are addressed here withou
 3. **Replacing approved references:** a different replacement image receives `reference_approved=False`; the old image's approval is not transferred. Categories and gallery role can be preserved. Changing the master identity reference requires explicit `confirm_master=True` (not exposed in the ordinary gallery picker).
 4. **Adding references:** new references default to unapproved even when a category is omitted. Explicitly reviewed references can still be approved. Existing legacy references without metadata retain their historic behavior and are not silently rewritten.
 
+## Local/remote Stage 3 reconciliation
+
+- Runtime status uses the **local** ReActor engine catalog for Stage 3 selection, even when RunPod is chosen for Stage 1; the generator's own engine list remains available separately as `generationIdentityEngines`.
+- Generated images no longer require RunPod's ReActor nodes in order to offer local Stage 3. The local route is checked instead, and the original generated image is retained if the local backend is unavailable.
+- Identity-only finishing of an already-saved RunPod result runs without contacting RunPod again. Remote refinement/upscale still require the original remote endpoint. This is deliberately fail-closed for remote operations.
+
 ## Verification
 
 - Full isolated Linux suite: **756 passed, 3 skipped, 4 subtests passed** (`PYTHONPATH=$PWD .venv/bin/python -m pytest -q tests`, using the user's preexisting GENESIS venv).

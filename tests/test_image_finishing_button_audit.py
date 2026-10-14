@@ -68,6 +68,11 @@ def verify():
             'LoadImage': {'input': {'required': {}}},
         }
         bridge._set_preview(uri.toString())
+        # Stage 3 now derives identity readiness from the LOCAL ComfyUI
+        # catalog, not the current generation/RunPod model catalog.
+        backend._local_safe = True
+        backend._local_status = {'ready': True, 'identityEngines': ['reactor_inswapper', 'reactor_hyperswap']}
+        backend._publish()
         def evaluate(code, scope=None):
             expression = QQmlExpression(context, scope or window, code)
             value, _ = expression.evaluate()
@@ -100,7 +105,7 @@ def verify():
         assert choose is not None and choose.property('enabled')
         evaluate('clicked()', choose)
         assert bridge._stage_three_engine == 'reactor_hyperswap'
-        assert not identity.property('enabled'), 'Face Lock retained readiness for the previous swap model'
+        assert identity.property('enabled'), 'Local ReActor HyperSwap was available despite the remote generator lacking it'
         open_stage_three()
         evaluate('clicked()', stage_choice(0))
         assert bridge._stage_three_engine == 'reactor_inswapper'
