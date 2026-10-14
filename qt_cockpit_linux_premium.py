@@ -182,9 +182,10 @@ def main() -> int:
     context = engine.rootContext()
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
-    context.setContextProperty("poseItems", load_pose_items(limit=600))
+    pose_rows = load_pose_items(limit=600)
+    context.setContextProperty("poseItems", pose_rows)
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
-    context.setContextProperty("curatedPosePresets", load_curated_pose_presets())
+    context.setContextProperty("curatedPosePresets", load_curated_pose_presets(pose_rows=pose_rows))
     context.setContextProperty("generationProfiles", [])
     context.setContextProperty("runtimeStatus", load_runtime_status(probe_remote=False))
 
