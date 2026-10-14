@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import signal
 import struct
 import subprocess
 import sys
@@ -2530,6 +2531,7 @@ class GenerationBridge(QObject):
         except (OSError, ValueError) as exc:
             self._set_status("Face selection failed · " + str(exc))
             return
+        self._cancel_requested = False
         self._set_busy(True)
         self._set_status("Preparing verified Person A regions…")
         self._start_busy_worker(self._run_routed_operation,
@@ -2602,6 +2604,57 @@ class GenerationBridge(QObject):
                 self._cancel_requested = False
                 self._set_busy(False)
 
+    def _run_local_facefusion_command(self, command, *, cwd: Path, timeout: float):
+        """Run a cancellable, isolated FaceFusion process without GPU/RunPod handoff.
+
+        Plain subprocess.run hides its child until return; Cancel previously left
+        a swap running for up to 30 minutes and could then adopt its output.
+        Track only our own process session, and tear down its children on
+        cancellation or timeout. Never signal another GENESIS/ComfyUI worker.
+        """
+        self._check_cancelled()
+        process = subprocess.Popen(
+            command, cwd=str(cwd), stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True,
+            start_new_session=(os.name == "posix"),
+        )
+        started = time.monotonic()
+        try:
+            while True:
+                self._check_cancelled()
+                remaining = float(timeout) - (time.monotonic() - started)
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                try:
+                    output, _ = process.communicate(timeout=min(0.25, remaining))
+                except subprocess.TimeoutExpired:
+                    continue
+                self._check_cancelled()
+                return subprocess.CompletedProcess(command, process.returncode, stdout=output)
+        finally:
+            if process.poll() is None:
+                # POSIX session owns only this freshly launched FaceFusion job,
+                # including its possible subprocesses. On Windows, terminate
+                # the FaceFusion process itself; never kill by process name.
+                try:
+                    if os.name == "posix":
+                        os.killpg(process.pid, signal.SIGTERM)
+                    else:
+                        process.terminate()
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.communicate(timeout=2)
+                except subprocess.TimeoutExpired:
+                    try:
+                        if os.name == "posix":
+                            os.killpg(process.pid, signal.SIGKILL)
+                        else:
+                            process.kill()
+                    except ProcessLookupError:
+                        pass
+                    process.communicate(timeout=2)
+
     def _run_face_swap(self, target: Path, source: Path, regions=None) -> None:
         try:
             # Defense in depth: no caller can upload face crops over RunPod.
@@ -2640,14 +2693,13 @@ class GenerationBridge(QObject):
                         "--face-selector-mode", "one",
                         "--execution-providers", provider,
                     ]
-                    completed = subprocess.run(
-                        command, cwd=str(ff_root), stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT, text=True, timeout=300,
-                        check=False,
+                    completed = self._run_local_facefusion_command(
+                        command, cwd=ff_root, timeout=300,
                     )
                     if completed.returncode or not swapped.is_file():
                         details = "\n".join((completed.stdout or "").splitlines()[-8:])
                         raise workflow_lab.ComfyError(details or "Local NSFW FaceFusion did not save an image.")
+                    self._check_cancelled()
                     self._check_cancelled()
                     self._output_dir.mkdir(parents=True, exist_ok=True)
                     stamp = str(time.time_ns())
@@ -2706,8 +2758,10 @@ class GenerationBridge(QObject):
                 self._record_finish("Face Lock · Person A", current, input_source=QUrl.fromLocalFile(str(target)).toString())
                 self._set_status(f"Complete · {current.name} · only the reviewed target area changed.")
         except Exception as exc:
-            self._set_status(f"Face swap failed · {exc}")
+            self._set_status("Face swap cancelled · saved image preserved." if self._cancel_requested
+                             else f"Face swap failed · {exc}")
         finally:
+            self._cancel_requested = False
             self._set_busy(False)
 
     @pyqtSlot(str, str)
@@ -2737,6 +2791,7 @@ class GenerationBridge(QObject):
             if not safe:
                 self._set_status(detail)
                 return
+        self._cancel_requested = False
         self._set_busy(True)
         self._set_status("Preparing FaceFusion · local image swap…")
         self._start_busy_worker(self._run_facefusion,
@@ -2749,14 +2804,14 @@ class GenerationBridge(QObject):
         try:
             self._output_dir.mkdir(parents=True, exist_ok=True)
             if self._facefusion_provider == 'migraphx':
-                probe = subprocess.run([str(ff_python), '-c',
+                probe = self._run_local_facefusion_command([str(ff_python), '-c',
                     "import ctypes,sys; from pathlib import Path; import onnxruntime as ort; "
                     "lib=ctypes.CDLL('/opt/rocm/lib/libamdhip64.so'); n=ctypes.c_int(); "
                     "status=lib.hipGetDeviceCount(ctypes.byref(n)); "
                     "sys.exit('AMD GPU is not accessible to this process') if status or n.value<1 else None; "
                     "session=ort.InferenceSession('.assets/models/hyperswap_1a_256.onnx',providers=['MIGraphXExecutionProvider']); "
                     "sys.exit('MIGraphX failed; CPU fallback is not allowed in GPU mode') if session.get_providers()[0]!='MIGraphXExecutionProvider' else None"],
-                    cwd=str(ff_entry.parent), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
+                    cwd=ff_entry.parent, timeout=300)
                 if probe.returncode:
                     raise RuntimeError((probe.stdout or 'AMD GPU preflight failed').strip().splitlines()[-1])
             stamp = str(time.time_ns())
@@ -2771,26 +2826,24 @@ class GenerationBridge(QObject):
                 "--workflow-mode", "image-to-image",
                 "--execution-providers", self._facefusion_provider,
             ]
-            completed = subprocess.run(
-                command,
-                cwd=str(integrations.FACEFUSION_ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=1800,
-                check=False,
+            completed = self._run_local_facefusion_command(
+                command, cwd=integrations.FACEFUSION_ROOT, timeout=1800,
             )
             if completed.returncode != 0 or not output.is_file():
                 tail = "\n".join((completed.stdout or "").splitlines()[-8:])
                 raise RuntimeError(tail or f"FaceFusion exited with code {completed.returncode}")
+            # User cancellation always wins over a completed result.
+            self._check_cancelled()
             self._adopt_operation_result(output, master=source)
             self._record_finish("FaceFusion", output, input_source=QUrl.fromLocalFile(str(target)).toString())
             self._set_status(f"FaceFusion complete · {output.name}")
         except subprocess.TimeoutExpired:
             self._set_status("FaceFusion timed out.")
         except Exception as exc:
-            self._set_status(f"FaceFusion failed · {exc}")
+            self._set_status("FaceFusion cancelled · original image preserved." if self._cancel_requested
+                             else f"FaceFusion failed · {exc}")
         finally:
+            self._cancel_requested = False
             self._set_busy(False)
 
     @pyqtSlot(str)

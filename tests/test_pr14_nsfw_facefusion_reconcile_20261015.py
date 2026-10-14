@@ -104,10 +104,10 @@ def test_facefusion_stage_three_keeps_crops_local_and_preserves_original(monkeyp
         assert source.as_posix() not in command and target.as_posix() not in command
         assert '--execution-providers' in command
         assert command[command.index('--execution-providers')+1]==provider
-        assert kw['cwd']==str(root)
+        assert Path(kw['cwd'])==root
         Image.new('RGB',(16,16),(90,90,90)).save(command[command.index('--output-path')+1])
         return SimpleNamespace(returncode=0,stdout='complete')
-    monkeypatch.setattr(c.subprocess,'run',fake_run)
+    monkeypatch.setattr(b,'_run_local_facefusion_command',fake_run)
     monkeypatch.setattr(b,'_record_finish',lambda *a,**k:records.append(('record',a,k)))
     monkeypatch.setattr(b,'_adopt_operation_result',lambda *a,**k:records.append(('adopt',a,k)))
     with use_route(Route('LOCAL','')):
@@ -130,7 +130,7 @@ def test_failed_local_facefusion_does_not_composite_or_edit_original(monkeypatch
     monkeypatch.setattr(pt,'prepare_crops',lambda target,source,regions,d:(a,t))
     monkeypatch.setattr(pt,'composite_crop',Mock(side_effect=AssertionError('Must never composite a failed result')))
     monkeypatch.setattr(b,'_connect_comfyui',Mock(side_effect=AssertionError('No ComfyUI contact')))
-    monkeypatch.setattr(c.subprocess,'run',lambda *args,**kw:SimpleNamespace(returncode=1,stdout='failed'))
+    monkeypatch.setattr(b,'_run_local_facefusion_command',lambda *args,**kw:SimpleNamespace(returncode=1,stdout='failed'))
     with use_route(Route('LOCAL','')):
         b._run_face_swap(t,a,(object(),object()))
     assert t.read_bytes()==before

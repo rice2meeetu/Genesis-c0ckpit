@@ -254,7 +254,7 @@ def test_facefusion_output_invalidates_prior_comfy_finishing_context(tmp_path, m
         output = Path(command[command.index("--output-path") + 1])
         Image.new("RGB", (16, 8), "gray").save(output)
         return SimpleNamespace(returncode=0, stdout="mock-completed")
-    monkeypatch.setattr(cockpit.subprocess, "run", execute)
+    monkeypatch.setattr(bridge, "_run_local_facefusion_command", execute)
     bridge._run_facefusion(source, source, Path("/fake/python"),
                            Path("/fake/facefusion.py"), Path("/fake/facefusion.ini"))
     assert bridge.status.startswith("FaceFusion complete"), bridge.status

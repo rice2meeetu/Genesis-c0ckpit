@@ -121,7 +121,7 @@ def test_facefusion_runner_uses_existing_runtime_without_undefined_state(monkeyp
         Path(command[command.index('--output-path')+1]).write_bytes(b'out')
         assert '--workflow-mode' in command
         return Mock(returncode=0,stdout='done')
-    monkeypatch.setattr(c.subprocess,'run',run)
+    monkeypatch.setattr(b,'_run_local_facefusion_command',run)
     b._run_facefusion(target,source,Path('/runtime/python'),Path('/runtime/facefusion.py'),Path('/runtime/facefusion.ini'))
     assert b.status.startswith('FaceFusion complete')
 
@@ -162,7 +162,7 @@ def test_local_face_finishing_respects_selected_swap_engine(monkeypatch,tmp_path
 def test_facefusion_gpu_failure_does_not_launch_cpu_fallback(monkeypatch,tmp_path):
     b=c.GenerationBridge();b._output_dir=tmp_path
     run=Mock(return_value=Mock(returncode=1,stdout='AMD GPU is not accessible to this process'))
-    monkeypatch.setattr(c.subprocess,'run',run)
+    monkeypatch.setattr(b,'_run_local_facefusion_command',run)
     b._run_facefusion(tmp_path/'target',tmp_path/'source',Path('/runtime/python'),Path('/runtime/facefusion.py'),Path('/runtime/config.ini'))
     run.assert_called_once()
     assert 'AMD GPU is not accessible' in b.status and not b.busy
