@@ -184,7 +184,11 @@ ApplicationWindow {
             if (stageThreeChoices[i].engine === stageThreeEngine) return stageThreeChoices[i].label
         return "Choose an identity engine"
     }
-    readonly property var stageOneChoices: generationModel.filter(function(row) { return row.stageOneEligible !== false || row.stageOneConfigured === true })
+    // The picker must represent the SAME catalog/index as the selected Stage 1
+    // header.  Filtering a runnable-but-ineligible row out here made the picker
+    // display a stale different model while the generation route used the
+    // selected row.  Generate remains gated by routeReady/runnable.
+    readonly property var stageOneChoices: generationModel
     readonly property var stageOneSelectableChoices: stageOneChoices
     readonly property int stageOneChoiceIndex: {
         for (var i = 0; i < stageOneSelectableChoices.length; ++i)

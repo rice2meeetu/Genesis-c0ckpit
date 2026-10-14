@@ -182,6 +182,30 @@ def model_generation_settings(model_name: str, *, source=False, remote=False) ->
             values.update(defaultSteps=8, defaultSampler="res_multistep")
         else:
             values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True, denoiseFixed=True)
+    elif model_name in {REMOTE_KLEIN_9B_MODEL, REMOTE_AISHA_9B_MODEL, REMOTE_AISHA_BF16_MODEL}:
+        # Klein 9B and both Aisha v9.7 files are distilled.  The saved
+        # reference workflow uses five steps; T2I is a four-step route.
+        values.update(defaultSteps=5 if source else 4, defaultCfg=1.0)
+        if source:
+            values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True,
+                          denoiseFixed=True)
+    elif model_name == REMOTE_DARKBEAST_9B_MODEL:
+        # DarkBeast V2 BFS: its dedicated reference graph and model guidance
+        # both specify five steps, CFG 1, not Miraclein's 12/1.1.
+        values.update(defaultSteps=5, defaultCfg=1.0)
+        if source:
+            values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True,
+                          denoiseFixed=True)
+    elif model_name == REMOTE_PORNMASTER_9B_MODEL:
+        # v3 FP8 is the 9B base fine-tune, not the separate v4 Turbo GGUF.
+        # Without an explicitly selected Turbo adapter, use base sampling for
+        # T2I.  Its existing reference graph is separately five-step/CFG 1;
+        # do not silently substitute v4's edit settings for a v3 reference.
+        values.update(defaultSteps=5 if source else 50,
+                      defaultCfg=1.0 if source else 4.0)
+        if source:
+            values.update(defaultScheduler="Flux2Scheduler", schedulerFixed=True,
+                          denoiseFixed=True)
     elif model_name in REMOTE_KLEIN9B_SOURCE_MODELS:
         if source:
             values.update(defaultSteps=5, defaultScheduler="Flux2Scheduler",
@@ -246,7 +270,40 @@ def model_profile_settings(model_name: str, *, remote=False) -> dict:
     result["qualityPresets"] = quality_sizes(source if remote and model_name in REMOTE_SOURCE_MODELS else create)
     result["sourceQualityPresets"] = quality_sizes(source)
     result["createQualityPresets"] = quality_sizes(create)
-    result["qualityNote"] = "Fast/Balanced use smaller model-native sizes. Quality restores the model's full default size and aspect ratio. 2K/4K upscale after sampling to the selected output long edge. Steps/CFG/sampler/scheduler and denoise return to the selected model's defaults; seed, prompt and identity source are preserved."
+    result["qualityNote"] = "Fast/Balanced reduce sampling size, and on applicable models the step count. Quality restores the selected model's full baseline. 2K/4K is applied after native sampling. CFG, scheduler and denoise stay model-specific; seed, prompt and source image are preserved."
+    # Do not apply non-distilled step reductions to four/five-step models.
+    # Each route (text or source/edit) starts from its own workflow baseline.
+    def tune_steps(presets, defaults, *, editing=False):
+        baseline = int(defaults["defaultSteps"])
+        if model_name in {REGULAR_9B_MODEL, LOCAL_AISHA_9B_MODEL, REMOTE_PORNMASTER_9B_MODEL}:
+            if baseline >= 40:
+                presets["Fast"].update(steps=24)
+                presets["Balanced"].update(steps=36)
+                presets["Quality"].update(steps=baseline)
+        elif model_name == QWEN21_MODEL and baseline >= 40:
+            presets["Fast"].update(steps=20)
+            presets["Balanced"].update(steps=30)
+            presets["Quality"].update(steps=baseline)
+        elif model_name == REMOTE_MOP_MODEL:
+            presets["Fast"].update(steps=6)
+            presets["Balanced"].update(steps=8)
+            presets["Quality"].update(steps=baseline)
+        elif model_name in REMOTE_CHECKPOINT_MODELS:
+            presets["Fast"].update(steps=12)
+            presets["Balanced"].update(steps=18)
+            presets["Quality"].update(steps=baseline)
+        elif model_name == LOCAL_PORNMASTER_9B_MODEL and not editing:
+            # Only the explicitly turbo-distilled v4 benefits from this 4/8
+            # division; do not reuse for the v3 base checkpoint.
+            presets["Fast"].update(steps=4, cfg=1.0)
+            presets["Balanced"].update(steps=8, cfg=1.5)
+            presets["Quality"].update(steps=baseline, cfg=1.5)
+
+    tune_steps(result["createQualityPresets"], create)
+    tune_steps(result["sourceQualityPresets"], source, editing=True)
+    result["qualityPresets"] = (result["sourceQualityPresets"]
+                                 if remote and model_name in REMOTE_SOURCE_MODELS
+                                 else result["createQualityPresets"])
     if model_name in ({QWEN_MODEL} | REMOTE_PHR00T_MODELS):
         for presets in (result["qualityPresets"], result["sourceQualityPresets"], result["createQualityPresets"]):
             # CFG 1.0 skips the unconditional pass in ComfyUI.  Phr00t is
@@ -1089,6 +1146,13 @@ def build_create_prompt(
         prompt["102"]["inputs"]["vae_name"] = REMOTE_9B_VAE
         prompt["107"]["inputs"]["text"] = prompt_text
         prompt["105"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
+        # The graph template is only a loader/conditioning layout; apply the
+        # selected model's own sampling profile rather than Miraclein's values.
+        sampling = model_generation_settings(model_name)
+        prompt["134"]["inputs"].update(steps=sampling["defaultSteps"],
+                                       cfg=sampling["defaultCfg"],
+                                       sampler_name=sampling["defaultSampler"],
+                                       scheduler=sampling["defaultScheduler"])
         prompt["9"]["inputs"]["filename_prefix"] = "GENESIS-Klein9B-T2I"
         insert_model_only_loras(prompt, "126", "134", "model", loras, lora_strengths)
     elif model_name == REGULAR_9B_MODEL:
@@ -1100,7 +1164,10 @@ def build_create_prompt(
         prompt["126"]["inputs"] = {"unet_name": REGULAR_9B_MODEL}
         prompt["136"]["inputs"]["clip_name"] = TEXT_ENCODER_9B
         prompt["107"]["inputs"]["text"] = prompt_text
-        prompt["134"]["inputs"].update({"steps": 4, "cfg": 1.0})
+        # This is the non-distilled Base Q4, not the four-step distilled 9B.
+        sampling = model_generation_settings(model_name)
+        prompt["134"]["inputs"].update(steps=sampling["defaultSteps"],
+                                       cfg=sampling["defaultCfg"])
         prompt["105"]["inputs"].update({"width": width, "height": height, "batch_size": 1})
         prompt["9"]["inputs"]["filename_prefix"] = "GENESIS-Klein9B-Regular"
         insert_model_only_loras(prompt, "126", "134", "model", loras, lora_strengths)

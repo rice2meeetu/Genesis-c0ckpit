@@ -130,8 +130,10 @@ def verify():
         QApplication.processEvents()
         picker = window.findChild(QObject, 'stageOneModelPicker')
         assert picker is not None
-        picker.setProperty('currentIndex', 2)
-        expression = QQmlExpression(context, picker, 'activated(2)')
+        # Picker includes unavailable catalog entries instead of hiding them.
+        # That keeps its selection index aligned with the selected Stage 1 card.
+        picker.setProperty('currentIndex', 3)
+        expression = QQmlExpression(context, picker, 'activated(3)')
         expression.evaluate()
         assert not expression.hasError(), expression.error().toString()
         QApplication.processEvents()

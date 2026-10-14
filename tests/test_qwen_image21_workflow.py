@@ -219,7 +219,9 @@ def test_verified_local_source_default_does_not_change_t2i_or_remote():
         defaults = cockpit.model_generation_settings(cockpit.QWEN21_MODEL, source=source, remote=remote)
         assert (defaults['defaultWidth'], defaults['defaultHeight']) == (1024, 1024)
     local = cockpit.model_profile_settings(cockpit.QWEN21_MODEL)
-    assert local['qualityPresets']['Quality'] == {'width': 1024, 'height': 1024}
+    assert local['qualityPresets']['Quality'] == {'width': 1024, 'height': 1024, 'steps': 40}
+    assert local['createQualityPresets']['Fast']['steps'] == 20
+    assert local['createQualityPresets']['Balanced']['steps'] == 30
     assert 'eight-minute' in local['qualityNote']
     assert 'eight-minute' not in cockpit.model_profile_settings(cockpit.QWEN21_MODEL, remote=True)['qualityNote']
 
