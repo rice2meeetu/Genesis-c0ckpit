@@ -350,10 +350,14 @@ def model_profile_settings(model_name: str, *, remote=False) -> dict:
 def load_curated_pose_presets(pose_rows: list[dict] | None = None) -> list[dict]:
     """Load authored text presets and verified pose+JSON-prompt pairs."""
     presets: list[dict] = []
-    # Curated imports declare exact paths within the bundled pose library.
-    # Only bind those declarations to indexed, existing files; similar names
-    # or an available but unrelated skeleton must never become a pose match.
-    library_root = (PROJECT_ROOT / "genesis/reference/assets/pose_library").resolve()
+    # Curated declarations must match an indexed, installed skeleton at its
+    # exact relative path, never a filename or category guess. Imported private
+    # packs may live in either legacy Pose Maker root instead of this checkout.
+    library_roots = tuple(path.resolve() for path in (
+        PROJECT_ROOT / "genesis/reference/assets/pose_library",
+        Path.home() / "AI/GENESIS_POSE_MAKER/assets/pose_library",
+        Path.home() / "Downloads/GENESIS_POSE_MAKER_V15_USER_IMAGE_SLOTS(1)/GENESIS_POSE_MAKER/assets/pose_library",
+    ))
     indexed_skeletons = {}
     for pose in pose_rows or ():
         local_file = QUrl(str(pose.get("source", ""))).toLocalFile()
@@ -409,9 +413,12 @@ def load_curated_pose_presets(pose_rows: list[dict] | None = None) -> list[dict]
                 for relative_path in declared:
                     if not isinstance(relative_path, str) or Path(relative_path).is_absolute():
                         continue
-                    skeleton_path = (library_root / relative_path).resolve()
-                    if skeleton_path.is_relative_to(library_root) and skeleton_path in indexed_skeletons:
-                        bound = indexed_skeletons[skeleton_path]
+                    for library_root in library_roots:
+                        skeleton_path = (library_root / relative_path).resolve()
+                        if skeleton_path.is_relative_to(library_root) and skeleton_path in indexed_skeletons:
+                            bound = indexed_skeletons[skeleton_path]
+                            break
+                    if bound is not None:
                         break
                 preset = {
                     "sourceMetadata": source_metadata(row),
@@ -3974,9 +3981,10 @@ def main() -> int:
     context = engine.rootContext()
     context.setContextProperty("genesisAssetRoot", QUrl.fromLocalFile(str(ASSET_ROOT) + "/"))
     context.setContextProperty("genesisUiRoot", QUrl.fromLocalFile(str(UI_ROOT) + "/"))
-    context.setContextProperty("poseItems", load_pose_items())
+    installed_pose_rows = load_pose_items(limit=10000)
+    context.setContextProperty("poseItems", installed_pose_rows[:12])
     context.setContextProperty("grokPresetItems", load_grok_preset_items())
-    context.setContextProperty("curatedPosePresets", load_curated_pose_presets() + pose_preset_references(load_pose_items(limit=10000)))
+    context.setContextProperty("curatedPosePresets", load_curated_pose_presets(pose_rows=installed_pose_rows) + pose_preset_references(installed_pose_rows))
     context.setContextProperty("generationProfiles", load_generation_profiles())
     context.setContextProperty("runtimeStatus", load_runtime_status())
     generation_bridge = GenerationBridge(app)
