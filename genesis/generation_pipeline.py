@@ -71,8 +71,10 @@ REALISM_COMPONENTS = (
     ("natural photographic sharpness", r"natural (?:photographic )?sharpness|sharp focus"),
 )
 IDENTITY_INSTRUCTION = (
-    "Preserve recognizable facial identity and distinguishing features. "
-    "Allow pose, viewpoint, expression and lighting to change naturally."
+    "Person A only: preserve the recognizable facial identity and distinguishing "
+    "features of the person in image1. Never copy Person A's face or identity "
+    "onto Person B or any other person. Person B has a separate, independent "
+    "identity. Allow pose, viewpoint, expression and lighting to change naturally."
 )
 
 
@@ -136,7 +138,7 @@ def adapt_prompt(prompt: str, model: str, *, source_image: bool = False,
         return "Create the requested image with coherent anatomy and composition. Instruction: " + text
     if family == "qwen_image":
         if source_image:
-            identity = "Preserve the same person and facial identity, recognizable facial features and distinguishing features from image1. "
+            identity = "Preserve the same person and facial identity from image1 for Person A only. " + IDENTITY_INSTRUCTION + " "
             pose = ("Use image2 only for pose, body arrangement, and composition; keep image1 as the identity reference. "
                     if pose_image else "")
             result = (identity + pose + "Allow the body pose, body position, framing, composition, viewpoint, expression and lighting to change naturally according to the instruction. "
