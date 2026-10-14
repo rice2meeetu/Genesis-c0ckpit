@@ -1780,7 +1780,10 @@ class GenerationBridge(QObject):
         self._stage_three_engine = "reactor_inswapper"
         # Job-scoped engine is separate from the selection shown in the UI.
         self._active_stage_three_engine = None
-        self._facefusion_provider = "migraphx"
+        # Installed MIGraphX provider is opt-in until a full GPU inference
+        # passes on this hardware. An offline neutral-image test timed out
+        # after 150s despite a clean kernel preflight (2026-10-15).
+        self._facefusion_provider = "cpu"
         self._cancel_requested = False
         self._active_client = None
         self._active_prompt_id = None
