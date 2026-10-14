@@ -334,6 +334,30 @@ def test_isolated_genesis_framing_node_does_not_replace_comfy_qwen_core():
     assert 'target_latent' in source
 
 
+@pytest.mark.parametrize('with_pose', [False, True])
+def test_v19_actual_source_dispatch_passes_tiled_decoder_model_override(monkeypatch, tmp_path, catalog, with_pose):
+    bridge = cockpit.GenerationBridge()
+    bridge._output_dir = tmp_path
+    client = Mock()
+    client.object_info.return_value = catalog
+    monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (client, {}))
+    monkeypatch.setattr(cockpit, 'validate_remote_workflow_assets', lambda *a: None)
+    monkeypatch.setattr(bridge, '_record_finish', lambda *a, **k: None)
+    calls = []
+    monkeypatch.setattr(bridge, '_run_reference_stage',
+                        lambda *a, **k: calls.append(k) or tmp_path / 'out.png')
+    source = tmp_path / 'source.png'
+    pose = tmp_path / 'pose.png' if with_pose else None
+    with use_route(Route('LOCAL', '')):
+        bridge._run_generate('A teapot', '', 512, 704, cockpit.QWEN_MODEL,
+                             'None', 'None', 'None', 0.5, 0.5, 0.5,
+                             source, pose, False, False, False,
+                             {'width': 512, 'height': 704})
+    assert len(calls) == 1
+    assert calls[0]['model_override'] == cockpit.QWEN_MODEL
+    assert calls[0].get('secondary_image') == pose
+
+
 @pytest.mark.parametrize('model,tiled', [
     (cockpit.QWEN_MODEL, True),
     (cockpit.REMOTE_PHR00T_V23_Q2_MODEL, False),

@@ -138,3 +138,76 @@ def test_queued_phr00t_references_are_snapshotted_independently(monkeypatch):
     bridge._set_busy(False)
     QCoreApplication.processEvents()
     assert runs[-1]==('prompt 2','file:///tmp/reference-2.png')
+
+
+@pytest.mark.parametrize('first,later', [('LOCAL', 'RUNPOD'), ('RUNPOD', 'LOCAL')])
+def test_queued_auto_route_never_drifts_when_readiness_changes(monkeypatch, first, later):
+    QCoreApplication.instance() or QCoreApplication([])
+    b = c.GenerationBridge()
+
+    class Router:
+        mode = 'AUTO'
+        endpoint = 'https://example-8189.proxy.runpod.net'
+        destination = first
+
+        def resolve(self, model):
+            return c.Route(self.destination, self.endpoint if self.destination == 'RUNPOD' else '')
+
+    b.backend_router = Router()
+    captured = []
+    monkeypatch.setattr(b, 'queueGenerateAdvanced', lambda *args: captured.append(args))
+    b._set_busy(True)
+    b.enqueueGenerateAdvanced(*job(prompt='pinned'))
+    assert b.pendingGenerationCount == 1
+    assert b._pending_generations[0]['route'].destination == first
+    b.backend_router.destination = later
+    b._set_busy(False)
+    b._dispatch_next_generation()
+    assert captured == []
+    assert b.pendingGenerationCount == 0
+    assert 'original resolved backend' in b.status
+
+
+def test_queued_character_snapshot_survives_picker_changes(monkeypatch):
+    QCoreApplication.instance() or QCoreApplication([])
+    b = c.GenerationBridge()
+    monkeypatch.setattr(c, 'get_character', lambda character_id: {
+        'primary_image': f'/tmp/{character_id}.png', 'references': []})
+    monkeypatch.setattr(c, 'preferred_reference', lambda character_id: f'/tmp/{character_id}.png')
+    captured = []
+    monkeypatch.setattr(b, 'queueGenerateAdvanced',
+                        lambda *args: captured.append(b._queued_character_override))
+    b._set_busy(True)
+    b.selectCharacterA('A')
+    b.enqueueGenerateAdvanced(*job(prompt='for-A'))
+    b.selectCharacterA('B')
+    b._set_busy(False)
+    b._dispatch_next_generation()
+    assert captured and captured[0]['id'] == 'A'
+    assert captured[0]['master'] == '/tmp/A.png'
+    assert b.selectedCharacterA == 'B'
+
+
+def test_cancel_stage_three_before_dialog_prevents_handoff():
+    QCoreApplication.instance() or QCoreApplication([])
+    b = c.GenerationBridge()
+    b._set_busy(True)
+    b._pending_stage_three = True
+    b.cancelGeneration()
+    assert not b._pending_stage_three and not b.busy
+    # The already-scheduled Qt callback is inert after cancellation.
+    b._choose_stage_three_faces('/tmp/target.png', '/tmp/source.png')
+    assert not b._pending_stage_three
+
+
+def test_history_records_actual_output_dimensions(tmp_path):
+    b = c.GenerationBridge()
+    b._finish_width, b._finish_height = 1024, 640
+    image = tmp_path / '4k.png'
+    Image.new('RGB', (3840, 2400)).save(image)
+    b._record_finish('4K', image)
+    url = b._preview
+    assert b._finish_contexts[url]['size'] == (3840, 2400)
+    b._finish_width, b._finish_height = 1024, 640
+    b._restore_finishing_context(url)
+    assert (b._finish_width, b._finish_height) == (3840, 2400)

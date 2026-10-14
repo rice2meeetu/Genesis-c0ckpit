@@ -118,6 +118,16 @@ def verify():
         assert submissions[-1][1] is True
         assert substitutions == []
 
+        # Text mode must send neither the retained image nor a FaceID flag.
+        window.setProperty("useSourceImageMode", False)
+        QApplication.processEvents()
+        assert not window.property("sdxlFaceIDActive")
+        evaluate("generateCurrent()")
+        assert submissions[-1][0][7] == ""
+        assert submissions[-1][1] is False
+        window.setProperty("useSourceImageMode", True)
+        assert window.property("sdxlFaceIDActive")
+
         # A different family disables FaceID and receives its own defaults.
         evaluate("clearPose()")
         evaluate("selectGeneration(2, false)")

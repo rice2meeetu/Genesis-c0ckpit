@@ -243,6 +243,9 @@ def main() -> int:
             next_source, next_pose, _ = consume_pose_workbench_handoff(source, pose, "skeleton", POSE_WORKBENCH_HANDOFF_FILE)
             if next_source != source:
                 window.setProperty("generationSource", QUrl.fromLocalFile(next_source))
+            if next_source:
+                # A source-bearing handoff is an explicit request to use it.
+                window.setProperty("useSourceImageMode", True)
             if next_pose != pose:
                 window.setProperty("selectedPoseSource", QUrl.fromLocalFile(next_pose))
                 window.setProperty("selectedPoseThumbnail", QUrl.fromLocalFile(next_pose))

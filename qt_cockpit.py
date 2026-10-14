@@ -1683,6 +1683,8 @@ class GenerationBridge(QObject):
         self._extra_reference_url = ""
         self._pending_generations = []
         self._queue_active = False
+        self._queued_route_override = None
+        self._queued_character_override = None
         self._pending_stage_three = False
         self.backend_router = None
         # Always dispatch queued jobs on Qt's owning thread after a worker ends.
@@ -1761,6 +1763,13 @@ class GenerationBridge(QObject):
         if not self._busy:
             return
         self._cancel_requested = True
+        if self._pending_stage_three:
+            # Generation has saved; no Stage 3 prompt may be uploaded after Cancel.
+            self._pending_stage_three = False
+            self._cancel_requested = False  # No Stage 3 worker exists yet.
+            self._set_status("Generation saved · pending Stage 3 cancelled.")
+            self._set_busy(False)
+            return
         self._set_status("Cancelling generation…")
         # Do not wait for the polling loop to notice the flag: interrupt the
         # active ComfyUI backend immediately. This targets the client used by
@@ -1946,6 +1955,15 @@ class GenerationBridge(QObject):
             self._cancel_requested = False
             self._set_busy(False)
 
+    def _snapshot_character_a(self):
+        """Freeze character details before queuing so later selection cannot alter a job."""
+        from copy import deepcopy
+        character_id = self._character_a
+        character = deepcopy(get_character(character_id) or {}) if character_id else {}
+        master = preferred_reference(character_id) if character_id else ""
+        return {"id": character_id, "data": character, "master": str(master or ""),
+                "primary_image": str(character.get("primary_image") or "")}
+
     def _identity_master(self, master_url=""):
         if self._character_a:
             value = preferred_reference(self._character_a)
@@ -2097,6 +2115,13 @@ class GenerationBridge(QObject):
 
     def _record_finish(self, stage, path, *, input_source=None):
         url = QUrl.fromLocalFile(str(path)).toString()
+        # Recorded history must reflect the saved output, not the sampler size.
+        from PIL import Image
+        try:
+            with Image.open(path) as image:
+                self._finish_width, self._finish_height = image.size
+        except (OSError, ValueError):
+            pass
         self._finish_contexts[url] = {"info": self._finish_info, "route": self._finish_route,
                                       "size": (self._finish_width, self._finish_height), "master": self._original_master}
         if not any(r['source'] == url for r in self._finish_results):
@@ -2340,6 +2365,11 @@ class GenerationBridge(QObject):
         """
         if not self._pending_stage_three:
             return
+        if self._cancel_requested:
+            self._pending_stage_three = False
+            self._set_status("Generation saved · Stage 3 cancelled.")
+            self._set_busy(False)
+            return
         from genesis.person_a_targeting import choose_face_region
         target, source = Path(target_path), Path(source_path)
         started = False
@@ -2348,17 +2378,26 @@ class GenerationBridge(QObject):
                 raise ValueError("saved output or original identity source is missing")
             self._set_status("Stage 3 · select Person A in the generated image…")
             target_region = choose_face_region(target, "generated target · Person A")
+            if self._cancel_requested:
+                self._set_status("Generation saved · Stage 3 cancelled.")
+                return
             if target_region is None:
                 self._set_status("Generation saved · Stage 3 skipped (target face not confirmed).")
                 return
             self._set_status("Stage 3 · select Person A in the original photo…")
             source_region = choose_face_region(source, "original source · Person A")
+            if self._cancel_requested:
+                self._set_status("Generation saved · Stage 3 cancelled.")
+                return
             if source_region is None:
                 self._set_status("Generation saved · Stage 3 skipped (source face not confirmed).")
                 return
             # Both paths and pixel digests were reviewed by the user.
             target_region.checked_image(target)
             source_region.checked_image(source)
+            if self._cancel_requested:
+                self._set_status("Generation saved · Stage 3 cancelled.")
+                return
             self._set_status("Stage 3 · correcting the reviewed Person A face only…")
             thread = threading.Thread(
                 target=self._run_routed_operation,
@@ -2373,6 +2412,7 @@ class GenerationBridge(QObject):
         finally:
             self._pending_stage_three = False
             if not started:
+                self._cancel_requested = False
                 self._set_busy(False)
 
     def _run_face_swap(self, target: Path, source: Path, regions=None) -> None:
@@ -2380,6 +2420,7 @@ class GenerationBridge(QObject):
             import tempfile
             from genesis.person_a_targeting import prepare_crops, composite_crop
             # No fallback to full-frame index 0. Verify image digests before upload.
+            self._check_cancelled()
             with tempfile.TemporaryDirectory(prefix="genesis-person-a-") as directory:
                 target_crop, source_crop = prepare_crops(target, source, regions, directory)
                 client, _ = self._connect_comfyui()
@@ -2393,6 +2434,7 @@ class GenerationBridge(QObject):
                 if swap_model not in _remote_choice_values(info, ("ReActorFaceSwapOpt",), "swap_model"):
                     raise workflow_lab.ComfyError("Selected ReActor swap model is unavailable.")
                 def upload(path):
+                    self._check_cancelled()
                     result = client.upload_image(path)
                     return "/".join(v for v in (result.get("subfolder"), result.get("name")) if v)
                 prompt = {
@@ -2411,6 +2453,7 @@ class GenerationBridge(QObject):
                         "images": ["swap", 0], "filename_prefix": "GENESIS-PersonA-Crop"}},
                 }
                 validate_operation_prompt(prompt, info, "Manual Person A")
+                self._check_cancelled()
                 stamp = str(time.time_ns())
                 swapped = self._submit_and_save(client, prompt, stamp, "PersonA-Crop")
                 current = composite_crop(target, regions[0], swapped,
@@ -2627,6 +2670,11 @@ class GenerationBridge(QObject):
         if model not in SUPPORTED_CREATE_MODELS:
             self._set_status("The selected model has no configured generation route.")
             return
+        try:
+            pinned_route = self.backend_router.resolve(model) if self.backend_router else None
+        except ValueError as exc:
+            self._set_status("Cannot queue without a ready backend: " + str(exc))
+            return
         job={"args": tuple(args), "model": model,
              "label": (str(args[0])[:58] or model),
              "output": self._output_target_long_edge,
@@ -2634,6 +2682,8 @@ class GenerationBridge(QObject):
              "extra_reference_url": self._extra_reference_url,
              "faceid": (bool(getattr(self,'_sdxl_faceid_enabled',False)),float(getattr(self,'_sdxl_faceid_strength',0.8))),
              "stage2": self._stage_two_model,
+             "route": pinned_route,
+             "character_snapshot": self._snapshot_character_a(),
              "endpoint": (self.backend_router.mode,self.backend_router.endpoint) if self.backend_router else None}
         self._pending_generations.append(job)
         self.queueChanged.emit()
@@ -2653,8 +2703,12 @@ class GenerationBridge(QObject):
             job=self._pending_generations.pop(0)
             self.queueChanged.emit()
             current=(self.backend_router.mode,self.backend_router.endpoint) if self.backend_router else None
-            if current!=job["endpoint"]:
-                self._set_status("Skipped queued job: backend changed. Requeue it on the intended backend.")
+            try:
+                resolved_route = self.backend_router.resolve(job["model"]) if self.backend_router else None
+            except ValueError:
+                resolved_route = None
+            if current != job["endpoint"] or resolved_route != job["route"]:
+                self._set_status("Skipped queued job: original resolved backend is no longer ready. Requeue explicitly.")
                 continue
             self._queue_active=True
             self._sdxl_faceid_enabled,self._sdxl_faceid_strength=job["faceid"]
@@ -2662,7 +2716,13 @@ class GenerationBridge(QObject):
             self._output_target_long_edge=job["output"]
             self._source_reference_megapixels=job["source_reference_megapixels"]
             self._extra_reference_url=job["extra_reference_url"]
-            self.queueGenerateAdvanced(*job["args"])
+            self._queued_route_override = job["route"]
+            self._queued_character_override = job["character_snapshot"]
+            try:
+                self.queueGenerateAdvanced(*job["args"])
+            finally:
+                self._queued_route_override = None
+                self._queued_character_override = None
             if self._busy:
                 return
             self._queue_active=False
@@ -2699,6 +2759,9 @@ class GenerationBridge(QObject):
             "output_long_edge": int(getattr(self, "_output_target_long_edge", 0)),
             "source_reference_megapixels": self._source_reference_megapixels,
             "extra_reference_url": self._extra_reference_url,
+            "character_snapshot": (self._queued_character_override
+                                   if self._queued_character_override is not None
+                                   else self._snapshot_character_a()),
         }
         strength = 0.5 if model_name == FOUR_B_MODEL else 0.65
         self.queueGenerate(
@@ -2767,7 +2830,8 @@ class GenerationBridge(QObject):
             self._set_status("Stage 3 face lock requires an original source image.")
             return
         try:
-            route = self.backend_router.resolve(model_name) if self.backend_router else None
+            route = (self._queued_route_override if self._queued_character_override is not None
+                     else self.backend_router.resolve(model_name) if self.backend_router else None)
         except ValueError as exc:
             self._set_status(str(exc))
             return
@@ -3053,7 +3117,7 @@ class GenerationBridge(QObject):
                     client, info, STAGE_1_WORKFLOW, source,
                     adapt_prompt(prompt_text, QWEN_MODEL, source_image=True, pose_image=pose is not None),
                     stamp, "Stage1", secondary_image=pose,
-                    controls=generation_controls,
+                    controls=generation_controls, model_override=QWEN_MODEL,
                 )
             elif source is not None:
                 raise workflow_lab.ComfyError("This model has no validated source-image workflow.")
@@ -3088,7 +3152,9 @@ class GenerationBridge(QObject):
                 # negative conditioning. Qwen 2.1 keeps the text for CFG > 1.
                 current = self._submit_and_save(client, prompt, stamp, "QwenImage21" if model_name == QWEN21_MODEL else "Klein")
 
-            self._original_master = source
+            identity_snapshot = (generation_controls or {}).get("character_snapshot") or {}
+            snapshot_master = Path(identity_snapshot["master"]) if identity_snapshot.get("master") else None
+            self._original_master = snapshot_master or source
             self._record_finish("Generated", current)
             self._check_cancelled()
             if use_stage_two:
@@ -3109,7 +3175,7 @@ class GenerationBridge(QObject):
             self._record_finish("Generated", current)
             self._set_progress(1.0)
             if use_stage_three:
-                identity_source = self._identity_master() or source
+                identity_source = self._original_master or source
                 if identity_source is not None and identity_source.is_file() and all(
                     kind in info for kind in ('ReActorFaceSwapOpt', 'ReActorOptions')):
                     self._pending_stage_three = True
@@ -3127,10 +3193,9 @@ class GenerationBridge(QObject):
             else:
                 self._set_status(f"Generation failed · {exc}")
         finally:
-            if release_busy:
+            if release_busy and not self._pending_stage_three:
                 self._cancel_requested = False
-                if not self._pending_stage_three:
-                    self._set_busy(False)
+                self._set_busy(False)
 
     def _run_4b_source(
         self, client, info: dict, source: Path, prompt_text: str,
@@ -3389,6 +3454,7 @@ class GenerationBridge(QObject):
         if input_image is None and (workflow not in {STAGE_1_WORKFLOW, REMOTE_PHR00T_V19_WORKFLOW, REMOTE_PHR00T_WORKFLOW} or secondary_image is not None):
             raise workflow_lab.ComfyError("Only Phr00t supports this no-reference graph.")
         images = ([input_image] if input_image is not None else []) + ([secondary_image] if secondary_image is not None else [])
+        used_reference_paths = {path.resolve() for path in images}
         if len(load_nodes) < len(images):
             raise workflow_lab.ComfyError(f"{stage} workflow has too few image inputs.")
         for node_id, path in zip(load_nodes, images):
@@ -3425,6 +3491,7 @@ class GenerationBridge(QObject):
             free_slot = next((slot for slot in ("image2", "image3") if encoder and slot not in encoder["inputs"] and slot in choices), None)
             if not free_slot:
                 raise workflow_lab.ComfyError("Phr00t's installed text encoder has no spare image reference slot.")
+            used_reference_paths.add(extra_path.resolve())
             uploaded = client.upload_image(extra_path)
             prompt["__genesis_extra_reference__"] = {"class_type": "LoadImage", "inputs": {
                 "image": "/".join(v for v in (uploaded.get("subfolder"), uploaded.get("name")) if v)}}
@@ -3434,19 +3501,31 @@ class GenerationBridge(QObject):
                             "visual reference, not a replacement for the main subject in Picture 1.")
         elif extra_url:
             raise workflow_lab.ComfyError("Extra reference images are currently supported only for Phr00t.")
-        if stage in {"Phr00t-v23", "Phr00t-v23-GGUF", "Phr00t-v22-GGUF", "Phr00t-v19", "Phr00t-v19-GGUF", "Stage1"} and self._character_a:
-            character = get_character(self._character_a) or {}
-            if input_image is not None and input_image.resolve() == Path(character.get("primary_image", "")).resolve():
+        # Use the identity snapshot owned by this job, never a character selected
+        # while it was waiting. Older direct callers receive a fresh snapshot.
+        character_snapshot = ((controls or {}).get("character_snapshot")
+                              if controls is not None and "character_snapshot" in controls
+                              else self._snapshot_character_a())
+        if (stage in {"Phr00t-v23", "Phr00t-v23-GGUF", "Phr00t-v22-GGUF",
+                      "Phr00t-v19", "Phr00t-v19-GGUF", "Stage1"}
+                and character_snapshot and character_snapshot.get("id")):
+            character = character_snapshot.get("data") or {}
+            primary_image = character_snapshot.get("primary_image") or character.get("primary_image", "")
+            if input_image is not None and primary_image and input_image.resolve() == Path(primary_image).resolve():
                 encode = next((n for n in prompt.values() if n.get("class_type") == "TextEncodeQwenImageEditPlus"), None)
                 optional = info.get("TextEncodeQwenImageEditPlus", {}).get("input", {}).get("optional", {})
                 if encode:
                     for ref in character.get("references", []):
-                        if Path(ref).resolve() == input_image.resolve() or not Path(ref).is_file() or not reference_is_approved(character, ref) or reference_category(character, ref) == "pose":
+                        if (Path(ref).resolve() in used_reference_paths
+                                or not Path(ref).is_file()
+                                or not reference_is_approved(character, ref)
+                                or reference_category(character, ref) == "pose"):
                             continue
                         field = next((name for name in ("image2", "image3")
                                       if name not in encode["inputs"] and name in optional), None)
                         if not field:
                             break  # Built-in encoder supports only image1..image3.
+                        used_reference_paths.add(Path(ref).resolve())
                         uploaded = client.upload_image(Path(ref))
                         node_id = "__character_a_" + field
                         prompt[node_id] = {"class_type": "LoadImage", "inputs": {"image": "/".join(v for v in (uploaded.get("subfolder"), uploaded.get("name")) if v)}}

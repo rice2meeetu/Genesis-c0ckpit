@@ -8,6 +8,7 @@ No external dependencies, network access, persistent state, or core overrides.
 
 import math
 
+import torch.nn.functional as F
 import comfy.utils
 import node_helpers
 from comfy_api.latest import ComfyExtension, io
@@ -66,9 +67,19 @@ class GenesisQwenImageEditFraming(io.ComfyNode):
                     target_height = int(target.shape[-2]) * 8
                     if target_width < 64 or target_height < 64:
                         raise ValueError("GENESIS Qwen framing target latent is too small")
+                    # Fit within the latent canvas, then pad: center-cropping
+                    # portrait/landscape mismatches loses parts of Person A.
+                    fit = min(target_width / samples.shape[3], target_height / samples.shape[2])
+                    fit_width = max(1, min(target_width, round(samples.shape[3] * fit)))
+                    fit_height = max(1, min(target_height, round(samples.shape[2] * fit)))
                     resized_ref = comfy.utils.common_upscale(
-                        samples, target_width, target_height, "lanczos", "center"
+                        samples, fit_width, fit_height, "lanczos", "center"
                     )
+                    pad_x, pad_y = target_width - fit_width, target_height - fit_height
+                    resized_ref = F.pad(resized_ref, (
+                        pad_x // 2, pad_x - pad_x // 2,
+                        pad_y // 2, pad_y - pad_y // 2,
+                    ), mode="replicate")
                 else:
                     resized_ref = samples
                 reference_latents.append(vae.encode(resized_ref.movedim(1, -1)[..., :3]))

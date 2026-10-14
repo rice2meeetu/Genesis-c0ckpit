@@ -37,6 +37,11 @@ class CaptureBackend(launch.BackendBridge):
     def start(self):
         pass
 
+    def resolve(self, model):
+        # This fixture advertises a ready local model; pin that same route
+        # for queue tests without requiring a live ComfyUI backend.
+        return c.Route('LOCAL', '')
+
     def _publish(self):
         # Busy changes must not replace our deliberately isolated catalog.
         pass

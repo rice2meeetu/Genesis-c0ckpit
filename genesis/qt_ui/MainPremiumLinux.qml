@@ -134,7 +134,7 @@ ApplicationWindow {
     property int generationSeed: -1
     property bool sdxlFaceIDEnabled: false
     readonly property bool sdxlFaceIDSupported: selectedGenerationProfile.faceidSupported === true
-    readonly property bool sdxlFaceIDActive: sdxlFaceIDEnabled && sdxlFaceIDSupported
+    readonly property bool sdxlFaceIDActive: sdxlFaceIDEnabled && sdxlFaceIDSupported && activeSourceImage
     onSdxlFaceIDEnabledChanged: if (sdxlFaceIDActive) generationDenoise = 0.55
     property real sdxlFaceIDStrength: 0.8
     property real generationDenoise: 1.0
@@ -1684,7 +1684,7 @@ ApplicationWindow {
                                         ComboBox {
                                             Layout.fillWidth: true; model: genesisBridge.characters; textRole: "name"
                                             currentIndex: { for (var i=0; i<model.length; i++) if (model[i].id === genesisBridge.selectedCharacterA) return i; return -1 }
-                                            onActivated: { genesisBridge.selectCharacterA(model[currentIndex].id); appRoot.generationSource = genesisBridge.characterIdentitySource(model[currentIndex].id) }
+                                            onActivated: { genesisBridge.selectCharacterA(model[currentIndex].id); appRoot.generationSource = genesisBridge.characterIdentitySource(model[currentIndex].id); appRoot.useSourceImageMode = true }
                                         }
                                         GButton { text: "Manage Characters"; onClicked: appRoot.pageIndex = 15 }
                                     }
@@ -2742,8 +2742,8 @@ ApplicationWindow {
                             Layout.fillWidth: true; bridge: genesisBridge; privatePreview: appRoot.privacyMode
                             inputSource: appRoot.generationSource.toString()
                             builderModel: appRoot.selectedGenerationProfile.model || ""
-                            onUseMaster: function(source) { appRoot.generationSource = source; appRoot.pageIndex = 0 }
-                            onBuildReference: function(source, prompt) { appRoot.generationSource = source; appRoot.generationPrompt = prompt; appRoot.pageIndex = 0 }
+                            onUseMaster: function(source) { appRoot.generationSource = source; appRoot.useSourceImageMode = true; appRoot.pageIndex = 0 }
+                            onBuildReference: function(source, prompt) { appRoot.generationSource = source; appRoot.useSourceImageMode = true; appRoot.generationPrompt = prompt; appRoot.pageIndex = 0 }
                         }
                     }
                 }

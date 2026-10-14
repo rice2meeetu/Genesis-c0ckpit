@@ -5,6 +5,15 @@ import sys
 from pathlib import Path
 
 
+def test_explicit_character_and_launcher_handoffs_activate_image_mode():
+    root = Path(__file__).resolve().parents[1]
+    qml = (root / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    launcher = (root / 'qt_cockpit_linux_premium.py').read_text()
+    assert 'onUseMaster: function(source) { appRoot.generationSource = source; appRoot.useSourceImageMode = true' in qml
+    assert 'onBuildReference: function(source, prompt) { appRoot.generationSource = source; appRoot.useSourceImageMode = true' in qml
+    assert 'window.setProperty("useSourceImageMode", True)' in launcher
+
+
 def test_text_image_modes_preserve_loaded_photo_but_route_only_requested_inputs(tmp_path):
     script = r'''
 import sys
