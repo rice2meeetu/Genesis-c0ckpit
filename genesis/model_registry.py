@@ -45,7 +45,7 @@ MODEL_PROFILES = (
      "lora": (), "vae": (), "encoder": (), "workflow": ("GENESIS_SDXL_SHARED_T2I",)},
     {
         "name": "Aisha 9B standard BF16 · GPU test pending",
-        "model": ("aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors",),
+        "model": ("aisha_nsfw_beta_v9_7_distilled_bf16.safetensors", "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors"),
         "lora": (),
         "vae": ("flux2-vae", "ae.safetensors"),
         "encoder": ("qwen_3_8b", "qwen3_8b"),
