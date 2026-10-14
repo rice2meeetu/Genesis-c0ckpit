@@ -11,13 +11,22 @@ from pathlib import Path
 
 WORKFLOW_DEFAULT = "Use workflow default"
 
+# Loaded exclusively by the FaceID pipeline, never as a user-stackable LoRA.
+INTERNAL_FACEID_LORAS = {"ip-adapter-faceid-plusv2_sdxl_lora.safetensors"}
+
 KLEIN_4B_LORAS = {
     "F2K4BBabe_Engel_v1.0.safetensors",
+    "F2K4BBabe_Americano_v1.0.safetensors",
     "f2k_4B_consist_20260314.safetensors",
     # Structurally validated and completed a coherent 512px render on
     # 2026-09-11. Keep strictly scoped to Klein 4B.
     "klein4b-deepthroat-22epoc-k3nk.safetensors",
 }
+
+# Explicit Qwen Image 2.1 adapter. Its upstream model card targets 2.1 and
+# weight keys are ComfyUI model-only compatible; never enable Qwen Image 2.0
+# LoRAs just because their training metadata says qwen_image_2.
+QWEN_IMAGE21_LORAS = {"Qwen2.1_Anything2RealCharacters.safetensors"}
 
 # Family compatibility is not enough after the 2026-09-21 KFD/SVM incident.
 # Keep this empty until a LoRA completes a guarded current-profile render
@@ -27,6 +36,11 @@ KLEIN_4B_RUNTIME_VERIFIED_LORAS: set[str] = set()
 
 # Metadata-verified on the GENESIS machine as flux2_klein_9b.
 KLEIN_9B_LORAS = {
+    # Exact source hashes matched the 9B repositories on 2026-10-13;
+    # tensor projections are 4096 wide, matching Klein 9B rather than 4B.
+    "flux2klein_bj.safetensors",
+    "flux2klein_cowgirl.safetensors",
+    "f2k_9B_lcs_consist_20260415.safetensors",
     # Shared-volume safetensors metadata inspected on B2, 2026-10-05.
     "Flux2 Klein 9B Realistic Detail LoRA.safetensors",
     "Flux2-Klein-9B-consistency-V2.safetensors",
@@ -56,6 +70,7 @@ LORA_TRIGGERS = {
 
 # Exact local files whose base family is known to be Krea 2.
 KREA2_LORAS = {
+    "k_blackanal.safetensors",
     "lenovo_krea2_2.safetensors",
     "snofs_krea_v1_3D.safetensors",
 }
@@ -89,13 +104,24 @@ FLUX1_LORAS = {
 }
 
 SDXL_LORAS = {
+    "skin texture style v4.safetensors",
+    "face_xl_v0_1.safetensors",
     "add-detail-xl (1).safetensors",
     "add-detail-xl.safetensors",
     "latent-consistency---lcm-lora-sdxl/pytorch_lora_weights.safetensors",
     "genshin impact pierro-V1.safetensors",
 }
 
+PONY_LORAS = {
+    'Realism_Lora_By_Stable_Yogi_Pony_V2.safetensors',
+    'Super_Skin_Detailer_By_Stable_Yogi_PD0_V1.safetensors',
+}
+
 KNOWN_MODELS = {
+    'ponyRealism_V23.safetensors': 'pony_sdxl',
+    'mopMixtureOfPerverts_instaV10DMD.safetensors': 'sdxl',
+    'epicrealismXL_vxviLastfameRealism.safetensors': 'sdxl',
+    'Realistic_Vision_V6.0_NV_B1.safetensors': 'sd15',
     "Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf": "qwen_image",
     "Qwen-Rapid-NSFW-v23_Q2_K.gguf": "qwen_image",
     "aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors": "flux2_klein_4b",
@@ -162,6 +188,8 @@ def lora_family(name: str | None) -> str:
         return "runtime_quarantined"
     if base in BLOCKED_UNVERIFIED_LORAS:
         return "unverified"
+    if base in QWEN_IMAGE21_LORAS:
+        return "qwen_image_2_1"
     if value in KLEIN_4B_LORAS or base in KLEIN_4B_LORAS:
         return "flux2_klein_4b"
     if value in KLEIN_9B_LORAS or base in KLEIN_9B_LORAS:
@@ -170,6 +198,8 @@ def lora_family(name: str | None) -> str:
         return "krea2"
     if value in FLUX1_LORAS or base in {Path(item).name for item in FLUX1_LORAS}:
         return "flux1"
+    if value in PONY_LORAS or base in PONY_LORAS:
+        return 'pony_sdxl'
     if value in SDXL_LORAS or base in {Path(item).name for item in SDXL_LORAS}:
         return "sdxl"
     lowered = value.lower()
@@ -190,6 +220,8 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     if not lora or lora == WORKFLOW_DEFAULT or lora == "None":
         return True
     base = _basename(lora)
+    if base in INTERNAL_FACEID_LORAS:
+        return False  # internal adapter is loaded once by attach_sdxl_faceid
     if base in BLOCKED_UNVERIFIED_LORAS or base in RUNTIME_QUARANTINED_LORAS:
         return False
     family = model_family(model)
@@ -203,13 +235,16 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
 
 
 def compatible_loras(model: str | None, available: list[str]) -> list[str]:
-    return [name for name in available if is_compatible(model, name)]
+    return [name for name in available if not any(part.startswith(".") or "partial" in part.lower() for part in Path(name).parts) and is_compatible(model, name)]
 
 
 def lora_trigger(name: str | None) -> str:
     """Return a metadata-verified trigger without modifying a prompt."""
 
-    return LORA_TRIGGERS.get(_basename(name), "")
+    base = _basename(name)
+    import re
+    canonical = re.sub(r" \(\d+\)(?=\.safetensors$)", "", base)
+    return LORA_TRIGGERS.get(base, LORA_TRIGGERS.get(canonical, ""))
 
 
 def compatibility_note(model: str | None) -> str:
@@ -222,6 +257,8 @@ def compatibility_note(model: str | None) -> str:
         "aisha_9b": "Aisha 9B · use only adapters verified specifically with Aisha",
         "flux1": "FLUX.1 · only FLUX.1 LoRAs",
         "sdxl": "SDXL · only SDXL LoRAs",
+        "pony_sdxl": "Pony · only Pony LoRAs",
+        "sd15": "SD 1.5 · only SD 1.5 LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
-        "qwen_image_2_1": "Qwen Image 2.1 · LoRAs disabled until a 2.1-specific adapter is verified",
+        "qwen_image_2_1": "Qwen Image 2.1 · use only the specifically approved 2.1 model-only adapter; never the older Qwen 2.0 LoRA",
     }.get(family, "Unknown model family · workflow defaults only")

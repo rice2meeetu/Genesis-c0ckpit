@@ -1115,7 +1115,7 @@ def run_stage3(target_img, source_img, swap_model, detector, source_face_index, 
         "enabled": True, "input_image": ["1", 0], "source_image": ["2", 0],
         "swap_model": str(swap_model or "inswapper_128.onnx"),
         "facedetection": str(detector or "retinaface_resnet50"),
-        "face_restore_model": str(restore_model or "CodeFormer") if face_restore else "none",
+        "face_restore_model": ("codeformer-v0.1.0.pth" if str(restore_model or "").strip().casefold() in {"", "codeformer", "codeformer-v0.1.0.pth"} else str(restore_model).strip()) if face_restore else "none",
         "face_restore_visibility": float(restore_visibility),
         "codeformer_weight": float(codeformer_weight),
         "detect_gender_input": "no", "detect_gender_source": "no",
@@ -2801,7 +2801,11 @@ def pose_library_index():
         data = json.loads(POSE_LIBRARY_INDEX_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, list):
             return []
-        return [dict(item) for item in data]
+        library_root = POSE_LIBRARY_DIR.resolve()
+        return [dict(item) for item in data if isinstance(item, dict)
+                and isinstance(item.get("path"), str)
+                and (library_root / item["path"]).resolve().is_relative_to(library_root)
+                and (library_root / item["path"]).is_file()]
     except Exception:
         return []
 
@@ -3477,7 +3481,7 @@ with gr.Blocks(title="GENESIS Pose Maker — V14") as demo:
             target_face_index = gr.Number(value=0, precision=0, label="Target face index")
             face_restore = gr.Checkbox(False, label="Face restore")
         with gr.Row():
-            restore_model = gr.Textbox(value="CodeFormer", label="Restore model")
+            restore_model = gr.Textbox(value="codeformer-v0.1.0.pth", label="Restore model")
             restore_visibility = gr.Slider(0.0,1.0,value=1.0,step=0.05,label="Restore visibility")
             codeformer_weight = gr.Slider(0.0,1.0,value=0.5,step=0.05,label="CodeFormer weight")
 

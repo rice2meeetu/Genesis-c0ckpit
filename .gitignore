@@ -57,5 +57,12 @@ To
 # Track schema, keep runtime database ignored
 !database/face_schema.sql
 
-# Machine-local RunPod connection selection
+# Machine-local RunPod selection
 .genesis-runpod-current
+
+# Isolated installed applications and smoke-test files
+.runtime/
+work/
+
+# Imported pose skeleton assets are machine-local; keep the index metadata, not private images.
+genesis/reference/assets/pose_library/

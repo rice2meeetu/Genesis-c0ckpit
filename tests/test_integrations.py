@@ -173,20 +173,32 @@ class IntegrationTests(unittest.TestCase):
     def test_gpu_kernel_preflight_is_clean_without_svm_warning(self):
         with patch("genesis.integrations.subprocess.run") as run:
             run.return_value.returncode = 0
-            run.return_value.stdout = "normal kernel output"
+            run.return_value.stdout = "amdgpu: ring gfx_0.0.0 uses VM inv eng 0 on hub 0"
             self.assertEqual(
                 integrations.gpu_kernel_preflight(),
                 (True, "GPU kernel preflight clean."),
             )
 
-    def test_gpu_kernel_preflight_latches_after_svm_warning(self):
+    def test_gpu_kernel_preflight_allows_workqueue_timing_notice(self):
         with patch("genesis.integrations.subprocess.run") as run:
             run.return_value.returncode = 0
             run.return_value.stdout = "workqueue: svm_range_restore_work [amdgpu] hogged CPU"
             ok, detail = integrations.gpu_kernel_preflight()
-        self.assertFalse(ok)
-        self.assertIn("reboot required", detail)
-        self.assertIn("svm_range_restore_work", detail)
+        self.assertTrue(ok)
+
+    def test_gpu_kernel_preflight_blocks_gpu_faults_and_svm_stack_traces(self):
+        for line in (
+            "amdgpu: ring gfx_0.0.0 timeout",
+            "amdgpu: GPU reset begin!",
+            "amdgpu: VM_L2_PROTECTION_FAULT_STATUS:0x1",
+            "RIP: svm_range_restore_work+0x23 [amdgpu]",
+        ):
+            with self.subTest(line=line), patch("genesis.integrations.subprocess.run") as run:
+                run.return_value.returncode = 0
+                run.return_value.stdout = line
+                ok, detail = integrations.gpu_kernel_preflight()
+                self.assertFalse(ok)
+                self.assertIn("reboot required", detail)
 
 
 if __name__ == "__main__":

@@ -22,17 +22,20 @@ def test_missing_refinement_is_rejected_before_stage_one(monkeypatch, tmp_path):
     bridge = c.GenerationBridge()
     monkeypatch.setattr(bridge, "_connect_comfyui", lambda: (Mock(), {}))
     def reject(workflow, info, model_override=None):
-        if model_override == c.REMOTE_DONUTS_MODEL:
-            raise c.workflow_lab.ComfyError("Donuts checkpoint missing")
+        if workflow == c.remote_reference_workflow(c.REMOTE_AISHA_9B_MODEL):
+            raise c.workflow_lab.ComfyError("Selected refinement checkpoint missing")
     monkeypatch.setattr(c, "validate_remote_workflow_assets", reject)
     run = Mock()
     monkeypatch.setattr(bridge, "_run_reference_stage", run)
     statuses = []
     monkeypatch.setattr(bridge, "_set_status", statuses.append)
-    with use_route(Route("LOCAL", "")):
+    # Missing *remote* refinement should be checked before Stage 1 starts.
+    # The LOCAL route intentionally blocks that unverified Stage-2 model even
+    # earlier, at the safety gate, so run this test in an explicit RunPod route.
+    monkeypatch.setattr(c, "load_remote_catalog", lambda *args, **kwargs: {})
+    with use_route(Route("RUNPOD", "https://demo-8189.proxy.runpod.net")):
         bridge._run_generate("a landscape", "", 512, 512, c.QWEN_MODEL,
                              "None", "None", "None", 0, 0, 0,
-                             tmp_path / "source.png", None, True, False, False,
-                             {"stage2_model": c.REMOTE_DONUTS_MODEL})
+                             tmp_path / "source.png", None, True, False, False)
     run.assert_not_called()
-    assert "Donuts checkpoint missing" in statuses[-1]
+    assert "Selected refinement checkpoint missing" in statuses[-1]

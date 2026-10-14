@@ -47,7 +47,7 @@ def test_queue_accepts_three_loras_and_preserves_strengths(model, monkeypatch):
 
 
 def test_source_4b_stacks_only_approved_loras_and_keeps_clip_clean(monkeypatch, tmp_path):
-    loras = sorted(compatibility.KLEIN_4B_LORAS)
+    loras = sorted(compatibility.KLEIN_4B_LORAS)[:3]
     monkeypatch.setattr(compatibility, "KLEIN_4B_RUNTIME_VERIFIED_LORAS", set(loras))
     prompt = {str(i): {"inputs": {}} for i in (1, 2, 4, 5, 6, 7, 8, 9, 11)}
     prompt["4"]["inputs"]["lora_name"] = "legacy-default"
@@ -107,3 +107,42 @@ def test_single_available_adapter_does_not_collapse_slot_controls():
     })[0]
     assert row["maxLoras"] == 3
     assert row["loras"] == ["None", LORAS[0]]
+
+
+def test_local_known_trigger_fallback_matches_remote_and_prioritizes_explicit_metadata():
+    known='FK_teeththroat.safetensors'
+    unknown='Flux Klein - NSFW v2.safetensors'
+    adapter='refcontrol_v2_poses.safetensors'
+    model=cockpit.REGULAR_9B_MODEL
+    report={'profiles':[{'ready':True,'evidence':{'MODEL':'/models/'+model}}]}
+    rows=cockpit.build_generation_profiles(report,[known,unknown,adapter],lora_triggers={known:[],adapter:[]})
+    row=rows[0]
+    assert row['triggers'][known]==['FK_strappadoblowjob']
+    assert row['triggers'][adapter]==['apply pose from image 1 with reference from image 2']
+    assert row['triggers'][unknown]==[]
+    explicit=cockpit.build_generation_profiles(report,[known],lora_triggers={known:['EXPLICIT_THIS_FILE']})[0]
+    assert explicit['triggers'][known]==['EXPLICIT_THIS_FILE']
+
+
+def test_lora_trigger_insert_button_only_inserts_selected_verified_words_once():
+    import json,re
+    from PyQt6.QtQml import QJSEngine
+    qml=(cockpit.PROJECT_ROOT/'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    engine=QJSEngine()
+    for name in ('selectedLoraInsertWords','insertSelectedLoraTriggers'):
+        match=re.search(r'    function '+name+r'\(.*?\n    }',qml,re.S)
+        assert match,name
+        assert not engine.evaluate(match.group()).isError(),name
+    profile={'triggers':{'FK_teeththroat.safetensors':['FK_strappadoblowjob'],
+                         'refcontrol_v2_poses.safetensors':['apply pose from image 1 with reference from image 2'],
+                         'Flux Klein - NSFW v2.safetensors':[]}}
+    engine.evaluate('var selectedGenerationProfile='+json.dumps(profile)+'; var selectedLora="FK_teeththroat.safetensors", selectedLoraTwo="refcontrol_v2_poses.safetensors", selectedLoraThree="None", generationPrompt="A test portrait";')
+    assert engine.evaluate('selectedLoraInsertWords().join(", ")').toString()=='FK_strappadoblowjob'
+    assert not engine.evaluate('insertSelectedLoraTriggers()').isError()
+    expected='A test portrait, FK_strappadoblowjob'
+    assert engine.evaluate('generationPrompt').toString()==expected
+    assert not engine.evaluate('insertSelectedLoraTriggers()').isError()
+    assert engine.evaluate('generationPrompt').toString()==expected
+    engine.evaluate('selectedLora="None";selectedLoraTwo="None";')
+    assert engine.evaluate('selectedLoraInsertWords().length').toInt()==0
+    assert 'objectName: "insertSelectedLoraTriggersButton"' in qml

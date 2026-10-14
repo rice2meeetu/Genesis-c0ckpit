@@ -55,8 +55,9 @@ def test_generation_keeps_model_lora_and_stage_controls():
     assert 'text: "COMPATIBLE LORA"' in qml
     assert 'text: "LORA TRIGGER · " + appRoot.selectedLoraTriggerText()' in qml
     assert 'text: "Stage 2 · refine"' in qml
-    assert 'text: "Stage 3 · identity lock"' in qml
-    assert 'model: ["Single model", "3-stage · Selected model → Refine → Identity"]' in qml
+    assert 'text: "Stage 3 · review Person A face after generation"' in qml
+    assert 'model: appRoot.stageTwoReady && appRoot.stageThreeReady && appRoot.activeSourceImage' in qml
+    assert '? ["Single model", "3-stage · Selected model → Refine → Identity"] : ["Single model"]' in qml
     assert "appRoot.useStageTwo = fullPipeline" in qml
     assert "appRoot.useStageThree = fullPipeline" in qml
     assert '"ReActor · Inswapper"' in qml
@@ -166,7 +167,7 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
     qml = source()
     for legacy_blue in ("#17324a", "#242a30", "#152b3b", "#39424b", "#24292f", "#5575c5ff"):
         assert legacy_blue not in qml
-    assert 'appRoot.width < 1300 ? 210 : 260' in qml
+    assert 'appRoot.width < 1300 ? 280 : 380' in qml
     assert 'appRoot.width < 1300 ? 280 : 360' in qml
     assert 'objectName: "generationResultPreview"' in qml
     assert 'Layout.preferredHeight: 180' in qml
@@ -176,17 +177,41 @@ def test_premium_linux_visual_polish_stays_charcoal_gold_and_compact():
 def test_premium_visual_assets_are_wired_into_home_and_navigation():
     qml = source()
     assert 'glassButtonSource: "../assets/ui/glass-button-pill.png"' in qml
-    assert 'genesis-cockpit-banner-lunacy-latest.png' in qml
+    assert 'genesis-banner-wide-lunacy.png' in qml
     assert 'fillMode: Image.PreserveAspectFit' in qml
     for asset in (
-        'image-swap_2026-08-22_22-36-37.jpg',
-        't.png',
-        'e7a0662e0c0a4c7e878c6d28827e813f.jpg',
-        'r.png',
-        'Untitled-1.png',
-        '1248519.small.jpg',
+        'panel-06-duplicate-lab.jpg',
+        'panel-03-face-studio.jpg',
+        'genesis-cockpit-banner-left-poster.jpg',
+        'panel-05-photo-organiser.jpg',
+        'panel-08-camera-hub.png',
+        'genesis-cockpit-banner-right-poster.jpg',
     ):
         assert asset in qml
         assert (ROOT / 'genesis' / 'assets' / 'home_buttons' / asset).is_file()
     assert (ROOT / 'genesis' / 'assets' / 'ui' / 'glass-button-pill.png').is_file()
-    assert (ROOT / 'genesis' / 'assets' / 'lunacy_banner' / 'genesis-cockpit-banner-lunacy-latest.png').is_file()
+    assert (ROOT / 'genesis' / 'assets' / 'lunacy_banner' / 'genesis-banner-wide-lunacy.png').is_file()
+
+
+def test_organiser_banner_visibility_tracks_tool_and_page():
+    import re
+    from PyQt6.QtQml import QJSEngine
+    qml = (ROOT / "genesis" / "qt_ui" / "MainPremiumLinux.qml").read_text()
+    banner = qml.split('objectName: "mainPageBanner"', 1)[1]
+    expression = re.search(r"visible: (.*?)\n            clip:", banner, re.S).group(1)
+    engine = QJSEngine()
+    for page, opened, key, expected in (
+        (3, True, "face organiser", False),
+        (3, True, "duplicate finder", False),
+        (3, False, "face organiser", True),
+        (3, True, "upscale", True),
+        (14, True, "face organiser", True),
+        (0, False, "", False),
+        (8, False, "", False),
+    ):
+        import json
+        engine.evaluate("var appRoot = " + json.dumps(dict(pageIndex=page, mediaToolOpen=opened, mediaToolKey=key)))
+        engine.evaluate("appRoot.mediaToolIsReview = function() { return this.mediaToolKey === 'duplicate finder' || this.mediaToolKey === 'face organiser'; }")
+        result = engine.evaluate(expression)
+        assert not result.isError()
+        assert result.toBool() == expected

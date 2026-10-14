@@ -14,7 +14,9 @@ from genesis.backend_bridge import BackendBridge
 from genesis.backend_routing import Route, normalize_endpoint, use_route
 
 
-PENDING = sorted(c.LOCAL_PENDING_KLEIN_MODELS | {c.QWEN21_MODEL, c.REMOTE_AISHA_9B_MODEL})
+# Qwen Image 2.1 completed bounded local generations after this older
+# baseline test was written; it is checked under fault gating separately.
+PENDING = sorted(c.LOCAL_PENDING_KLEIN_MODELS | {c.REMOTE_AISHA_9B_MODEL})
 
 
 @pytest.mark.parametrize("model", PENDING)

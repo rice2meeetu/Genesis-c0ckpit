@@ -96,3 +96,13 @@ class ModelCompatibilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_audited_lora_records_and_duplicate_trigger():
+    from genesis.model_compatibility import lora_family, lora_trigger, is_compatible
+    assert lora_family('skin texture style v4.safetensors') == 'sdxl'
+    assert lora_family('k_blackanal.safetensors') == 'krea2'
+    assert lora_family('F2K4BBabe_Americano_v1.0.safetensors') == 'flux2_klein_4b'
+    assert lora_trigger('Flux2-Klein-9B-consistency-V2 (1).safetensors') == 'consistency'
+    assert not is_compatible('flux-2-klein-9b.safetensors', 'skin texture style v4.safetensors')
+    assert not is_compatible('flux-2-klein-4b.safetensors', 'F2K4BBabe_Americano_v1.0.safetensors')
