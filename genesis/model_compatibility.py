@@ -11,6 +11,9 @@ from pathlib import Path
 
 WORKFLOW_DEFAULT = "Use workflow default"
 
+# Loaded exclusively by the FaceID pipeline, never as a user-stackable LoRA.
+INTERNAL_FACEID_LORAS = {"ip-adapter-faceid-plusv2_sdxl_lora.safetensors"}
+
 KLEIN_4B_LORAS = {
     "F2K4BBabe_Engel_v1.0.safetensors",
     "F2K4BBabe_Americano_v1.0.safetensors",
@@ -19,6 +22,11 @@ KLEIN_4B_LORAS = {
     # 2026-09-11. Keep strictly scoped to Klein 4B.
     "klein4b-deepthroat-22epoc-k3nk.safetensors",
 }
+
+# Explicit Qwen Image 2.1 adapter. Its upstream model card targets 2.1 and
+# weight keys are ComfyUI model-only compatible; never enable Qwen Image 2.0
+# LoRAs just because their training metadata says qwen_image_2.
+QWEN_IMAGE21_LORAS = {"Qwen2.1_Anything2RealCharacters.safetensors"}
 
 # Family compatibility is not enough after the 2026-09-21 KFD/SVM incident.
 # Keep this empty until a LoRA completes a guarded current-profile render
@@ -180,6 +188,8 @@ def lora_family(name: str | None) -> str:
         return "runtime_quarantined"
     if base in BLOCKED_UNVERIFIED_LORAS:
         return "unverified"
+    if base in QWEN_IMAGE21_LORAS:
+        return "qwen_image_2_1"
     if value in KLEIN_4B_LORAS or base in KLEIN_4B_LORAS:
         return "flux2_klein_4b"
     if value in KLEIN_9B_LORAS or base in KLEIN_9B_LORAS:
@@ -210,6 +220,8 @@ def is_compatible(model: str | None, lora: str | None) -> bool:
     if not lora or lora == WORKFLOW_DEFAULT or lora == "None":
         return True
     base = _basename(lora)
+    if base in INTERNAL_FACEID_LORAS:
+        return False  # internal adapter is loaded once by attach_sdxl_faceid
     if base in BLOCKED_UNVERIFIED_LORAS or base in RUNTIME_QUARANTINED_LORAS:
         return False
     family = model_family(model)
@@ -248,5 +260,5 @@ def compatibility_note(model: str | None) -> str:
         "pony_sdxl": "Pony · only Pony LoRAs",
         "sd15": "SD 1.5 · only SD 1.5 LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
-        "qwen_image_2_1": "Qwen Image 2.1 · LoRAs disabled until a 2.1-specific adapter is verified",
+        "qwen_image_2_1": "Qwen Image 2.1 · use only the specifically approved 2.1 model-only adapter; never the older Qwen 2.0 LoRA",
     }.get(family, "Unknown model family · workflow defaults only")
