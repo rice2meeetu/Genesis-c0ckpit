@@ -1775,6 +1775,8 @@ class GenerationBridge(QObject):
         self._finish_route = None
         self._finish_width, self._finish_height = 1024, 1024
         self._stage_two_model = REMOTE_AISHA_9B_MODEL
+        self._sdxl_faceid_enabled = False
+        self._sdxl_faceid_strength = 0.8
         self._stage_three_engine = "reactor_inswapper"
         # Job-scoped engine is separate from the selection shown in the UI.
         self._active_stage_three_engine = None
@@ -2866,6 +2868,13 @@ class GenerationBridge(QObject):
             if current != job["endpoint"] or resolved_route != job["route"]:
                 self._set_status("Skipped queued job: original resolved backend is no longer ready. Requeue explicitly.")
                 continue
+            # queueGenerateAdvanced captures settings synchronously into
+            # generation_controls before launching its worker. Never leave a
+            # past job's controls in the bridge fields used by later manual
+            # jobs; the UI may already have selected different settings.
+            ui_settings = (self._sdxl_faceid_enabled, self._sdxl_faceid_strength,
+                           self._stage_two_model, self._output_target_long_edge,
+                           self._source_reference_megapixels, self._extra_reference_url)
             self._queue_active=True
             self._sdxl_faceid_enabled,self._sdxl_faceid_strength=job["faceid"]
             self._stage_two_model=job["stage2"]
@@ -2877,7 +2886,14 @@ class GenerationBridge(QObject):
             self._queued_character_override = job["character_snapshot"]
             try:
                 self.queueGenerateAdvanced(*job["args"])
+            except Exception as exc:
+                # Unexpected synchronous launch failures must not strand the
+                # pending queue. Do not touch an already-running worker.
+                self._set_status(f"Queued generation could not start · {exc}")
             finally:
+                (self._sdxl_faceid_enabled, self._sdxl_faceid_strength,
+                 self._stage_two_model, self._output_target_long_edge,
+                 self._source_reference_megapixels, self._extra_reference_url) = ui_settings
                 self._queued_route_override = None
                 self._queued_character_override = None
             if self._busy:
@@ -2917,19 +2933,25 @@ class GenerationBridge(QObject):
             "output_long_edge": int(getattr(self, "_output_target_long_edge", 0)),
             "source_reference_megapixels": self._source_reference_megapixels,
             "extra_reference_url": self._extra_reference_url,
-            "character_snapshot": (self._queued_character_override
-                                   if self._queued_character_override is not None
+            "character_snapshot": (self._queued_character_override if self._queue_active
                                    else self._snapshot_character_a()),
         }
         strength = 0.5 if model_name == FOUR_B_MODEL else 0.65
-        self.queueGenerate(
-            prompt_text, negative_prompt, int(width), int(height), model_name,
-            lora_one, lora_two, lora_three,
-            strength if strength_one is None else strength_one,
-            strength if strength_two is None else strength_two,
-            strength if strength_three is None else strength_three,
-            source_url, pose_url, use_stage_two, use_stage_three, use_upscale,
-        )
+        controls = self._next_generation_controls
+        try:
+            self.queueGenerate(
+                prompt_text, negative_prompt, int(width), int(height), model_name,
+                lora_one, lora_two, lora_three,
+                strength if strength_one is None else strength_one,
+                strength if strength_two is None else strength_two,
+                strength if strength_three is None else strength_three,
+                source_url, pose_url, use_stage_two, use_stage_three, use_upscale,
+            )
+        finally:
+            # Rejected/aborted requests never leave controls that a later
+            # legacy/manual generation could accidentally pick up.
+            if self._next_generation_controls is controls:
+                self._next_generation_controls = None
 
     @pyqtSlot(str, str, int, int, str, str, str, str, float, float, float, str, str, bool, bool, bool)
     def queueGenerate(
@@ -2988,7 +3010,7 @@ class GenerationBridge(QObject):
             self._set_status("Stage 3 face lock requires an original source image.")
             return
         try:
-            route = (self._queued_route_override if self._queued_character_override is not None
+            route = (self._queued_route_override if self._queue_active
                      else self.backend_router.resolve(model_name) if self.backend_router else None)
         except ValueError as exc:
             self._set_status(str(exc))

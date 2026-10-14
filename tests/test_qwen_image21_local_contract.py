@@ -28,13 +28,16 @@ def build_from_ui(monkeypatch, tmp_path, *, source, pose, denoise=1.0):
     statuses = []
     monkeypatch.setattr(bridge, '_set_status', statuses.append)
     # Capture precisely what the existing QML-facing slot sends into queueGenerate.
-    queued = Mock()
+    snapshots = []
+    queued = Mock(side_effect=lambda *args: snapshots.append(dict(bridge._next_generation_controls)))
     monkeypatch.setattr(bridge, 'queueGenerate', queued)
     bridge.queueGenerateAdvanced('A standing portrait', 'blur', 768, 1152,
         cockpit.QWEN21_MODEL, 'None', 'None', str(source or ''), str(pose or ''),
         False, False, False, 25, 1.7, 123, denoise, 'euler', 'simple')
     queued.assert_called_once()
-    controls = dict(bridge._next_generation_controls)
+    assert len(snapshots) == 1
+    controls = snapshots[0]
+    assert bridge._next_generation_controls is None
     # queueGenerate attaches the negative prompt before starting the worker.
     controls['negative_prompt'] = queued.call_args.args[1]
     captured = {}

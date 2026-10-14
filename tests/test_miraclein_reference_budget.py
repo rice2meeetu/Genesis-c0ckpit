@@ -53,15 +53,20 @@ def test_reference_budget_setter_keeps_safe_range(value, expected):
 
 def test_advanced_request_captures_reference_budget_before_worker(monkeypatch):
     bridge = c.GenerationBridge()
-    monkeypatch.setattr(bridge, "queueGenerate", Mock())
+    snapshots = []
+    dispatch = Mock(side_effect=lambda *args: snapshots.append(dict(bridge._next_generation_controls)))
+    monkeypatch.setattr(bridge, "queueGenerate", dispatch)
     bridge.setSourceReferenceMegapixels(BUDGET)
     bridge.queueGenerateAdvanced(*advanced_args())
-    controls = dict(bridge._next_generation_controls)
+    assert len(snapshots) == 1
+    controls = snapshots[0]
+    # Transient controls are only valid during synchronous job preparation.
+    assert bridge._next_generation_controls is None
     bridge.setSourceReferenceMegapixels(0.0)
     assert controls["source_reference_megapixels"] == BUDGET
     assert controls["width"] == controls["height"] == 640
     assert controls["cfg"] == 1.0
-    bridge.queueGenerate.assert_called_once()
+    dispatch.assert_called_once()
 
 
 def test_waiting_jobs_keep_their_reference_budget(monkeypatch):
