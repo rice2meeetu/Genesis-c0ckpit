@@ -201,10 +201,27 @@ class BackendBridge(QObject):
                 status['identityEngines'] = []
                 status['identityReady'] = False
                 if status.get('ready'):
+                    # A connected backend must confirm its pose graph. Keep
+                    # filesystem discovery for explicit LOCAL cold starts.
+                    for row in result['local']:
+                        row['upscaleReady'] = False
+                        row['outputUpscaleReady'] = False
+                        if row['model'] in cockpit.REMOTE_SDXL_MODELS:
+                            row['poseReady'] = False
                     try:
                         client = cockpit.workflow_lab.ComfyClient(
                             cockpit.workflow_lab.COMFY_URL, timeout=8)
-                        engines = remote_identity_engines(client.object_info())
+                        info = client.object_info()
+                        pose_models = cockpit._remote_choice_values(info, ("ControlNetLoader",), "control_net_name")
+                        upscale_ready, output_upscale_ready = cockpit.upscale_catalog_readiness(info)
+                        for row in result['local']:
+                            row['upscaleReady'] = upscale_ready
+                            row['outputUpscaleReady'] = output_upscale_ready
+                            if row['model'] in cockpit.REMOTE_SDXL_MODELS:
+                                row['poseReady'] = bool(row.get('ready') and
+                                    cockpit.REMOTE_SDXL_POSE_CONTROLNET in pose_models and
+                                    all(node in info for node in ("LoadImage", "ImageScale", "ControlNetApplyAdvanced")))
+                        engines = remote_identity_engines(info)
                         status['identityEngines'] = engines
                         status['identityReady'] = bool(engines)
                     except Exception as exc:
