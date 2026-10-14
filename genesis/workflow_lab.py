@@ -416,18 +416,33 @@ def pose_library_index() -> list[dict]:
     else:
         return []
 
-    # The versioned index may describe privately installed images.  Never
-    # advertise a pose if its file is absent, and never resolve a manifest
-    # path outside the user's installed pose-library directory.
-    library_root = (REFERENCE_DIR / "assets" / "pose_library").resolve()
-    available = []
-    for item in entries:
-        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+    # The versioned index may describe privately installed images. Prefer a
+    # bundled imported library when it has its own index, otherwise use the
+    # external Pose Maker library that the Qt picker already supports. A fresh
+    # repository checkout deliberately contains neither imported image pack.
+    bundled = REFERENCE_DIR / "assets" / "pose_library"
+    external = (
+        Path.home() / "AI" / "GENESIS_POSE_MAKER" / "assets" / "pose_library",
+        Path.home() / "Downloads" / "GENESIS_POSE_MAKER_V15_USER_IMAGE_SLOTS(1)"
+        / "GENESIS_POSE_MAKER" / "assets" / "pose_library",
+    )
+    # Prefer the bundled library when indexed files are installed, but recover
+    # a legacy external import when the bundled directory is absent/empty.
+    # Use a single selected root to avoid accidentally mixing unrelated packs.
+    for library in (bundled, *external):
+        if not library.is_dir():
             continue
-        candidate = (library_root / item["path"]).resolve()
-        if candidate.is_relative_to(library_root) and candidate.is_file():
-            available.append(item)
-    return available
+        library_root = library.resolve()
+        available = []
+        for item in entries:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                continue
+            candidate = (library_root / item["path"]).resolve()
+            if candidate.is_relative_to(library_root) and candidate.is_file():
+                available.append(item)
+        if available:
+            return available
+    return []
 
 
 def pose_library_categories() -> list[str]:

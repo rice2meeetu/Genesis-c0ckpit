@@ -24,3 +24,23 @@ def test_only_installed_skeletons_are_listed(monkeypatch, tmp_path):
     (library / "actual.png").unlink()
     assert workflow_lab.pose_library_index() == []
     assert workflow_lab.pose_library_page()["total"] == 0
+
+
+def test_legacy_pose_maker_files_remain_available_without_bundled_pack(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    external = home / "AI" / "GENESIS_POSE_MAKER" / "assets" / "pose_library"
+    external.mkdir(parents=True)
+    (external / "installed.png").write_bytes(b"pose")
+    manifest = tmp_path / "pose_library_index.json"
+    manifest.write_text(json.dumps([
+        {"category": "Imported", "path": "installed.png"},
+        {"category": "Imported", "path": "not-installed.png"},
+        {"category": "Imported", "path": "../outside.png"},
+    ]))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(workflow_lab, "REFERENCE_DIR", tmp_path)
+    monkeypatch.setattr(workflow_lab, "POSE_INDEX_PATH", manifest)
+    assert workflow_lab.pose_library_index() == [
+        {"category": "Imported", "path": "installed.png"}
+    ]
+    assert workflow_lab.pose_library_page()["total"] == 1
