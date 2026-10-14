@@ -111,6 +111,18 @@ def test_folder_picker_keeps_directory_selection(tmp_path, monkeypatch):
 def test_windows_places_preserve_defaults_and_skip_missing(tmp_path, monkeypatch):
     from pathlib import Path
     from PyQt6.QtCore import QUrl
+    # /mnt/C is an Ubuntu mount, not a Windows path. On native Windows,
+    # Qt should keep the default home/drive sidebar instead of inventing a
+    # Linux mount. Keep the mount-exists/mount-missing cases for Linux only.
+    if os.name == "nt":
+        dialog = ImagePicker(folder=tmp_path, settings=QSettings(
+            str(tmp_path / "places.ini"), QSettings.Format.IniFormat))
+        places = dialog.sidebarUrls()
+        assert QUrl.fromLocalFile(str(Path.home())) in places
+        assert all("/mnt/C" not in url.toString() for url in places)
+        assert len(places) == len(set(url.toString() for url in places))
+        dialog.reject()
+        return
     original = Path.is_dir
     for mounted in (True, False):
         monkeypatch.setattr(Path, "is_dir", lambda path: mounted if str(path) in ("/mnt/C", "/mnt/C/Users/p4uln") else original(path))
