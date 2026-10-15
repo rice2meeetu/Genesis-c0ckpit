@@ -137,3 +137,82 @@ def test_local_facefusion_timeout_reaps_only_its_own_child(tmp_path,monkeypatch)
     with pytest.raises(subprocess.TimeoutExpired):
         b._run_local_facefusion_command([sys.executable,'-c','import time;time.sleep(30)'],cwd=tmp_path,timeout=0.15)
     assert len(created)==1 and created[0].poll() is not None
+
+
+@pytest.mark.skipif(__import__('os').name != 'posix', reason='POSIX session/process-group behavior')
+@pytest.mark.parametrize('stop_reason', ['timeout', 'cancel'])
+def test_exited_wrapper_does_not_leave_its_descendant_running(tmp_path, monkeypatch, stop_reason):
+    """A vanished launcher still has a live session when its child holds stdout.
+
+    This regression exercises real harmless short-lived Python subprocesses.
+    The test has its own unconditional group cleanup on failure.
+    """
+    import os
+    import signal
+    b = bridge(tmp_path)
+    b._set_busy(True)
+    child_pid_path = tmp_path / 'test-child.pid'
+    child_code = ('import os,sys,time; from pathlib import Path; '
+                  'Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(20)')
+    wrapper_code = ('import subprocess,sys,time; '
+                    f'subprocess.Popen([sys.executable,"-c",{child_code!r},{str(child_pid_path)!r}]);'
+                    'time.sleep(.15)')
+    original_popen = subprocess.Popen
+    created = []
+    def capture(*args, **kwargs):
+        proc = original_popen(*args, **kwargs)
+        created.append(proc)
+        return proc
+    monkeypatch.setattr(c.subprocess, 'Popen', capture)
+
+    result = []
+    finished = Event()
+    def run():
+        try:
+            b._run_local_facefusion_command([sys.executable, '-c', wrapper_code],
+                                            cwd=tmp_path, timeout=1.0)
+        except Exception as exc:
+            result.append(exc)
+        finally:
+            finished.set()
+    thread = Thread(target=run, daemon=True)
+    try:
+        thread.start()
+        started = time.monotonic()
+        while time.monotonic()-started < 3 and not child_pid_path.exists():
+            time.sleep(.01)
+        assert child_pid_path.is_file(), 'Grandchild did not write its PID'
+        child_pid = int(child_pid_path.read_text())
+        while time.monotonic()-started < 3 and created and created[0].poll() is None:
+            time.sleep(.01)
+        assert created and created[0].poll() == 0, 'Wrapper must exit before cancellation'
+        if stop_reason == 'cancel':
+            b.cancelGeneration()
+        assert finished.wait(timeout=4), 'Runner did not finish promptly'
+        assert len(result) == 1
+        if stop_reason == 'timeout':
+            assert isinstance(result[0], subprocess.TimeoutExpired)
+        else:
+            assert 'cancelled' in str(result[0]).lower()
+        # A killed child may be a short-lived zombie until the init process
+        # reaps it; zombie != a runnable process still doing FaceFusion work.
+        end=time.monotonic()+2
+        def still_running(pid):
+            try:
+                stat=Path(f'/proc/{pid}/stat').read_text()
+                return stat[stat.rfind(')')+2] not in ('Z', 'X')
+            except (FileNotFoundError, ProcessLookupError):
+                # Linux can remove a child's /proc entry between opening
+                # and reading it; both errors mean it is no longer running.
+                return False
+        while time.monotonic() < end and still_running(child_pid):
+            time.sleep(.02)
+        assert not still_running(child_pid), 'Cancelled FaceFusion descendant survived its parent'
+    finally:
+        # Never let a broken test leave a synthetic sleeping descendant alive.
+        if created and os.getpgrp() != created[0].pid:
+            try:
+                os.killpg(created[0].pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        thread.join(timeout=2)

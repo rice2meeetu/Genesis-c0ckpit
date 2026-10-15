@@ -2619,6 +2619,7 @@ class GenerationBridge(QObject):
             start_new_session=(os.name == "posix"),
         )
         started = time.monotonic()
+        completed = False
         try:
             while True:
                 self._check_cancelled()
@@ -2630,16 +2631,19 @@ class GenerationBridge(QObject):
                 except subprocess.TimeoutExpired:
                     continue
                 self._check_cancelled()
+                completed = True
                 return subprocess.CompletedProcess(command, process.returncode, stdout=output)
         finally:
-            if process.poll() is None:
-                # POSIX session owns only this freshly launched FaceFusion job,
-                # including its possible subprocesses. On Windows, terminate
-                # the FaceFusion process itself; never kill by process name.
+            if not completed:
+                # A wrapper can exit before its helper process. Its descendants
+                # may still hold stdout open, so communicate() can time out even
+                # though process.poll() has already returned an exit code.
+                # Always signal the unique session created for this job on POSIX;
+                # never signal other GENESIS/ComfyUI processes by name.
                 try:
                     if os.name == "posix":
                         os.killpg(process.pid, signal.SIGTERM)
-                    else:
+                    elif process.poll() is None:
                         process.terminate()
                 except ProcessLookupError:
                     pass
@@ -2649,7 +2653,7 @@ class GenerationBridge(QObject):
                     try:
                         if os.name == "posix":
                             os.killpg(process.pid, signal.SIGKILL)
-                        else:
+                        elif process.poll() is None:
                             process.kill()
                     except ProcessLookupError:
                         pass
