@@ -85,8 +85,16 @@ ApplicationWindow {
         && (!useStageThree || (activeSourceImage && stageThreeReady))
         && (!useUpscale || (generationOutputTarget > 0 ? outputUpscaleReady : generationUpscaleReady))
     onUseSourceImageModeChanged: {
+        // Route-mode changes may require different model sampling defaults,
+        // but must not erase edits to an existing prompt or a chosen seed.
+        var authoredPrompt = generationPrompt
+        var authoredNegative = generationNegativePrompt
+        var chosenSeed = generationSeed
         if (!useSourceImageMode) useStageThree = false
         applyGenerationDefaults(selectedGenerationProfile)
+        generationPrompt = authoredPrompt
+        generationNegativePrompt = authoredNegative
+        generationSeed = chosenSeed
     }
     property var generationModel: typeof generationProfiles !== "undefined"
         ? generationProfiles.filter(function(row) {
@@ -121,7 +129,8 @@ ApplicationWindow {
     property url generationSource: ""
     property url extraReferenceSource: ""  // Optional third Phr00t reference, never T2I.
     readonly property bool phr00tSelected: String(selectedGenerationProfile.model || "").toLowerCase().indexOf("qwen-rapid") >= 0
-    onGenerationSourceChanged: if (useSourceImageMode) applyGenerationDefaults(selectedGenerationProfile)
+    // Replacing a photo is an input change, not a request to reset sampler,
+    // denoise, custom dimensions or the chosen output target.
     property url faceSwapTarget: ""
     property url faceSwapSource: ""
     property string generationPrompt: ""
@@ -418,6 +427,18 @@ ApplicationWindow {
     }
 
     function selectGeneration(index, userChoseModel) {
+        // Clicking an already selected model must not wipe customized
+        // controls, the three LoRAs or the selected 2K/4K output target.
+        if (generationModel[index] && selectedModelName === generationModel[index].model
+                && selectedGenerationIndex === index) {
+            // Reaffirm an explicitly chosen remote route, without wiping
+            // user controls merely because the same model was clicked.
+            var sameRow = generationModel[index]
+            if (userChoseModel !== false && (sameRow.remote === true
+                    || String(sameRow.destination || "").indexOf("RUNPOD") >= 0))
+                backendBridge.prepareModelRoute(sameRow.model)
+            return
+        }
         if (generationModel[index]) {
             selectedModelName = generationModel[index].model
             if (userChoseModel !== false && (generationModel[index].remote === true || String(generationModel[index].destination || "").indexOf("RUNPOD") >= 0))
@@ -438,14 +459,20 @@ ApplicationWindow {
         var profile = generationModel[index]
         if (!profile) return
         applyGenerationDefaults(profile)
-        generationOutputTarget = 0
-        useUpscale = false
+        // Final output size is a separate choice. Keep it when the new
+        // model supports the same upscaler, otherwise return to native.
+        if (generationOutputTarget > 0 && profile.outputUpscaleReady === false) {
+            generationOutputTarget = 0
+            useUpscale = false
+        }
     }
 
     function applyGenerationDefaults(profile) {
         if (!profile) return
         if (profile.faceidSupported !== true) sdxlFaceIDEnabled = false
-        var defaults = activeSourceImage
+        // Choose mode-specific settings from the explicit mode button,
+        // regardless of whether its image picker has a loaded file yet.
+        var defaults = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
             ? (profile.sourceDefaults || profile) : (profile.createDefaults || profile)
         generationWidth = defaults.defaultWidth !== undefined ? defaults.defaultWidth : 1024
         generationHeight = defaults.defaultHeight !== undefined ? defaults.defaultHeight : 1024
@@ -458,7 +485,7 @@ ApplicationWindow {
         // Local 16 GB Phr00t defaults can prefer a smaller Fast/Balanced
         // native inference size. Explicit Quality still restores full defaults.
         if (profile.preferredPreset) {
-            var speedPresets = activeSourceImage
+            var speedPresets = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
                 ? (profile.sourceQualityPresets || profile.qualityPresets)
                 : (profile.createQualityPresets || profile.qualityPresets)
             var preferred = speedPresets && speedPresets[profile.preferredPreset]
@@ -473,15 +500,17 @@ ApplicationWindow {
         if (sdxlFaceIDEnabled && profile.faceidSupported === true) generationDenoise = 0.55
     }
 
-    readonly property var activeGenerationDefaults: activeSourceImage
+    readonly property var activeGenerationDefaults: useSourceImageMode
         ? (selectedGenerationProfile.sourceDefaults || selectedGenerationProfile)
         : (selectedGenerationProfile.createDefaults || selectedGenerationProfile)
 
     function qualityPresetActive(name, width, height) {
         var profile = selectedGenerationProfile
-        var presets = activeSourceImage ? (profile.sourceQualityPresets || profile.qualityPresets) : (profile.createQualityPresets || profile.qualityPresets)
+        var presets = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
+            ? (profile.sourceQualityPresets || profile.qualityPresets) : (profile.createQualityPresets || profile.qualityPresets)
         var size = presets && presets[name] ? presets[name] : ({width: width, height: height})
-        var defaults = activeSourceImage ? (profile.sourceDefaults || profile) : (profile.createDefaults || profile)
+        var defaults = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
+            ? (profile.sourceDefaults || profile) : (profile.createDefaults || profile)
         var expectedCfg = size.cfg !== undefined ? size.cfg : defaults.defaultCfg
         var expectedSteps = size.steps !== undefined ? size.steps : defaults.defaultSteps
         return generationWidth === size.width && generationHeight === size.height
@@ -492,11 +521,12 @@ ApplicationWindow {
 
     function applyQualityPreset(name, width, height) {
         var profile = selectedGenerationProfile
-        var presets = activeSourceImage ? (profile.sourceQualityPresets || profile.qualityPresets) : (profile.createQualityPresets || profile.qualityPresets)
-        // Native quality/speed is independent of the final output upscale target.
+        var presets = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
+            ? (profile.sourceQualityPresets || profile.qualityPresets) : (profile.createQualityPresets || profile.qualityPresets)
+        // Speed presets change only their documented sampling controls.
+        // Do not reset a chosen sampler/scheduler/denoise, source or LoRAs.
         if (presets && presets[name]) {
-            applyGenerationDefaults(selectedGenerationProfile)
-            var defaults = activeSourceImage
+            var defaults = (typeof useSourceImageMode !== "undefined" ? useSourceImageMode : activeSourceImage)
                 ? (profile.sourceDefaults || profile) : (profile.createDefaults || profile)
             generationWidth = presets[name].width
             generationHeight = presets[name].height
@@ -612,7 +642,9 @@ ApplicationWindow {
             poseCategory = row.poseHintCategory
             poseSearch = ""
         }
-        applyGenerationDefaults(selectedGenerationProfile)
+        // A text pose updates only the authored prompt and explicit model
+        // settings; do not reset a manually chosen sampler or denoise.
+        applyPresetPayload(selectedPresetPayload, selectedGenerationProfile)
         selectedPresetName = row.label || row.name || "Preset"
         selectedPresetId = presetSelectionKey(row)
         if (row.requiresPoseSelection && !selectedPoseSource.toString().length) {
@@ -639,7 +671,10 @@ ApplicationWindow {
             if (!row.prompt)
                 presetSettingsNote = "Pose image linked; no authored JSON prompt is available for this pose."
         }
-        applyGenerationDefaults(selectedGenerationProfile)
+        // An unannotated skeleton is only a pose input; it must not reset
+        // sampler, seed, denoise, quality, LoRAs or a custom prompt.
+        if (selectedPresetPayload && selectedPresetPayload.source)
+            applyPresetPayload(selectedPresetPayload, selectedGenerationProfile)
     }
 
     function filteredPresets() {

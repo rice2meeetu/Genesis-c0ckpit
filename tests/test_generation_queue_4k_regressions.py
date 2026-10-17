@@ -46,7 +46,7 @@ def test_quality_and_2k_4k_buttons_keep_dimensions_and_model_defaults():
     p=c.model_profile_settings(c.REMOTE_PHR00T_V23_GGUF_MODEL,remote=True)
     e.evaluate('var selectedGenerationProfile='+json.dumps(p)+'; var generationSource="file:///reference.png"; var activeSourceImage=true;'+
         'var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationReferenceMegapixels; var selectedPresetPayload=null;'+
-        'var generationSeed=11, generationOutputTarget=0, useUpscale=false, sdxlFaceIDEnabled=false, outputUpscaleReady=true; var genesisBridge={busy:false};')
+        'var useSourceImageMode=true, generationSeed=11, generationOutputTarget=0, useUpscale=false, sdxlFaceIDEnabled=false, outputUpscaleReady=true; var genesisBridge={busy:false};')
     assert not e.evaluate('applyGenerationDefaults(selectedGenerationProfile)').isError()
     assert not e.evaluate('applyQualityPreset("Quality",1024,1024)').isError()
     assert e.evaluate('generationWidth').toInt()==2264
