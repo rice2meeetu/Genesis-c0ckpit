@@ -8,16 +8,18 @@ if [[ -f "$SCRIPT_DIR/.genesis-runpod-current" ]]; then
   source "$SCRIPT_DIR/.genesis-runpod-current"
   set +a
 fi
-# An explicit RunPod URL requests the connected launch profile; an SSH host
-# alone is not consent to enable background remote polling. Preserve a manual
-# LOCAL override and its explicit autoconnect=0 choice.
-if [[ -n "${GENESIS_RUNPOD_URL:-}" ]]; then
-  export GENESIS_BACKEND_MODE="${GENESIS_BACKEND_MODE:-RUNPOD}"
-  export GENESIS_RUNPOD_AUTOCONNECT="${GENESIS_RUNPOD_AUTOCONNECT:-1}"
+# The desktop shortcut is LOCAL unless the user explicitly chooses RUNPOD.
+# Keep saved RunPod endpoint metadata without silently starting its tunnel.
+export GENESIS_BACKEND_MODE="${GENESIS_BACKEND_MODE:-LOCAL}"
+if [[ -z "${GENESIS_RUNPOD_AUTOCONNECT:-}" ]]; then
+  if [[ "${GENESIS_BACKEND_MODE^^}" == "RUNPOD" ]]; then
+    export GENESIS_RUNPOD_AUTOCONNECT=1
+  else
+    export GENESIS_RUNPOD_AUTOCONNECT=0
+  fi
 fi
-# A previously configured tunnel can be checked without silently enabling
-# RunPod polling. GENESIS_RUNPOD_AUTOCONNECT=0 skips it when requested.
-if [[ -n "${GENESIS_RUNPOD_SSH_HOST:-}" && "${GENESIS_RUNPOD_AUTOCONNECT:-1}" == "1" ]]; then
+# Only explicitly selected RUNPOD launches may start the tunnel.
+if [[ "${GENESIS_BACKEND_MODE^^}" == "RUNPOD" && "${GENESIS_RUNPOD_AUTOCONNECT}" == "1" && -n "${GENESIS_RUNPOD_SSH_HOST:-}" ]]; then
   if ! bash "$SCRIPT_DIR/scripts/ensure-runpod-8189-tunnel.sh"; then
     echo "GENESIS: 8189 tunnel is unavailable. Open the cockpit and check the connection settings." >&2
   fi

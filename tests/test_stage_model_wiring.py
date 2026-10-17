@@ -182,8 +182,14 @@ def test_desktop_launcher_respects_endpoint_and_local_override(tmp_path):
     env.pop('GENESIS_RUNPOD_AUTOCONNECT', None)
     subprocess.run(['bash', str(tmp_path / 'launch-qt-cockpit.sh')], env=env, check=True)
     result = json.loads(output.read_text())
-    assert result['GENESIS_BACKEND_MODE'] == 'RUNPOD'
+    assert result['GENESIS_BACKEND_MODE'] == 'LOCAL'
     assert result['GENESIS_RUNPOD_URL'] == env['GENESIS_RUNPOD_URL']
+    assert result['GENESIS_RUNPOD_AUTOCONNECT'] == '0'
+    env.update(GENESIS_BACKEND_MODE='RUNPOD')
+    env.pop('GENESIS_RUNPOD_AUTOCONNECT', None)
+    subprocess.run(['bash', str(tmp_path / 'launch-qt-cockpit.sh')], env=env, check=True)
+    result = json.loads(output.read_text())
+    assert result['GENESIS_BACKEND_MODE'] == 'RUNPOD'
     assert result['GENESIS_RUNPOD_AUTOCONNECT'] == '1'
     env.update(GENESIS_BACKEND_MODE='LOCAL', GENESIS_RUNPOD_AUTOCONNECT='0')
     subprocess.run(['bash', str(tmp_path / 'launch-qt-cockpit.sh')], env=env, check=True)

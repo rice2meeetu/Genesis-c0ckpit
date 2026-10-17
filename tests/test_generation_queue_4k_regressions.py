@@ -59,8 +59,10 @@ def test_quality_and_2k_4k_buttons_keep_dimensions_and_model_defaults():
         assert e.evaluate('generationOutputTarget').toInt()==target
         assert e.evaluate('useUpscale').toBool()
     assert not e.evaluate('applyQualityPreset("Balanced",1024,1024)').isError()
-    assert e.evaluate('generationOutputTarget').toInt()==0
-    assert not e.evaluate('useUpscale').toBool()
+    assert e.evaluate('generationWidth').toInt()==p['sourceQualityPresets']['Balanced']['width']
+    assert e.evaluate('generationHeight').toInt()==p['sourceQualityPresets']['Balanced']['height']
+    assert e.evaluate('generationOutputTarget').toInt()==3840
+    assert e.evaluate('useUpscale').toBool()
 
 
 def test_queued_jobs_keep_faceid_output_route_and_settings(monkeypatch):

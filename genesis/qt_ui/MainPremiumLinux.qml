@@ -493,8 +493,7 @@ ApplicationWindow {
     function applyQualityPreset(name, width, height) {
         var profile = selectedGenerationProfile
         var presets = activeSourceImage ? (profile.sourceQualityPresets || profile.qualityPresets) : (profile.createQualityPresets || profile.qualityPresets)
-        generationOutputTarget = 0
-        useUpscale = false
+        // Native quality/speed is independent of the final output upscale target.
         if (presets && presets[name]) {
             applyGenerationDefaults(selectedGenerationProfile)
             var defaults = activeSourceImage
@@ -517,8 +516,7 @@ ApplicationWindow {
 
     function applyOutputTarget(longEdge) {
         if (!outputUpscaleReady || genesisBridge.busy) return
-        // Only one native generation; 2K/4K are deliberate post-upscale targets.
-        applyQualityPreset("Quality", 1024, 1024)
+        // Preserve selected Fast/Balanced/Quality sampler; enlarge only the final output.
         generationOutputTarget = longEdge
         useUpscale = true
     }
@@ -1902,8 +1900,8 @@ ApplicationWindow {
                                         GButton { id: qualityQualityButton; objectName: "qualityQualityButton"; Layout.preferredWidth: implicitWidth; text: "Quality"; active: appRoot.qualityPresetActive("Quality", 1024, 1024); onClicked: appRoot.applyQualityPreset("Quality", 1024, 1024) }
                                         GButton { id: quality2KButton; objectName: "quality2KButton"; enabled: !genesisBridge.busy && appRoot.outputUpscaleReady; text: "2K"; active: appRoot.generationOutputTarget === 2560 && appRoot.useUpscale; onClicked: appRoot.applyOutputTarget(2560) }
                                         GButton { id: quality4KButton; objectName: "quality4KButton"; enabled: !genesisBridge.busy && appRoot.outputUpscaleReady; text: "4K"; active: appRoot.generationOutputTarget === 3840 && appRoot.useUpscale; onClicked: appRoot.applyOutputTarget(3840) }
-                                        Text { Layout.columnSpan: 1; text: appRoot.generationOutputTarget === 3840 ? "3840 long edge" : appRoot.generationOutputTarget === 2560 ? "2560 long edge" : "Native"; color: appRoot.gold; font.pixelSize: 12 }
-                                        Text { Layout.columnSpan: 3; Layout.fillWidth: true; text: "2K ≈ 2560×1440 and 4K ≈ 3840×2160 at 16:9. Preserves the model's aspect ratio; generates natively first, then uses the installed upscaler. No 4K sampler overload."; color: appRoot.textDim; font.pixelSize: 13; wrapMode: Text.Wrap }
+                                        GButton { objectName: "qualityNativeButton"; text: "Native"; active: appRoot.generationOutputTarget === 0; onClicked: { appRoot.generationOutputTarget = 0; appRoot.useUpscale = false } }
+                                        Text { Layout.columnSpan: 3; Layout.fillWidth: true; text: "Choose Fast, Balanced or Quality independently of Native, 2K or 4K output. At 16:9, 2K ≈ 2560×1440 and 4K ≈ 3840×2160. Larger targets require the installed upscaler; native sampler resolution is unchanged."; color: appRoot.textDim; font.pixelSize: 13; wrapMode: Text.Wrap }
                                     }
                                     GridLayout {
                                         Layout.fillWidth: true

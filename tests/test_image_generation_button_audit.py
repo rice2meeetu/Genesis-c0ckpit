@@ -240,7 +240,11 @@ def verify():
                     assert win.property('generationOutputTarget') == target
                     assert win.property('useUpscale')
                 click(named('qualityBalancedButton'))
+                assert win.property('generationOutputTarget') == 3840
+                assert win.property('useUpscale')
+                click(named('qualityNativeButton'))
                 assert win.property('generationOutputTarget') == 0
+                assert not win.property('useUpscale')
                 click(named('generateButton'))
                 assert captures[-1][0][7:9] == (source_arg, pose.toString())
                 assert not named('generateButton').property('enabled')

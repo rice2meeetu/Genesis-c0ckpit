@@ -1,0 +1,19 @@
+[Unit]
+Description=GENESIS existing ComfyUI ROCm backend
+Conflicts=genesis-llama.service genesis-assistant.service genesis-qwen.service genesis-voice.service
+ConditionPathExists=%h/AI/ComfyUI/.venv/bin/python
+ConditionPathExists=%h/AI/ComfyUI/main.py
+
+[Service]
+Type=simple
+# KFD/SVM safety: allow mappings from the previous ROCm workload to settle.
+ExecStartPre=/bin/sleep 10
+WorkingDirectory=%h/AI/ComfyUI
+ExecStart=%h/AI/ComfyUI/.venv/bin/python %h/AI/ComfyUI/main.py --reserve-vram 1 --bf16-unet --preview-method none --disable-async-offload --listen 127.0.0.1 --port 8188
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:%h/.local/state/genesis/comfyui.log
+StandardError=append:%h/.local/state/genesis/comfyui.log
+
+[Install]
+WantedBy=default.target
