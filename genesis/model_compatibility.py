@@ -26,6 +26,11 @@ KLEIN_4B_LORAS = {
 # Explicit Qwen Image 2.1 adapter. Its upstream model card targets 2.1 and
 # weight keys are ComfyUI model-only compatible; never enable Qwen Image 2.0
 # LoRAs just because their training metadata says qwen_image_2.
+# Keep the otherwise matching TheseAlpacas V2 *out* of the picker on this
+# PC: ComfyUI's Qwen 2.1 + adapter render caused system-wide RAM pressure
+# and Linux OOM-killed genesis-comfyui.service on 2026-10-17 at 18:01.
+# Its exact file SHA matches an upstream 2.1 file, but that is not a local
+# runtime pass. Revisit after a controlled lower-memory or RunPod validation.
 QWEN_IMAGE21_LORAS = {"Qwen2.1_Anything2RealCharacters.safetensors"}
 
 # Family compatibility is not enough after the 2026-09-21 KFD/SVM incident.
@@ -292,6 +297,13 @@ LORA_HELP_BY_FILENAME = {
         "Qwen Image 2.1 character-realism adapter. Only for the Qwen Image 2.1 "
         "route; not compatible with Phr00t/Qwen Image 2.0."
     ),
+    "NSFW Qwen by TheseAlpacas V2.safetensors": (
+        "TheseAlpacas V2 was verified against the published Qwen Image 2.1 "
+        "SHA-256 checksum, but is temporarily DISABLED on this local PC: "
+        "a 512px four-step render with strength 0.6 caused system RAM exhaustion "
+        "and Linux killed ComfyUI. Do not retry without a safer memory profile "
+        "or adequate RunPod memory; not compatible with Phr00t/Qwen 2.0."
+    ),
     "Realism_Lora_By_Stable_Yogi_Pony_V2.safetensors": (
         "Pony/SDXL realism style adapter; not for ordinary SDXL checkpoints. "
         "Validate skin texture and likeness."
@@ -342,5 +354,5 @@ def compatibility_note(model: str | None) -> str:
         "pony_sdxl": "Pony · only Pony LoRAs",
         "sd15": "SD 1.5 · only SD 1.5 LoRAs",
         "qwen_image": "Qwen Image · no installed LoRA has verified compatibility",
-        "qwen_image_2_1": "Qwen Image 2.1 · use only the specifically approved 2.1 model-only adapter; never the older Qwen 2.0 LoRA",
+        "qwen_image_2_1": "Qwen Image 2.1 · local TheseAlpacas V2 LoRA held after RAM OOM (2026-10-17); do not force-enable. Only verified 2.1 adapters are offered.",
     }.get(family, "Unknown model family · workflow defaults only")
