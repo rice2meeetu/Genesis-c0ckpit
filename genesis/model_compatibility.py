@@ -247,6 +247,88 @@ def lora_trigger(name: str | None) -> str:
     return LORA_TRIGGERS.get(base, LORA_TRIGGERS.get(canonical, ""))
 
 
+
+# Descriptions are guidance, not claims of measured improvements. Keep
+# compatibility gating separate from descriptions; don't expose a LoRA just
+# because a name implies a family.
+LORA_HELP_BY_FILENAME = {
+    "add-detail-xl.safetensors": (
+        "SDXL detail adapter. Adds texture/sharpness emphasis; watch for overly "
+        "crisp faces or loss of likeness."
+    ),
+    "add-detail-xl (1).safetensors": (
+        "SDXL detail adapter (alternate filename). Adds texture/sharpness emphasis; "
+        "compare with the original before increasing strength."
+    ),
+    "skin texture style v4.safetensors": (
+        "SDXL skin-texture style adapter. Inspect faces closely and use a light "
+        "strength if the source person must remain recognisable."
+    ),
+    "face_xl_v0_1.safetensors": (
+        "SDXL face-oriented adapter. Filename suggests face styling; this is "
+        "not a FaceID/identity-lock model. Test for identity drift."
+    ),
+    "Flux2 Klein 9B Realistic Detail LoRA.safetensors": (
+        "Klein 9B Base detail adapter. Tends toward realism/detail; "
+        "check results with the specific checkpoint."
+    ),
+    "Flux2-Klein-9B-consistency-V2.safetensors": (
+        "Klein 9B Base consistency adapter. Intended to help consistency "
+        "across outputs; consistent identity is not guaranteed."
+    ),
+    "refcontrol_v2_poses.safetensors": (
+        "Klein 9B pose-reference adapter. Requires the correct two-image roles "
+        "in its supported workflow; selecting it alone does not add pose control."
+    ),
+    "Klein_Anatomy_Revamped.safetensors": (
+        "Klein 9B Base anatomy adapter. Intended for body proportions; "
+        "inspect outputs for unexpected changes."
+    ),
+    "flux2klein_body_version_a.safetensors": (
+        "Klein 9B Base body-focused adapter. Use conservative strengths and "
+        "compare the pose and subject identity."
+    ),
+    "Qwen2.1_Anything2RealCharacters.safetensors": (
+        "Qwen Image 2.1 character-realism adapter. Only for the Qwen Image 2.1 "
+        "route; not compatible with Phr00t/Qwen Image 2.0."
+    ),
+    "Realism_Lora_By_Stable_Yogi_Pony_V2.safetensors": (
+        "Pony/SDXL realism style adapter; not for ordinary SDXL checkpoints. "
+        "Validate skin texture and likeness."
+    ),
+    "Super_Skin_Detailer_By_Stable_Yogi_PD0_V1.safetensors": (
+        "Pony/SDXL skin detail adapter; not for ordinary SDXL checkpoints. "
+        "Start gently to avoid overprocessing."
+    ),
+}
+
+
+def lora_help(name: str | None) -> str:
+    """Concise guidance for a *compatible* picker entry.
+
+    This deliberately does not infer activation words, benchmark scores,
+    or provenance from arbitrary safetensors filenames.
+    """
+    base = _basename(name)
+    import re
+    canonical = re.sub(r" \(\d+\)(?=\.safetensors$)", "", base)
+    text = LORA_HELP_BY_FILENAME.get(base) or LORA_HELP_BY_FILENAME.get(canonical)
+    if text:
+        return text
+    family = lora_family(name)
+    display = {
+        "sdxl": "SDXL",
+        "pony_sdxl": "Pony/SDXL",
+        "flux2_klein_9b_base": "Klein 9B Base",
+        "flux2_klein_4b": "Klein 4B",
+        "qwen_image_2_1": "Qwen Image 2.1",
+        "flux1": "FLUX.1",
+        "krea2": "Krea 2",
+    }.get(family, "Unclassified")
+    return (f"{display} adapter. No reviewed purpose or activation phrase is "
+            "available for this exact file; use a low strength and compare "
+            "outputs rather than assuming the filename guarantees an effect.")
+
 def compatibility_note(model: str | None) -> str:
     family = model_family(model)
     return {

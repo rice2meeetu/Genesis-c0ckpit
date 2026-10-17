@@ -146,3 +146,52 @@ def test_lora_trigger_insert_button_only_inserts_selected_verified_words_once():
     engine.evaluate('selectedLora="None";selectedLoraTwo="None";')
     assert engine.evaluate('selectedLoraInsertWords().length').toInt()==0
     assert 'objectName: "insertSelectedLoraTriggersButton"' in qml
+
+
+def test_model_specific_lora_help_is_included_for_local_and_remote_profiles():
+    """Help follows the compatible picker, not an unverified global catalog."""
+    from genesis.model_compatibility import lora_help
+    known = "add-detail-xl.safetensors"
+    foreign = "Flux Klein - NSFW v2.safetensors"
+    model = cockpit.REMOTE_DONUTS_MODEL
+    report = {"profiles": [{"name": "Donuts", "ready": True,
+               "evidence": {"MODEL": "/fake/models/" + model}}]}
+    row = cockpit.build_generation_profiles(report, [known, foreign])[0]
+    assert row["loras"] == ["None", known]
+    assert list(row["loraHelp"]) == [known]
+    assert "SDXL" in row["loraHelp"][known]
+    assert row["triggers"][known] == []
+    assert "No reviewed purpose" in lora_help("some_new_sdxl_adapter.safetensors")
+    assert "FaceID" in lora_help("face_xl_v0_1.safetensors")
+
+    remote = cockpit.build_remote_generation_profiles({
+        "CheckpointLoaderSimple": {"input": {"required": {"ckpt_name": [[model], {}]}}},
+        "LoraLoader": {"input": {"required": {"lora_name": [[known, foreign], {}]}}},
+    })[0]
+    assert remote["loras"] == ["None", known]
+    assert list(remote["loraHelp"]) == [known]
+
+
+def test_lora_help_ui_has_three_independent_slot_details_without_inventing_triggers():
+    import re
+    from PyQt6.QtQml import QJSEngine
+    qml = (cockpit.PROJECT_ROOT / "genesis/qt_ui/MainPremiumLinux.qml").read_text()
+    assert all(f'objectName: "lora{slot}Info"' in qml
+               for slot in ("One", "Two", "Three"))
+    m = re.search(r'    function selectedLoraHelpText\(.*?\n    }', qml, re.S)
+    assert m, "LoRA help function must remain in the real QML"
+    engine = QJSEngine()
+    assert not engine.evaluate(m.group()).isError()
+    assert not engine.evaluate("""var selectedGenerationProfile = {
+        loraHelp: {"add-detail-xl.safetensors": "SDXL detail adapter."},
+        triggers: {"add-detail-xl.safetensors": [],
+                   "other.safetensors": ["known_word"]}
+    };""").isError()
+    none = engine.evaluate('selectedLoraHelpText("None")').toString()
+    detail = engine.evaluate('selectedLoraHelpText("add-detail-xl.safetensors")').toString()
+    known = engine.evaluate('selectedLoraHelpText("other.safetensors")').toString()
+    assert none == ""
+    assert "SDXL detail adapter" in detail
+    assert "No verified trigger" in detail
+    assert "known_word" in known
+    assert "No verified trigger" not in known

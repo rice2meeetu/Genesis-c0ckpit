@@ -27,7 +27,7 @@ from PyQt6.QtQml import QQmlApplicationEngine
 from PyQt6.QtWidgets import QApplication
 from genesis.qt_media_picker import FilePicker as QFileDialog
 
-from genesis.model_compatibility import compatibility_note, compatible_loras, is_compatible, lora_trigger, model_family
+from genesis.model_compatibility import compatibility_note, compatible_loras, is_compatible, lora_trigger, lora_help, model_family
 from genesis.model_registry import MODEL_ROOTS, readiness_report
 from genesis.asset_inventory import unavailable_local_assets
 from genesis.pose_preset_payload import preset_payload, source_metadata, pose_preset_references
@@ -548,6 +548,7 @@ def build_generation_profiles(
             "loras": ["None", *compatible],
             "triggers": {name: verified_lora_trigger_words(name, lora_triggers)
                          for name in compatible},
+            "loraHelp": {name: lora_help(name) for name in compatible},
             "ready": ready,
             "upscaleReady": upscale_ready,
             "outputUpscaleReady": output_upscale_ready,
@@ -780,6 +781,7 @@ def build_remote_generation_profiles(info: dict) -> list[dict]:
                 name: ([lora_trigger(name)] if lora_trigger(name) else [])
                 for name in compatible
             },
+            "loraHelp": {name: lora_help(name) for name in compatible},
             "ready": True,
             "runnable": runnable,
             "stageOneEligible": model_name in SUPPORTED_CREATE_MODELS,
