@@ -200,7 +200,7 @@ def test_family_specific_identity_guidance_and_sdxl_source_default():
 
 @pytest.mark.parametrize('model', sorted(c.SUPPORTED_CREATE_MODELS))
 @pytest.mark.parametrize('source', [False, True])
-def test_quality_buttons_restore_each_models_settings_and_preserve_seed(model, source):
+def test_quality_buttons_preserve_advanced_controls_and_restore_model_speed_settings(model, source):
     import re
     qml = (c.PROJECT_ROOT / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
     engine = QJSEngine()
@@ -211,17 +211,21 @@ def test_quality_buttons_restore_each_models_settings_and_preserve_seed(model, s
     engine.evaluate('var selectedGenerationProfile = ' + json.dumps(profile))
     engine.evaluate('var generationSource = ' + json.dumps('original.png' if source else ''))
     engine.evaluate('var activeSourceImage = ' + ('true' if source else 'false'))
+    engine.evaluate('var useSourceImageMode = ' + ('true' if source else 'false'))
     engine.evaluate('var sdxlFaceIDEnabled = false; var generationSeed = 123; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler;')
     defaults = profile['sourceDefaults' if source else 'createDefaults']
     for quality in ('Fast', 'Balanced', 'Quality'):
         engine.evaluate('generationSteps = 99; generationCfg = 99; generationSampler = "wrong"; generationScheduler = "wrong"; generationDenoise = 0;')
         engine.evaluate('applyQualityPreset(' + json.dumps(quality) + ', 1, 1)')
         expected = profile['sourceQualityPresets' if source else 'createQualityPresets'][quality]
-        for setting in ('Steps', 'Cfg', 'Denoise', 'Sampler', 'Scheduler'):
-            # Distilled Phr00t presets intentionally lower steps and CFG for
-            # speed; all other controls still return to model defaults.
+        for setting in ('Steps', 'Cfg'):
+            # Fast/Balanced/Quality change model-specific speed controls, not
+            # the user's advanced sampler/scheduler/denoise choices.
             value = expected.get(setting[0].lower() + setting[1:], defaults['default' + setting])
             assert engine.evaluate('generation' + setting).toVariant() == value, (model, source, quality, setting)
+        assert engine.evaluate('generationSampler').toString() == 'wrong'
+        assert engine.evaluate('generationScheduler').toString() == 'wrong'
+        assert engine.evaluate('generationDenoise').toNumber() == 0
         assert engine.evaluate('generationWidth').toInt() == expected['width']
         assert engine.evaluate('generationHeight').toInt() == expected['height']
         assert engine.evaluate('generationSeed').toInt() == 123

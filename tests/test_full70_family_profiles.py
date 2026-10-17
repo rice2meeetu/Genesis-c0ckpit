@@ -78,6 +78,9 @@ def test_text_preset_preserves_selected_skeleton_and_model_settings():
     settings=c.model_profile_settings(c.REMOTE_MOP_MODEL,remote=True)
     eng.evaluate('selectedGenerationProfile='+json.dumps({'model':c.REMOTE_MOP_MODEL,**settings}))
     eng.evaluate('selectedGenerationProfile.sourceDefaults='+json.dumps(settings['sourceDefaults']))
+    # Selecting the model first establishes its sampler, scheduler and
+    # step defaults. The text pose must not clobber subsequent manual edits.
+    assert not eng.evaluate('applyGenerationDefaults(selectedGenerationProfile)').isError()
     assert not eng.evaluate('applyPreset({id:"full70:test",label:"Pose A",prompt:"original"})').isError()
     assert eng.evaluate('selectedPoseSource').toString()=='bone.png'
     assert eng.evaluate('generationPrompt').toString().startswith(c.REMOTE_MOP_MODEL+' family-specific')
