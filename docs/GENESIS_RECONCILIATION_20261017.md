@@ -1,0 +1,10 @@
+# GENESIS reconciliation — 17 October 2026
+
+- Base: clean-history integration PR #14, based on current GitHub main; retains newer queued-job, FaceFusion lifecycle/cancellation, worker-start, and pose-library safety fixes.
+- Source of local updates: verified local safety branch `safety/local-verified-20261017` (`c2e17c4`), kept intact. Its specific UI and launcher fixes are applied on this integration branch; selected documentation, standalone Qwen Image 2.1 reference workflow, optional warm-cache unit, and offline speed benchmark are retained.
+- Restored local improvements: Fast/Balanced/Quality and Native/2K/4K selectable independently; LOCAL-by-default standard desktop launcher without automatic RunPod tunnelling; single-target pose-maker Stage 3 guard, updated Person A prompt, identity-lock SDXL denoise baseline, and clearer engine choices.
+- Deliberately retained newer candidate protections: FaceFusion subprocess cancellation and local-only routing, safer CPU default/MIGraphX opt-in, queued-job identity and backend snapshots, installed pose-file validation, safe worker startup, and verified local Aisha Base workflow checkpoint.
+- Not copied from the local safety branch: a pose-library index whose 587 paths are absent in the integration checkout (would publish dangling references); an experimental FaceFusion GPU-profile test depending on helpers not present in the reviewed implementation; a duplicate engine-discovery module already superseded in this candidate.
+- GPU evidence: local SDXL generation succeeded on the *separate* installed safety branch; this integration was verified with offline Qt/application tests only, not every live model or RunPod pod. No claims of live RunPod, FaceFusion MIGraphX, or all-model render success.
+- Private RunPod credentials, local backups, and private pose assets remain excluded. The installed GENESIS checkout is not replaced by this isolated integration branch.
+- Supersedes draft PRs #11, #12, #13 and #14 once replacement integration is accepted; do not merge overlapping PRs separately.

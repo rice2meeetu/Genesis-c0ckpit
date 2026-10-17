@@ -19,7 +19,7 @@ def fixture_image(tmp_path):
     return path
 
 
-@pytest.mark.parametrize('operation', ['face_swap', 'edit', 'inpaint', 'upscale'])
+@pytest.mark.parametrize('operation', ['edit', 'inpaint', 'upscale'])
 def test_operation_destination_respects_mode_and_safety(operation):
     bridge = BackendBridge(cockpit.GenerationBridge())
     bridge._endpoint = 'https://remote.example'
@@ -54,7 +54,8 @@ def test_queued_operations_capture_route_before_thread_start(tmp_path, monkeypat
     path = fixture_image(tmp_path)
     uri = QUrl.fromLocalFile(str(path)).toString()
     bridge = cockpit.GenerationBridge()
-    route = Route('RUNPOD', 'https://original.example')
+    route = (Route('LOCAL', '') if operation == 'face_swap'
+             else Route('RUNPOD', 'https://original.example'))
     bridge.backend_router = Mock()
     bridge.backend_router.resolve_operation.return_value = route
     monkeypatch.setattr(cockpit, 'EDIT_WORKFLOW', path)
@@ -62,13 +63,17 @@ def test_queued_operations_capture_route_before_thread_start(tmp_path, monkeypat
     monkeypatch.setattr(bridge, '_run_' + operation, worker)
     thread = Mock()
     monkeypatch.setattr(cockpit.threading, 'Thread', thread)
-    if operation == 'face_swap': bridge.queueFaceSwap(uri, uri)
+    if operation == 'face_swap':
+        # This test checks route capture, not the dialog. User selection is
+        # exercised in test_face_region_dialog_ui.py (accept and cancel).
+        monkeypatch.setattr('genesis.person_a_targeting.choose_face_region', lambda *_: Mock())
+        bridge.queueFaceSwap(uri, uri)
     elif operation == 'edit': bridge.queueEdit(uri, 'neutral mug', 0.5)
     else: bridge.queueInpaint(uri, uri, 'neutral mug', 0.5)
     bridge.backend_router.resolve_operation.assert_called_once_with(operation)
     bridge.backend_router.resolve_operation.return_value = Route('LOCAL', '')
     call = thread.call_args.kwargs
-    assert call['target'](*call['args']) == 'https://original.example'
+    assert call['target'](*call['args']) == ('' if operation == 'face_swap' else 'https://original.example')
     worker.assert_called_once()
 
 

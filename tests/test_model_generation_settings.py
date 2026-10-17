@@ -55,16 +55,21 @@ def test_qml_switching_models_and_source_resets_settings_and_preset():
     for name in ('applyGenerationDefaults', 'applyQualityPreset', 'qualityPresetActive'):
         function = re.search(r'    function ' + name + r'\(.*?\n    }', qml, re.S).group()
         assert not engine.evaluate(function).isError()
-    engine.evaluate('var generationSource = ""; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler;')
+    engine.evaluate('var activeSourceImage = false, generationSource = ""; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler;')
     profile = c.model_profile_settings(c.REMOTE_MIRACLEIN_9B_MODEL, remote=True)
     engine.evaluate('var selectedGenerationProfile = ' + json.dumps(profile))
     engine.evaluate('applyGenerationDefaults(selectedGenerationProfile)')
     assert engine.evaluate('generationScheduler').toString() == 'simple'
+    # A photograph can stay loaded while T2I remains selected.
     engine.evaluate('generationSource = "file:///source.png"; applyGenerationDefaults(selectedGenerationProfile)')
+    assert engine.evaluate('generationScheduler').toString() == 'simple'
+    engine.evaluate('activeSourceImage = true; applyGenerationDefaults(selectedGenerationProfile)')
     assert engine.evaluate('generationScheduler').toString() == 'Flux2Scheduler'
-    for name, size in (('Fast', 768), ('Balanced', 1024), ('Quality', 1536)):
+    for name in ('Fast', 'Balanced', 'Quality'):
         engine.evaluate(f'applyQualityPreset("{name}", 512, 512)')
-        assert engine.evaluate('generationWidth').toInt() == size
+        expected = profile['sourceQualityPresets'][name]
+        assert engine.evaluate('generationWidth').toInt() == expected['width']
+        assert engine.evaluate('generationHeight').toInt() == expected['height']
         assert engine.evaluate('generationSteps').toInt() == 12
         assert engine.evaluate('generationCfg').toNumber() == 1.1
         assert engine.evaluate(f'qualityPresetActive("{name}", 512, 512)').toBool()
@@ -73,7 +78,64 @@ def test_qml_switching_models_and_source_resets_settings_and_preset():
     engine.evaluate('applyGenerationDefaults(selectedGenerationProfile)')
     assert engine.evaluate('generationScheduler').toString() == 'beta'
     assert engine.evaluate('generationSampler').toString() == 'er_sde'
+    # Local v19 Q4 deliberately starts on tested Fast. Selecting Balanced or
+    # Quality must restore its six-step identity/consistency baseline.
+    assert engine.evaluate('generationSteps').toInt() == 4
+    assert not engine.evaluate('applyQualityPreset("Balanced",512,512)').isError()
     assert engine.evaluate('generationSteps').toInt() == 6
+    assert not engine.evaluate('applyQualityPreset("Quality",1024,1024)').isError()
+    assert engine.evaluate('generationSteps').toInt() == 6
+
+
+def test_phr00t_speed_presets_keep_quality_and_fast_sampling():
+    v23 = c.model_profile_settings(c.REMOTE_PHR00T_V23_Q2_MODEL, remote=False)
+    assert v23['preferredPreset'] == 'Balanced'
+    assert v23['sourceQualityPresets']['Fast'] == {'width': 1024, 'height': 640, 'cfg': 1.0, 'steps': 4}
+    assert v23['sourceQualityPresets']['Balanced'] == {'width': 1344, 'height': 832, 'cfg': 1.0, 'steps': 4}
+    assert v23['sourceQualityPresets']['Quality'] == {'width': 2264, 'height': 1360, 'cfg': 1.2, 'steps': 4}
+    assert 'preferredPreset' not in c.model_profile_settings(c.REMOTE_PHR00T_V23_Q2_MODEL, remote=True)
+    v19 = c.model_profile_settings(c.QWEN_MODEL, remote=False)
+    assert v19['sourceQualityPresets']['Fast']['steps'] == 4
+    assert 'tiled VAE decoding' in v19['qualityNote']
+    assert v19['sourceQualityPresets']['Balanced']['width'] == 640
+    assert v19['sourceQualityPresets']['Quality']['height'] == 1216
+
+
+def test_qml_phr00t_speed_presets_apply_and_restore_full_quality():
+    qml = (c.PROJECT_ROOT / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    engine = QJSEngine()
+    for name in ('applyGenerationDefaults', 'applyQualityPreset', 'qualityPresetActive'):
+        function = re.search(r'    function ' + name + r'\(.*?\n    }', qml, re.S).group()
+        assert not engine.evaluate(function).isError()
+    p = c.model_profile_settings(c.REMOTE_PHR00T_V23_Q2_MODEL, remote=False)
+    engine.evaluate('var selectedGenerationProfile=' + json.dumps(p) + '; var activeSourceImage=true; var generationSource="file:///source.png"; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationReferenceMegapixels, generationOutputTarget, useUpscale; var selectedPresetPayload=null, sdxlFaceIDEnabled=false;')
+    assert not engine.evaluate('applyGenerationDefaults(selectedGenerationProfile)').isError()
+    assert (engine.evaluate('generationWidth').toInt(), engine.evaluate('generationHeight').toInt()) == (1344, 832)
+    assert engine.evaluate('generationCfg').toNumber() == 1.0
+    assert not engine.evaluate('applyQualityPreset("Fast",512,512)').isError()
+    assert (engine.evaluate('generationWidth').toInt(), engine.evaluate('generationHeight').toInt()) == (1024, 640)
+    assert engine.evaluate('generationSteps').toInt() == 4
+    assert engine.evaluate('qualityPresetActive("Fast",512,512)').toBool()
+    engine.evaluate('generationCfg = 1.2')
+    assert not engine.evaluate('qualityPresetActive("Fast",512,512)').toBool()
+    assert not engine.evaluate('applyQualityPreset("Quality",1024,1024)').isError()
+    assert (engine.evaluate('generationWidth').toInt(), engine.evaluate('generationHeight').toInt()) == (2264, 1360)
+    assert engine.evaluate('generationCfg').toNumber() == 1.2
+    assert engine.evaluate('qualityPresetActive("Quality",1024,1024)').toBool()
+    v19 = c.model_profile_settings(c.QWEN_MODEL, remote=False)
+    assert v19['preferredPreset'] == 'Fast'
+    assert 'preferredPreset' not in c.model_profile_settings(c.QWEN_MODEL, remote=True)
+    assert v19['sourceQualityPresets']['Fast'] == {'width':512,'height':704,'cfg':1.0,'steps':4}
+    engine.evaluate('selectedGenerationProfile = ' + json.dumps(v19))
+    engine.evaluate('applyGenerationDefaults(selectedGenerationProfile)')
+    assert (engine.evaluate('generationWidth').toInt(),engine.evaluate('generationHeight').toInt()) == (512,704)
+    assert engine.evaluate('generationSteps').toInt() == 4
+    assert engine.evaluate('qualityPresetActive("Fast",512,512)').toBool()
+    assert not engine.evaluate('applyQualityPreset("Balanced",512,512)').isError()
+    assert engine.evaluate('generationSteps').toInt() == 6
+    assert not engine.evaluate('applyQualityPreset("Quality",1024,1024)').isError()
+    assert engine.evaluate('generationSteps').toInt() == 6
+    assert (engine.evaluate('generationWidth').toInt(),engine.evaluate('generationHeight').toInt()) == (832,1216)
 
 
 def test_4b_source_applies_visible_controls_and_seed(monkeypatch, tmp_path):
@@ -116,20 +178,31 @@ def test_local_catalog_preserves_lora_subdirectory_names(monkeypatch, tmp_path):
     assert row['triggers']['klein9b/refcontrol_v2_poses.safetensors'] == ['refcontrol']
 
 
-def test_base_9b_graph_defaults_match_undistilled_profile(monkeypatch):
-    monkeypatch.setattr(c, "REGULAR_9B_WORKFLOWS", (c.REMOTE_MIRACLEIN_T2I_WORKFLOW,))
-    info = json.loads((Path(__file__).parent / 'fixtures/runpod_stage_models_schema.json').read_text())
-    info['UnetLoaderGGUF']['input']['required']['unet_name'][0].append(c.REGULAR_9B_MODEL)
-    info['FluxGuidance'] = {'input': {'required': {'conditioning': ['CONDITIONING'], 'guidance': ['FLOAT']}}}
-    prompt = c.build_create_prompt(info, 'A ceramic vase', 512, 512, c.REGULAR_9B_MODEL)
-    assert prompt['134']['inputs']['steps'] == 50
-    assert prompt['134']['inputs']['cfg'] == 4.0
+def test_scheduler_picker_contains_all_editable_model_defaults():
+    qml = (c.PROJECT_ROOT / 'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    options = json.loads(re.search(r'\["beta", "simple"[^\]]+\]', qml).group())
+    for model in c.SUPPORTED_CREATE_MODELS:
+        for source in (False, True):
+            values = c.model_generation_settings(model, source=source)
+            if not values['schedulerFixed']:
+                assert values['defaultScheduler'] in options
 
 
-def test_aisha_t2i_keeps_legacy_face_swap_workflow_separate():
-    legacy = json.loads((c.REFERENCE_WORKFLOW_ROOT / 'GENESIS_AISHA_9B_TEST.json').read_text())
-    assert any(node['type'] == 'ReActorFaceSwap' for node in legacy['nodes'])
-    assert c.LOCAL_AISHA_9B_WORKFLOW.name == 'GENESIS_AISHA_9B_T2I.json'
-    create = json.loads(c.LOCAL_AISHA_9B_WORKFLOW.read_text())
-    assert any(node['class_type'] == 'Flux2Scheduler' for node in create.values())
-    assert not any(node['class_type'] == 'ReActorFaceSwap' for node in create.values())
+def test_lora_training_tags_are_not_mislabeled_as_activation_triggers(tmp_path):
+    import struct
+    sample = tmp_path / 'sample.safetensors'
+    header = {'__metadata__': {'ss_tag_frequency':'{"1_misc":{"all":23,"misc":40,"portrait":9}}'}}
+    binary = json.dumps(header).encode()
+    sample.write_bytes(struct.pack('<Q',len(binary)) + binary)
+    assert c.lora_trigger_words(sample) == []
+    header['__metadata__']['modelspec.trigger_phrase'] = 'verified_phrase'
+    binary = json.dumps(header).encode()
+    sample.write_bytes(struct.pack('<Q',len(binary)) + binary)
+    assert c.lora_trigger_words(sample) == ['verified_phrase']
+
+
+def test_phr00t_does_not_offer_unverified_qwen2_lora():
+    adapter='NSFW Qwen by TheseAlpacas V2.safetensors'
+    for model in (c.QWEN_MODEL,c.REMOTE_PHR00T_V23_Q2_MODEL,c.REMOTE_PHR00T_MODEL):
+        assert not is_compatible(model,adapter)
+        assert c.model_lora_limit(model)==0

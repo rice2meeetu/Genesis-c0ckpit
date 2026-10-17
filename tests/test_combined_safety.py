@@ -14,7 +14,9 @@ from genesis.backend_bridge import BackendBridge
 from genesis.backend_routing import Route, normalize_endpoint, use_route
 
 
-PENDING = sorted(c.LOCAL_PENDING_KLEIN_MODELS | {c.QWEN21_MODEL, c.REMOTE_AISHA_9B_MODEL})
+# Qwen Image 2.1 completed bounded local generations after this older
+# baseline test was written; it is checked under fault gating separately.
+PENDING = sorted(c.LOCAL_PENDING_KLEIN_MODELS | {c.REMOTE_AISHA_9B_MODEL})
 
 
 @pytest.mark.parametrize("model", PENDING)
@@ -84,8 +86,11 @@ def test_invalid_port_reports_validation_error():
         normalize_endpoint("https://example.test:bad")
 
 
-@pytest.mark.parametrize("launcher", ["launch-qt-cockpit.sh", "launch-qt-cockpit-runpod.sh"])
-def test_tunnel_failure_still_opens_ui_without_autoconnect(tmp_path, launcher):
+@pytest.mark.parametrize("launcher, requests_tunnel, expected_mode, expected_autoconnect", [
+    ("launch-qt-cockpit.sh", False, "LOCAL", "0"),
+    ("launch-qt-cockpit-runpod.sh", True, "RUNPOD", None),
+])
+def test_tunnel_failure_still_opens_ui_without_autoconnect(tmp_path, launcher, requests_tunnel, expected_mode, expected_autoconnect):
     root = Path(__file__).resolve().parents[1]
     shutil.copy2(root / launcher, tmp_path / launcher)
     scripts = tmp_path / "scripts"
@@ -103,8 +108,10 @@ def test_tunnel_failure_still_opens_ui_without_autoconnect(tmp_path, launcher):
     result = subprocess.run(["bash", str(tmp_path / launcher)], env=env,
                             text=True, capture_output=True, timeout=5)
     assert result.returncode == 0, result.stderr
-    assert "tunnel is unavailable" in result.stderr
-    assert json.loads(output.read_text())["autoconnect"] is None
+    assert ("tunnel is unavailable" in result.stderr) == requests_tunnel
+    data = json.loads(output.read_text())
+    assert data["mode"] == expected_mode
+    assert data["autoconnect"] == expected_autoconnect
 
 
 def test_model_registry_has_no_duplicate_profiles():

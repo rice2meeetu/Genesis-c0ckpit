@@ -15,7 +15,7 @@ import qt_cockpit_linux_premium as launcher
 # Keep real user presets and backend discovery outside this UI test.
 launcher.load_pose_items = lambda **kwargs: [{"name": "Standing", "source": "file:///test-pose.png", "prompt": "Standing upright"}]
 launcher.load_grok_preset_items = lambda: []
-launcher.load_curated_pose_presets = lambda: []
+launcher.load_curated_pose_presets = lambda **kwargs: []
 launcher.BackendBridge.start = lambda self: None
 real_engine = launcher.QQmlApplicationEngine
 engines = []
@@ -50,16 +50,16 @@ def verify():
         expression = QQmlExpression(engines[0].rootContext(), window,
             "applyPreset({label:'Seated', prompt:'A person seated on a chair'})")
         expression.evaluate()
-        assert not window.property("selectedPoseSource").toString()
+        assert window.property("selectedPoseSource").toString() == "file:///test-pose.png"
         assert window.property("generationPrompt") == "A person seated on a chair"
         expression = QQmlExpression(engines[0].rootContext(), window,
             "applyPose({name:'Standing', source:'file:///test-pose.png', prompt:'Standing upright'})")
         expression.evaluate()
-        assert window.property("selectedPresetName") == ""
-        assert window.property("generationPrompt") == "Standing upright"
+        assert window.property("selectedPresetName") == "Seated"
+        assert window.property("generationPrompt") == "A person seated on a chair"
         QQmlExpression(engines[0].rootContext(), window,
             "applyPose({name:'Unmapped', source:'file:///test-pose.png', prompt:''})").evaluate()
-        assert window.property("generationPrompt") == ""
+        assert window.property("generationPrompt") == "A person seated on a chair"
         QQmlExpression(engines[0].rootContext(), window, "clearPose()").evaluate()
         assistant = window.findChild(QObject, "assistantWorkspace")
         face_swap = window.findChild(QObject, "faceSwapWorkspace")
