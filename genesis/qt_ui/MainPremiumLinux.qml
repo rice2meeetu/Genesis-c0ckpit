@@ -308,6 +308,18 @@ ApplicationWindow {
         mediaBridge.runSelectedTool(mediaToolKey)
     }
 
+    function selectedLoraHelpText(name) {
+        if (!name || name === "None") return ""
+        var profile = selectedGenerationProfile
+        var guide = profile && profile.loraHelp ? profile.loraHelp[name] : ""
+        var triggers = profile && profile.triggers ? profile.triggers[name] : []
+        var promptHelp = triggers && triggers.length
+            ? "Verified activation: " + triggers.join(", ") + ". Add to prompt only if useful."
+            : "No verified trigger phrase for this file; do not invent one."
+        return (guide || "Exact-file information unavailable; compare results at low strength.")
+            + "\n" + promptHelp
+    }
+
     function selectedLoraTriggerText() {
         var profile = selectedGenerationProfile
         var triggerMap = profile && profile.triggers ? profile.triggers : ({})
@@ -1882,6 +1894,27 @@ ApplicationWindow {
                                             textFromValue: function(value) { return (value / 100.0).toFixed(2) }
                                             valueFromText: function(text) { return Math.round(Number(text) * 100) }
                                         }
+                                    }
+                                    Text {
+                                        objectName: "loraOneInfo"
+                                        Layout.fillWidth: true
+                                        visible: appRoot.selectedLora !== "None" && (appRoot.selectedGenerationProfile.maxLoras || 0) > 0
+                                        text: appRoot.selectedLoraHelpText(appRoot.selectedLora)
+                                        color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap
+                                    }
+                                    Text {
+                                        objectName: "loraTwoInfo"
+                                        Layout.fillWidth: true
+                                        visible: appRoot.selectedLoraTwo !== "None" && (appRoot.selectedGenerationProfile.maxLoras || 0) > 1
+                                        text: appRoot.selectedLoraHelpText(appRoot.selectedLoraTwo)
+                                        color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap
+                                    }
+                                    Text {
+                                        objectName: "loraThreeInfo"
+                                        Layout.fillWidth: true
+                                        visible: appRoot.selectedLoraThree !== "None" && (appRoot.selectedGenerationProfile.maxLoras || 0) > 2
+                                        text: appRoot.selectedLoraHelpText(appRoot.selectedLoraThree)
+                                        color: appRoot.textDim; font.pixelSize: 12; wrapMode: Text.Wrap
                                     }
                                     Text {
                                         Layout.fillWidth: true

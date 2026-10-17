@@ -106,3 +106,20 @@ def test_audited_lora_records_and_duplicate_trigger():
     assert lora_trigger('Flux2-Klein-9B-consistency-V2 (1).safetensors') == 'consistency'
     assert not is_compatible('flux-2-klein-9b.safetensors', 'skin texture style v4.safetensors')
     assert not is_compatible('flux-2-klein-4b.safetensors', 'F2K4BBabe_Americano_v1.0.safetensors')
+
+
+
+def test_installed_qwen21_thesealpacas_v2_is_exclusive_to_qwen21_model():
+    from genesis.model_compatibility import compatible_loras, lora_help, is_compatible
+    name = "NSFW Qwen by TheseAlpacas V2.safetensors"
+    model = "qwen_image_2.1_bf16.safetensors"
+    # The exact upstream checksum matches Qwen 2.1, but the actual local
+    # 512px generation triggered an OOM kill; family identity is insufficient.
+    assert not is_compatible(model, name)
+    assert compatible_loras(model, [name]) == []
+    assert not is_compatible("Qwen-Rapid-AIO-NSFW-v19_Q4_K.gguf", name)
+    assert not is_compatible("Qwen-Rapid-NSFW-v23_Q2_K.gguf", name)
+    assert not is_compatible("aisha_nsfw_beta_v1_4b_distilled_bf16.safetensors", name)
+    assert "SHA-256" in lora_help(name)
+    assert "DISABLED" in lora_help(name)
+    assert "memory" in lora_help(name).lower() or "RAM" in lora_help(name)
