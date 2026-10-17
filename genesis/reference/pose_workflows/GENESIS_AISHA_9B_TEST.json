@@ -2,7 +2,7 @@
   "1": {
     "class_type": "UNETLoader",
     "inputs": {
-      "unet_name": "aisha-official-flux-2-klein-9b-base-nsfw-standard.safetensors",
+      "unet_name": "aisha_nsfw_beta_v9_7_distilled_bf16.safetensors",
       "weight_dtype": "default"
     },
     "_meta": {

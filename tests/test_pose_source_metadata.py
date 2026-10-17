@@ -113,8 +113,8 @@ def test_preset_binding_keeps_uploaded_source_and_refreshes_model_payload():
     for name in ('applyPose','applyGenerationDefaults','applyPresetPayload'):
         function=re.search(r'    function '+name+r'\(.*?\n    }',qml,re.S).group()
         assert not engine.evaluate(function).isError()
-    engine.evaluate('''var generationSource="untouched-master.png", selectedGenerationProfile={model:"v19"}, activeGenerationDefaults={};
-    var selectedPresetPayload=null, selectedPoseSource, selectedPoseThumbnail, selectedPoseName, selectedPoseCategory, selectedPosePrompt, selectedPresetName, generationPrompt, generationNegativePrompt, presetAttribution, presetSettingsNote, generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationSeed;
+    engine.evaluate('''var generationSource="untouched-master.png", selectedGenerationProfile={model:"v19"}, activeGenerationDefaults={}, activeSourceImage=true, sdxlFaceIDEnabled=false;
+    var selectedPresetPayload=null, selectedPoseSource, selectedPoseThumbnail, selectedPoseName, selectedPoseCategory, selectedPosePrompt, selectedPresetName, selectedPresetId, generationPrompt, generationNegativePrompt, presetAttribution, presetSettingsNote, generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler, generationSeed;
     var genesisBridge={posePresetPayload:function(row,model){return {prompt:model+" original",negativePrompt:"",attribution:"Pack",settings:{steps:model==="v19"?6:4},settingsNote:"Tested"}}};''')
     assert not engine.evaluate('applyPose({source:"control.png",prompt:"fallback"})').isError()
     assert engine.evaluate('generationSource').toString()=='untouched-master.png'

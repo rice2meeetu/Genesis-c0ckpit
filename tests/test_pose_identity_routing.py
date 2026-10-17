@@ -79,9 +79,10 @@ def test_phr00t_edit_template_and_separate_pose(monkeypatch, tmp_path, catalog, 
     encode = next(n['inputs'] for n in graph.values() if n['class_type'] == 'TextEncodeQwenImageEditPlus')
     assert graph[encode['image1'][0]]['inputs']['image'] == 'original.png'
     assert graph[encode['image2'][0]]['inputs']['image'] == 'control.png'
-    assert 'Preserve the same person and facial identity' in encode['prompt']
-    assert 'Allow the body pose' in encode['prompt']
-    assert 'Use image2 only for pose' in encode['prompt']
+    assert 'preserve the same person and facial identity' in encode['prompt']
+    assert 'Picture 1 (image1)' in encode['prompt']
+    assert 'Picture 2 (image2) only for pose' in encode['prompt']
+    assert 'do not copy its face or identity' in encode['prompt']
     assert REFCONTROL_TRIGGER not in encode['prompt']
     assert client.upload_image.call_count == 2
 
@@ -98,7 +99,7 @@ def test_gguf_9b_reference_route_uses_selected_loader(monkeypatch, tmp_path, cat
     assert REFCONTROL_TRIGGER in graph['4']['inputs']['text']
 
 
-def test_later_identity_lock_receives_untouched_original(monkeypatch, tmp_path):
+def test_selected_stage3_generates_before_manual_identity_review(monkeypatch, tmp_path):
     bridge = c.GenerationBridge(); bridge._output_dir = tmp_path
     monkeypatch.setattr(bridge, '_connect_comfyui', lambda: (Mock(), {}))
     monkeypatch.setattr(c, 'load_remote_catalog', lambda _: {})
@@ -110,12 +111,9 @@ def test_later_identity_lock_receives_untouched_original(monkeypatch, tmp_path):
         bridge._run_generate('stand beside a chair', '', 512, 512, c.REMOTE_PHR00T_MODEL,
             'None', 'None', 'None', 0, 0, 0, source, pose, True, True, False,
             {'stage2_model': c.REMOTE_MIRACLEIN_V2_MODEL})
-    assert run.call_count == 3
-    assert run.call_args_list[0].args[3] == source
-    assert run.call_args_list[0].kwargs['secondary_image'] == pose
-    assert run.call_args_list[1].args[3] == tmp_path / 'stage1.png'
-    assert run.call_args_list[2].args[3] == tmp_path / 'stage2.png'
-    assert run.call_args_list[2].kwargs['secondary_image'] == source
+    assert run.call_count == 2  # Stages 1 and 2 are not blocked by Face ID review.
+    assert all(call.args[2] != c.STAGE_3_WORKFLOW for call in run.call_args_list)
+    assert "Stage 3 skipped" in bridge._status  # no valid original face file in fixture
 
 
 def test_4b_passes_pose_into_native_reference_chain(monkeypatch, tmp_path):
@@ -153,7 +151,7 @@ def test_section_selectors_hide_unusable_files_without_losing_runpod_models():
         dict(model='klein', runnable=True, selectable=True, stageOneEligible=True, stageTwoEligible=True, remote=True),
         dict(model='unsupported', runnable=False, selectable=True, remote=True),
     ]
-    engine.evaluate('var generationSource = ""; var generationProfiles = ' + json.dumps(rows))
+    engine.evaluate('var useSourceImageMode = false, generationSource = ""; var generationProfiles = ' + json.dumps(rows))
     expression = re.search(r'property var generationModel: (.*?)(?=\n    (?:readonly |property |on))', qml, re.S).group(1).strip()
     result = engine.evaluate('var generationModel = ' + expression)
     assert not result.isError(), result.toString()
@@ -212,15 +210,20 @@ def test_quality_buttons_restore_each_models_settings_and_preserve_seed(model, s
     profile = c.model_profile_settings(model, remote=True)
     engine.evaluate('var selectedGenerationProfile = ' + json.dumps(profile))
     engine.evaluate('var generationSource = ' + json.dumps('original.png' if source else ''))
-    engine.evaluate('var generationSeed = 123; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler;')
+    engine.evaluate('var activeSourceImage = ' + ('true' if source else 'false'))
+    engine.evaluate('var sdxlFaceIDEnabled = false; var generationSeed = 123; var generationWidth, generationHeight, generationSteps, generationCfg, generationDenoise, generationSampler, generationScheduler;')
     defaults = profile['sourceDefaults' if source else 'createDefaults']
     for quality in ('Fast', 'Balanced', 'Quality'):
         engine.evaluate('generationSteps = 99; generationCfg = 99; generationSampler = "wrong"; generationScheduler = "wrong"; generationDenoise = 0;')
         engine.evaluate('applyQualityPreset(' + json.dumps(quality) + ', 1, 1)')
+        expected = profile['sourceQualityPresets' if source else 'createQualityPresets'][quality]
         for setting in ('Steps', 'Cfg', 'Denoise', 'Sampler', 'Scheduler'):
-            assert engine.evaluate('generation' + setting).toVariant() == defaults['default' + setting], (model, source, setting)
-        assert engine.evaluate('generationWidth').toInt() == profile['qualityPresets'][quality]['width']
-        assert engine.evaluate('generationHeight').toInt() == profile['qualityPresets'][quality]['height']
+            # Distilled Phr00t presets intentionally lower steps and CFG for
+            # speed; all other controls still return to model defaults.
+            value = expected.get(setting[0].lower() + setting[1:], defaults['default' + setting])
+            assert engine.evaluate('generation' + setting).toVariant() == value, (model, source, quality, setting)
+        assert engine.evaluate('generationWidth').toInt() == expected['width']
+        assert engine.evaluate('generationHeight').toInt() == expected['height']
         assert engine.evaluate('generationSeed').toInt() == 123
         assert engine.evaluate('generationSource').toString() == ('original.png' if source else '')
 
@@ -252,12 +255,14 @@ def test_source_picker_hides_models_without_source_edit_workflows():
     assert next(row for row in rows if row['model'] == c.KV_9B_MODEL)['sourceSupported'] is False
     expression = re.search(r'property var generationModel: (.*?)(?=\n    (?:readonly |property |on))', qml, re.S).group(1).strip()
     engine.evaluate('var generationProfiles = ' + json.dumps(rows))
-    for source, expected_count in [('', 2), ('original.png', 1)]:
-        engine.evaluate('var generationSource = ' + json.dumps(source))
+    # The source can stay loaded while text mode shows every T2I model.
+    engine.evaluate('var generationSource = "original.png"')
+    for image_mode, expected_count in [(False, 2), (True, 1)]:
+        engine.evaluate('var useSourceImageMode = ' + ('true' if image_mode else 'false'))
         result = engine.evaluate('var generationModel = ' + expression)
         assert not result.isError(), result.toString()
         assert engine.evaluate('generationModel.length').toInt() == expected_count
-        if source:
+        if image_mode:
             assert engine.evaluate('generationModel[0].model').toString() == c.REMOTE_KLEIN_9B_MODEL
 
 

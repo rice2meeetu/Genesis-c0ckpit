@@ -91,8 +91,12 @@ def test_stage3_manual_target_source_review_and_route(monkeypatch,tmp_path):
     assert not bridge.busy
 
 
-def test_finish_button_enabled_only_for_verified_manual_reactor(tmp_path):
+def test_finish_button_enabled_only_for_verified_manual_reactor(tmp_path, monkeypatch):
     from PyQt6.QtCore import QUrl
+    # Simulate a machine where only Inswapper is installed. Do not derive
+    # readiness from the generation backend or this developer PC's models.
+    monkeypatch.setattr(c, 'installed_reactor_engines',
+                        lambda: ['reactor_inswapper'])
     b=c.GenerationBridge()
     source=pic(tmp_path/'master.png');output=pic(tmp_path/'finished.png')
     b._original_master=source
@@ -146,3 +150,47 @@ def test_manual_person_a_face_swap_preserves_all_pixels_outside_target_box(monke
         assert image.getpixel((400,100))==(255,255,0)
     assert 'only the reviewed target area changed' in b.status
     assert b.finishingResults[-1]['label']=='Face Lock · Person A'
+
+
+def test_nsfw_facefusion_stage3_uses_local_crop_only_and_keeps_other_pixels(monkeypatch, tmp_path):
+    from unittest.mock import Mock
+    from PyQt6.QtCore import QUrl
+    from PIL import ImageChops
+    from genesis.backend_routing import Route, use_route
+    ff_root = tmp_path / 'isolated-local-facefusion'
+    (ff_root / '.venv/bin').mkdir(parents=True)
+    for suffix in ('.venv/bin/python', 'facefusion.py', 'facefusion.ini'):
+        (ff_root / suffix).write_text('fake isolated test runtime')
+    monkeypatch.setattr(c.integrations, 'FACEFUSION_ROOT', ff_root)
+    target = tmp_path / 'target.png'
+    source = tmp_path / 'source.png'
+    Image.new('RGB', (256, 256), '#2c5e78').save(target)
+    Image.new('RGB', (256, 256), '#9d5938').save(source)
+    original, target_hash = image_snapshot(target)
+    _, source_hash = image_snapshot(source)
+    region = (32, 32, 192, 192)
+    bridge = c.GenerationBridge()
+    bridge._stage_three_engine = 'facefusion_nsfw'
+    bridge._facefusion_provider = 'cpu'
+    bridge._output_dir = tmp_path
+    bridge._connect_comfyui = Mock(side_effect=AssertionError('Local Stage 3 FaceFusion must not contact ComfyUI'))
+    def fake_local_process(command, **kwargs):
+        assert kwargs['cwd'] == str(ff_root)
+        assert command[command.index('--execution-providers') + 1] == 'cpu'
+        assert '--source-paths' in command and '--target-path' in command
+        cropped = Path(command[command.index('--output-path') + 1])
+        Image.new('RGB', (160, 160), '#7ca49a').save(cropped)
+        return Mock(returncode=0, stdout='local only')
+    monkeypatch.setattr(c.subprocess, 'run', fake_local_process)
+    with use_route(Route('RUNPOD', 'https://example.invalid')):
+        bridge._run_face_swap(target, source, (
+            FaceRegion(target_hash, region),
+            FaceRegion(source_hash, region),
+        ))
+    output = Path(QUrl(bridge.previewUrl).toLocalFile())
+    assert output.is_file(), bridge.status
+    changed, _ = image_snapshot(output)
+    expected = original.copy()
+    expected.paste(Image.new('RGB', (160, 160), '#7ca49a'), region)
+    assert ImageChops.difference(changed, expected).getbbox() is None
+    assert bridge.status.startswith('Complete')

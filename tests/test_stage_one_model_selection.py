@@ -32,6 +32,11 @@ def test_configured_stage_one_choices_never_claim_inactive_models_ready():
         cockpit.LOCAL_AISHA_9B_MODEL,
         cockpit.REMOTE_DONUTS_MODEL,
         cockpit.REMOTE_BIGLUSTY_DONUT_MODEL,
+        cockpit.REMOTE_EPICREALISM_MODEL,
+        cockpit.REMOTE_PONY_MODEL,
+        cockpit.REMOTE_MOP_MODEL,
+        cockpit.REMOTE_REALISTIC_VISION_MODEL,
+        cockpit.REMOTE_PHR00T_V22_GGUF_MODEL,
     }
     assert all(not row['runnable'] and not row['ready'] and row['stageOneConfigured'] for row in rows)
 
@@ -98,7 +103,7 @@ from PyQt6.QtWidgets import QApplication
 import qt_cockpit_linux_premium as launcher
 launcher.load_pose_items = lambda **kwargs: []
 launcher.load_grok_preset_items = lambda: []
-launcher.load_curated_pose_presets = lambda: []
+launcher.load_curated_pose_presets = lambda **kwargs: []
 launcher.load_runtime_status = lambda **kwargs: {'identityEngines':['reactor_reswapper']}
 launcher.BackendBridge.start = lambda self: None
 engines = []
@@ -125,8 +130,10 @@ def verify():
         QApplication.processEvents()
         picker = window.findChild(QObject, 'stageOneModelPicker')
         assert picker is not None
-        picker.setProperty('currentIndex', 2)
-        expression = QQmlExpression(context, picker, 'activated(2)')
+        # Picker includes unavailable catalog entries instead of hiding them.
+        # That keeps its selection index aligned with the selected Stage 1 card.
+        picker.setProperty('currentIndex', 3)
+        expression = QQmlExpression(context, picker, 'activated(3)')
         expression.evaluate()
         assert not expression.hasError(), expression.error().toString()
         QApplication.processEvents()
@@ -151,8 +158,10 @@ def verify():
         popup = window.findChild(QObject, 'stageModelPopup')
         assert popup.property('visible')
         QQmlExpression(context, window, 'selectStageChoice(0)').evaluate()
+        stage_three_engine, _ = QQmlExpression(context, window, 'stageThreeChoices[0].engine').evaluate()
+        assert stage_three_engine
         for stage, choice, expected in [(1, 0, 'miracleinNSFWGeneration_20FP8.safetensors'),
-                                         (2, 0, 'reactor_reswapper')]:
+                                         (2, 0, stage_three_engine)]:
             value, _ = QQmlExpression(context, repeater, 'itemAt(' + str(stage) + ')').evaluate()
             stage_card = value.toQObject() if hasattr(value, 'toQObject') else value
             mouse = stage_card.findChild(QObject, 'stageModelBoxClick' + str(stage))
@@ -207,3 +216,27 @@ sys.exit(launcher.main())
                             env=env, text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "STAGE_ONE_SELECTION_OK" in result.stdout
+
+
+def test_mixture_of_perverts_is_selectable_when_runpod_advertises_it():
+    """Live catalog entries outrank offline placeholders for configured SDXL."""
+    bridge = BackendBridge(cockpit.GenerationBridge())
+    bridge._mode = 'RUNPOD'
+    bridge._endpoint = 'http://127.0.0.1:18189'
+    bridge._connected = True
+    bridge._remote_status = {'ready': True}
+    bridge._remote = cockpit.build_remote_generation_profiles({
+        'CheckpointLoaderSimple': {'input': {'required': {
+            'ckpt_name': [[cockpit.REMOTE_MOP_MODEL, cockpit.REMOTE_DONUTS_MODEL]]}}},
+        'ControlNetLoader': {'input': {'required': {
+            'control_net_name': [[cockpit.REMOTE_SDXL_POSE_CONTROLNET]]}}},
+    })
+    events = []
+    bridge.profilesReady.connect(events.append)
+    bridge._publish()
+    models = {row['model']: row for row in events[-1]}
+    mop = models[cockpit.REMOTE_MOP_MODEL]
+    assert mop['runnable'] and mop['ready'] and mop['routeReady'] and mop['selectable']
+    assert mop['destination'] == 'RUNPOD'
+    assert mop['poseReady'] and mop['faceidSupported']
+    assert bridge.resolve(cockpit.REMOTE_MOP_MODEL).destination == 'RUNPOD'

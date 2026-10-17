@@ -19,7 +19,7 @@ def fixture_image(tmp_path):
     return path
 
 
-@pytest.mark.parametrize('operation', ['face_swap', 'edit', 'inpaint', 'upscale'])
+@pytest.mark.parametrize('operation', ['edit', 'inpaint', 'upscale'])
 def test_operation_destination_respects_mode_and_safety(operation):
     bridge = BackendBridge(cockpit.GenerationBridge())
     bridge._endpoint = 'https://remote.example'
@@ -39,6 +39,31 @@ def test_operation_destination_respects_mode_and_safety(operation):
     with pytest.raises(ValueError): bridge.resolve_operation(operation)
 
 
+@pytest.mark.parametrize('mode', ['RUNPOD', 'AUTO', 'LOCAL'])
+def test_face_swap_always_local_even_when_remote_is_ready(monkeypatch, mode):
+    bridge = BackendBridge(cockpit.GenerationBridge())
+    bridge._mode = mode
+    bridge._endpoint = 'https://remote.example'
+    bridge._connected = True
+    bridge._remote_status = {'ready': True}
+    bridge._local_status = {'ready': True}
+    bridge._local_safe = True
+    monkeypatch.setattr('genesis.local_identity.installed_reactor_engines',
+                        lambda: ['reactor_inswapper'])
+    monkeypatch.setattr('genesis.backend_bridge.installed_reactor_engines',
+                        lambda: ['reactor_inswapper'])
+    monkeypatch.setattr('genesis.integrations.gpu_kernel_preflight',
+                        lambda: (True, 'safe'))
+    route = bridge.resolve_operation('face_swap')
+    assert route.destination == 'LOCAL'
+    assert route.url == ''
+    bridge._local_safe = False
+    monkeypatch.setattr('genesis.integrations.gpu_kernel_preflight',
+                        lambda: (False, 'GPU unavailable'))
+    with pytest.raises(ValueError, match='Local face swap blocked'):
+        bridge.resolve_operation('face_swap')
+
+
 def test_remote_ready_is_not_routable_until_explicit_connect():
     bridge = BackendBridge(cockpit.GenerationBridge())
     bridge._mode = 'RUNPOD'
@@ -54,7 +79,7 @@ def test_queued_operations_capture_route_before_thread_start(tmp_path, monkeypat
     path = fixture_image(tmp_path)
     uri = QUrl.fromLocalFile(str(path)).toString()
     bridge = cockpit.GenerationBridge()
-    route = Route('RUNPOD', 'https://original.example')
+    route = Route('LOCAL', '') if operation == 'face_swap' else Route('RUNPOD', 'https://original.example')
     bridge.backend_router = Mock()
     bridge.backend_router.resolve_operation.return_value = route
     monkeypatch.setattr(cockpit, 'EDIT_WORKFLOW', path)
@@ -62,13 +87,17 @@ def test_queued_operations_capture_route_before_thread_start(tmp_path, monkeypat
     monkeypatch.setattr(bridge, '_run_' + operation, worker)
     thread = Mock()
     monkeypatch.setattr(cockpit.threading, 'Thread', thread)
-    if operation == 'face_swap': bridge.queueFaceSwap(uri, uri)
+    if operation == 'face_swap':
+        # This test checks route capture, not the dialog. User selection is
+        # exercised in test_face_region_dialog_ui.py (accept and cancel).
+        monkeypatch.setattr('genesis.person_a_targeting.choose_face_region', lambda *_: Mock())
+        bridge.queueFaceSwap(uri, uri)
     elif operation == 'edit': bridge.queueEdit(uri, 'neutral mug', 0.5)
     else: bridge.queueInpaint(uri, uri, 'neutral mug', 0.5)
     bridge.backend_router.resolve_operation.assert_called_once_with(operation)
     bridge.backend_router.resolve_operation.return_value = Route('LOCAL', '')
     call = thread.call_args.kwargs
-    assert call['target'](*call['args']) == 'https://original.example'
+    assert call['target'](*call['args']) == route.url
     worker.assert_called_once()
 
 
@@ -83,16 +112,28 @@ def test_remote_context_does_not_leak_between_threads():
     assert observed == ['https://job.example']
 
 
-@pytest.mark.parametrize('mode', ['RUNPOD', 'AUTO'])
-def test_facefusion_never_silently_runs_local_in_other_modes(tmp_path, monkeypatch, mode):
-    uri = fixture_image(tmp_path).as_uri()
+@pytest.mark.parametrize('mode', ['RUNPOD', 'AUTO', 'LOCAL'])
+def test_facefusion_launches_only_local_process_regardless_of_generation_mode(tmp_path, monkeypatch, mode):
+    image = fixture_image(tmp_path)
+    uri = image.as_uri()
+    ff_root = tmp_path / 'facefusion'
+    (ff_root / '.venv/bin').mkdir(parents=True)
+    (ff_root / '.venv/bin/python').write_text('isolated fake')
+    (ff_root / 'facefusion.py').write_text('isolated fake')
+    (ff_root / 'facefusion.ini').write_text('[execution]')
+    monkeypatch.setattr(cockpit.integrations, 'FACEFUSION_ROOT', ff_root)
     bridge = cockpit.GenerationBridge()
     bridge.backend_router = SimpleNamespace(mode=mode)
-    thread = Mock(side_effect=AssertionError('local process requested'))
+    bridge.setFaceFusionProvider('cpu')
+    thread = Mock()
     monkeypatch.setattr(cockpit.threading, 'Thread', thread)
     bridge.queueFaceFusion(uri, uri)
-    assert 'local image-only' in bridge.status
-    thread.assert_not_called()
+    assert 'local image swap' in bridge.status
+    assert bridge.busy
+    thread.assert_called_once()
+    assert thread.call_args.kwargs['target'] == bridge._run_facefusion
+    assert thread.call_args.kwargs['args'][:2] == (image, image)
+    thread.return_value.start.assert_called_once()
 
 
 def test_media_worker_captures_selected_endpoint(monkeypatch):

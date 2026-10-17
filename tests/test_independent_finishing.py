@@ -36,15 +36,19 @@ def test_each_supported_finish_combination_keeps_master_and_intermediates(tmp_pa
         return output('upscale',client.upload_image.call_args.args[0])
     monkeypatch.setattr(bridge, '_submit_and_save', upscale)
     bridge._run_finish(selected,master,finishing_plan(refine,identity,scale),scale,c.REMOTE_MIRACLEIN_9B_MODEL,'None',0)
-    assert [x[0] for x in calls] == finishing_plan(refine,identity,scale)
+    # Identity is intentionally deferred: no unreviewed scene-wide swap.
+    expected_steps=[step for step in finishing_plan(refine,identity,scale) if step != 'identity']
+    assert [x[0] for x in calls] == expected_steps
     for previous, following in zip(calls, calls[1:]):
         assert following[1] == tmp_path/(previous[0]+'.png')
     assert selected.read_bytes()==b'selected untouched'
     assert master.read_bytes()==b'master untouched'
-    for stage,current,identity_source in calls:
-        if stage=='identity': assert identity_source == master
     assert len(bridge.finishingResults)==len(calls)
-    assert not bridge.busy
+    if identity:
+        assert bridge._pending_stage_three  # Qt face confirmation is pending
+        assert 'confirm Person A' in bridge.status
+    else:
+        assert not bridge.busy
 
 
 def test_stage3_does_not_require_stage2():

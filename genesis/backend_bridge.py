@@ -4,6 +4,7 @@ import threading
 from pathlib import Path
 from PyQt6.QtCore import QObject, QSettings, QTimer, pyqtProperty, pyqtSignal, pyqtSlot
 from genesis.backend_routing import Route, choose_route, normalize_endpoint, use_route
+from genesis.local_identity import installed_reactor_engines
 
 
 _REMOTE_IDENTITY_MODELS = {
@@ -20,7 +21,13 @@ def remote_identity_engines(info: dict) -> list[str]:
     This keeps configured identity routes visible without claiming unavailable
     custom nodes or weights are usable on the current pod.
     """
-    node = info.get("ReActorFaceSwap") or {}
+    # Generation Stage 3 and manual Person A correction use the options-based
+    # ReActor graph, not the legacy ReActorFaceSwap node. Advertise readiness
+    # only when the exact nodes required by that graph are present.
+    required_nodes = ("ReActorFaceSwapOpt", "ReActorOptions", "LoadImage", "SaveImage")
+    if not all(name in info for name in required_nodes):
+        return []
+    node = info["ReActorFaceSwapOpt"] or {}
     inputs = node.get("input") or {}
     values: set[str] = set()
     for group in ("required", "optional"):
@@ -267,6 +274,16 @@ class BackendBridge(QObject):
         """
         if operation not in {'face_swap', 'edit', 'inpaint', 'upscale'}:
             raise ValueError('Unsupported routed operation: ' + operation)
+        if operation == 'face_swap':
+            # Face swaps are NEVER routed to RunPod, irrespective of the
+            # generation mode or whether local ComfyUI is already running.
+            from genesis import integrations
+            if not installed_reactor_engines():
+                raise ValueError('Local ReActor node or swap models are not installed.')
+            safe, reason = integrations.gpu_kernel_preflight()
+            if not safe:
+                raise ValueError('Local face swap blocked: ' + reason)
+            return Route('LOCAL', '', allow_start=True)
         if self._mode != 'RUNPOD' and self._local_safe and self._local_status.get('ready'):
             return Route('LOCAL', '')
         if self._mode != 'LOCAL' and self._connected and self._endpoint and self._remote_status.get('ready'):

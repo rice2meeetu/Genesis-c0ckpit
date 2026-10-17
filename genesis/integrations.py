@@ -66,10 +66,8 @@ COMFYUI_PYTHON_CANDIDATES = (
     COMFYUI_ROOT / "venv/bin/python",
 )
 FACEFUSION_ROOT_CANDIDATES = (
-    Path(__file__).resolve().parents[1] / ".runtime" / "facefusion",
-    Path.home() / "facefusion",
-    Path.home() / "AI" / "facefusion",
-    Path.home() / "AI" / "FaceFusion",
+    # Strict local-only NSFW FaceFusion. Never silently select an old SFW copy.
+    Path(__file__).resolve().parents[1] / ".runtime" / "facefusion-nsfw-modern",
 )
 SWARMUI_ROOT_CANDIDATES = (
     Path.home() / "AI" / "SwarmUI",

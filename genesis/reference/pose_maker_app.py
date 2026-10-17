@@ -826,8 +826,11 @@ def _compose_stage1_prompt(user_prompt: str, negative_prompt: str, strict_identi
     parts = []
     if strict_identity_lock:
         parts.append(
-            "IDENTITY LOCK: image1 is the only identity/person source. Preserve image1's recognizable face, "
-            "facial structure, skin tone, hair, eye appearance, age appearance and overall identity. "
+            "IDENTITY LOCK: image1 is the identity reference for Person A ONLY. Preserve Person A's "
+            "recognizable face, facial structure, skin tone, hair, eye appearance and age appearance. "
+            "Person B and any other people must have independent faces; never copy Person A's face "
+            "onto another person. A single-person pose skeleton controls Person A's pose, not "
+            "Person B's identity. "
             f"Identity priority: {_strength_level(identity_strength)}."
         )
     if pose_used:
@@ -936,7 +939,10 @@ def _run_stage1_sdxl(source, pose, pose_prompt, negative_prompt, pose_mode, pose
     prompt["9"] = make_node("KSampler", {
         "model": ["1", 0], "positive": ["7", 0], "negative": ["7", 1], "latent_image": ["8", 0],
         "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
-        "sampler_name": str(sampler), "scheduler": str(scheduler), "denoise": 0.72,
+        "sampler_name": str(sampler), "scheduler": str(scheduler),
+        # Preserve more of the source face when identity lock is requested.
+        # This is not a substitute for a dedicated SDXL face-identity adapter.
+        "denoise": 0.55 if strict_identity_lock else 0.72,
     })
     prompt["11"] = make_node("VAEDecode", {"samples": ["9", 0], "vae": ["1", 2]})
     prompt["12"] = make_node("SaveImage", {"images": ["11", 0], "filename_prefix": "GENESIS_STAGE1_SDXL_POSE"})
@@ -1107,8 +1113,21 @@ def run_stage2(stage1_img, model_name, seed, denoise, positive_prompt, negative_
     return fetch_output_image(outputs, "8"), ckpt
 
 
+def _single_reactor_face_index(value, label):
+    """Prevent multi-face swaps: identity lock must target exactly one face."""
+    try:
+        number = int(value)
+        if float(value) != number or number < 0:
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{label} must be one non-negative face index; multi-face selection is disabled.") from None
+    return str(number)
+
+
 def run_stage3(target_img, source_img, swap_model, detector, source_face_index, target_face_index,
                face_restore, restore_model, restore_visibility, codeformer_weight, progress_cb=None):
+    source_face_index = _single_reactor_face_index(source_face_index, "Source face")
+    target_face_index = _single_reactor_face_index(target_face_index, "Target face")
     target_name = upload_image(target_img, "stage2")
     source_name = upload_image(source_img, "face")
     reactor_inputs = {
@@ -3470,12 +3489,13 @@ with gr.Blocks(title="GENESIS Pose Maker — V14") as demo:
 
     with gr.Accordion("STAGE 3 CONFIG — ReActor Face Lock", open=False, elem_classes="config-accordion"):
         with gr.Row():
-            swap_model = gr.Textbox(value="inswapper_128.onnx", label="Swap model")
-            detector = gr.Textbox(value="retinaface_resnet50", label="Face detector")
+            swap_model = gr.Dropdown(choices=["inswapper_128.onnx", "reswapper_256.onnx", "hyperswap_1a_256.onnx"], value="inswapper_128.onnx", label="Swap model")
+            detector = gr.Dropdown(choices=["retinaface_resnet50", "retinaface_mobile0.25", "YOLOv5l", "YOLOv5n"], value="retinaface_resnet50", label="Face detector")
         with gr.Row():
             source_face_index = gr.Number(value=0, precision=0, label="Source face index")
-            target_face_index = gr.Number(value=0, precision=0, label="Target face index")
+            target_face_index = gr.Number(value=0, precision=0, label="ReActor target face index (detector order; verify Person A)")
             face_restore = gr.Checkbox(False, label="Face restore")
+        gr.Markdown("**Two-person safety:** ReActor index 0 is the first *detected* face, not necessarily Person A. Check the generated Stage 2 image and explicitly set the target face index before Stage 3. Never assume left/right position determines ReActor's ordering. Only one target face is permitted.")
         with gr.Row():
             restore_model = gr.Textbox(value="codeformer-v0.1.0.pth", label="Restore model")
             restore_visibility = gr.Slider(0.0,1.0,value=1.0,step=0.05,label="Restore visibility")

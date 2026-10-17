@@ -96,11 +96,14 @@ def verify():
         assert identity.property('enabled'), bridge.status
         # Switch using the real Stage 3 popup and its real button delegate.
         open_stage_three()
-        choose = stage_choice(1)
+        # Three installed local ReActor engines: Inswapper, ReSwapper, HyperSwap.
+        choose = stage_choice(2)
         assert choose is not None and choose.property('enabled')
         evaluate('clicked()', choose)
         assert bridge._stage_three_engine == 'reactor_hyperswap'
-        assert not identity.property('enabled'), 'Face Lock retained readiness for the previous swap model'
+        # HyperSwap's local weight is installed; the generation backend's
+        # Inswapper-only catalog must not incorrectly disable local Face Lock.
+        assert identity.property('enabled'), 'Local HyperSwap was blocked by stale generation catalog'
         open_stage_three()
         evaluate('clicked()', stage_choice(0))
         assert bridge._stage_three_engine == 'reactor_inswapper'
@@ -109,20 +112,25 @@ def verify():
         assert len(finish_calls) == 1
         assert finish_calls[0][:3] == (False, True, 0)
         assert finish_calls[0][5:] == ('None', 0.0)
-        # FaceFusion's UI must honor its explicit LOCAL-only route contract.
+        # The fourth Stage 3 choice must be the installed local NSFW FaceFusion.
+        last_index = evaluate('stageThreeChoices.length - 1')
+        assert evaluate('stageThreeChoices[' + str(last_index) + '].engine') == 'facefusion_nsfw'
+        open_stage_three()
+        ff_choice = stage_choice(last_index)
+        assert ff_choice is not None and ff_choice.property('enabled')
+        evaluate('clicked()', ff_choice)
+        assert bridge._stage_three_engine == 'facefusion_nsfw'
+        assert identity.property('enabled'), 'Local NSFW FaceFusion must qualify for Stage 3'
+        # FaceFusion always executes on this PC, independently of the Stage 1 mode.
         window.setProperty('pageIndex', 12)
         window.setProperty('faceSwapTarget', uri)
         window.setProperty('faceSwapSource', uri)
-        facefusion = button_named('faceFusionButton', 'FACEFUSION · LOCAL IMAGE')
-        for mode in ('RUNPOD', 'AUTO'):
+        facefusion = button_named('faceFusionButton', 'NSFW FACEFUSION · LOCAL')
+        for mode in ('RUNPOD', 'AUTO', 'LOCAL'):
             backend._mode = mode
             backend.changed.emit()
             QApplication.processEvents()
-            assert not facefusion.property('enabled'), 'FaceFusion enabled in ' + mode
-        backend._mode = 'LOCAL'
-        backend.changed.emit()
-        QApplication.processEvents()
-        assert facefusion.property('enabled')
+            assert facefusion.property('enabled'), 'Local FaceFusion unavailable in ' + mode
         evaluate('clicked()', facefusion)
         assert facefusion_calls == [(uri.toString(), uri.toString())]
         bridge._set_busy(True)
@@ -262,6 +270,9 @@ def test_facefusion_output_invalidates_prior_comfy_finishing_context(tmp_path, m
 @pytest.mark.parametrize("route", [Route("LOCAL", ""), Route("RUNPOD", "https://current.example")])
 def test_standalone_comfy_result_uses_its_captured_finishing_context(tmp_path, monkeypatch, kind, route):
     bridge = cockpit.GenerationBridge()
+    # The mocked backend below provides ReActor nodes, not a FaceFusion process.
+    # Isolate the test from the user's saved Stage 3 engine preference.
+    bridge._stage_three_engine = "reactor_inswapper"
     bridge._output_dir = tmp_path
     bridge._finish_route = Route("RUNPOD", "https://previous.example")
     bridge._finish_info = {"old-generation-catalog": {}}
@@ -299,7 +310,10 @@ def test_standalone_comfy_result_uses_its_captured_finishing_context(tmp_path, m
     bridge._run_routed_operation(route, operation, *args)
     assert bridge.status.startswith("Complete"), bridge.status
     assert bridge.previewUrl == QUrl.fromLocalFile(str(output)).toString()
-    assert bridge._finish_route == route
+    # A requested remote face-swap route is forcibly replaced with a LOCAL
+    # finishing route. Other operations preserve their captured destination.
+    expected_route = Route('LOCAL', '') if kind == 'face_swap' else route
+    assert bridge._finish_route == expected_route
     assert bridge._finish_info == info
     assert (bridge._finish_width, bridge._finish_height) == (48, 32)
 
@@ -374,3 +388,11 @@ def test_media_ai_upscale_accepts_classic_and_modern_model_combo(tmp_path, monke
     assert result.output == target
     with Image.open(target) as image:
         assert image.size == (32, 16)
+
+
+
+def test_stage_three_unavailable_label_refers_to_local_engine():
+    qml = (Path(__file__).resolve().parents[1] /
+           'genesis/qt_ui/MainPremiumLinux.qml').read_text()
+    assert 'Unavailable · local ReActor engine missing' in qml
+    assert 'ReActor engine missing on current RunPod' not in qml

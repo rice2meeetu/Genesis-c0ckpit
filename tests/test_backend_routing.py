@@ -85,10 +85,13 @@ def test_remote_identity_engines_fail_closed_without_reactor():
 
 def test_remote_identity_engines_require_advertised_swap_weights():
     from genesis.backend_bridge import remote_identity_engines
-    info = {'ReActorFaceSwap': {'input': {'required': {'swap_model': [[
+    info = {'ReActorFaceSwapOpt': {'input': {'required': {'swap_model': [[
         'inswapper_128.onnx', 'hyperswap_1a_256.onnx'
-    ]]}}}}
+    ]]}}}, 'ReActorOptions': {}, 'LoadImage': {}, 'SaveImage': {}}
     assert remote_identity_engines(info) == ['reactor_inswapper', 'reactor_hyperswap']
+    assert remote_identity_engines({'ReActorFaceSwap': info['ReActorFaceSwapOpt']}) == []
+    for missing in ('ReActorFaceSwapOpt', 'ReActorOptions', 'LoadImage', 'SaveImage'):
+        assert remote_identity_engines({k: v for k,v in info.items() if k != missing}) == []
 
 
 @pytest.mark.parametrize("ready, outcome, expected", [
@@ -105,8 +108,9 @@ def test_local_probe_publishes_identity_without_remote_contact(monkeypatch, read
     monkeypatch.setattr(cockpit, "load_generation_profiles", lambda: rows)
     monkeypatch.setattr(cockpit, "load_runtime_status", lambda: {"ready": ready, "remote": False})
     monkeypatch.setattr(cockpit.integrations, "gpu_kernel_preflight", lambda: (True, "safe"))
-    info = {"ReActorFaceSwap": {"input": {"required": {
-        "swap_model": [["inswapper_128.onnx"]]}}}} if outcome == "installed" else {}
+    info = {"ReActorFaceSwapOpt": {"input": {"required": {
+        "swap_model": [["inswapper_128.onnx"]]}}},
+        "ReActorOptions": {}, "LoadImage": {}, "SaveImage": {}} if outcome == "installed" else {}
     client = Mock()
     client.object_info.return_value = info
     if outcome == "error":

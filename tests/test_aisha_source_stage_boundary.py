@@ -114,9 +114,21 @@ def test_changed_output_topology_fails_before_upload(monkeypatch, tmp_path, save
     submit.assert_not_called()
 
 
-@pytest.mark.parametrize('stage_three', [False, True])
-def test_stage_three_remains_a_separate_manual_review(monkeypatch, tmp_path, saved_prompt, catalog, stage_three):
+@pytest.mark.parametrize(('stage_three', 'stage_engine'), [
+    (False, 'reactor_inswapper'),
+    (True, 'reactor_inswapper'),
+    (True, 'facefusion_nsfw'),
+])
+def test_stage_three_remains_a_separate_manual_review(monkeypatch, tmp_path, saved_prompt, catalog, stage_three, stage_engine):
+    # Neither the host's saved engine nor installed model set may drive this offline test.
+    monkeypatch.setattr(c, 'installed_reactor_engines', lambda: ['reactor_inswapper'])
+    ff_root = tmp_path / 'facefusion-test'
+    (ff_root / '.venv/bin').mkdir(parents=True)
+    for file in (ff_root / '.venv/bin/python', ff_root / 'facefusion.py', ff_root / 'facefusion.ini'):
+        file.touch()
+    monkeypatch.setattr(c.integrations, 'FACEFUSION_ROOT', ff_root)
     bridge, client, submit = setup_bridge(monkeypatch, tmp_path, saved_prompt)
+    bridge._stage_three_engine = stage_engine
     source = tmp_path / 'source.png'
     source.write_bytes(b'offline source')
     catalog.update({'ReActorFaceSwapOpt': {}, 'ReActorOptions': {}})

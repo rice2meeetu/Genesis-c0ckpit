@@ -28,6 +28,22 @@ class CaptureBridge(c.GenerationBridge):
     def upscaleAvailable(self):
         return upscale_ready
 
+    @pyqtProperty(bool, constant=True)
+    def faceFusionAvailable(self):
+        # Stage 3 fixtures test explicit ReActor inventories, not whether
+        # FaceFusion happens to be installed on the developer's computer.
+        return False
+
+    @pyqtProperty('QVariantList', constant=True)
+    def localFaceSwapEngines(self):
+        # The Stage 3 catalog is local. Fixture availability must not change
+        # depending on the machine running the QML audit.
+        if scenario == 'unavailable-stage-three':
+            return []
+        if scenario == 'stage-pipeline':
+            return ['reactor_reswapper']
+        return ['reactor_inswapper', 'reactor_reswapper', 'reactor_hyperswap']
+
     @pyqtSlot(str,str,int,int,str,str,str,str,str,bool,bool,bool,int,float,int,float,str,str,str,float,float,float)
     def queueGenerateAdvanced(self, *args):
         captures.append((tuple(args), self._output_target_long_edge))
@@ -36,6 +52,11 @@ class CaptureBridge(c.GenerationBridge):
 class CaptureBackend(launch.BackendBridge):
     def start(self):
         pass
+
+    def resolve(self, model):
+        # This fixture advertises a ready local model; pin that same route
+        # for queue tests without requiring a live ComfyUI backend.
+        return c.Route('LOCAL', '')
 
     def _publish(self):
         # Busy changes must not replace our deliberately isolated catalog.
@@ -235,7 +256,11 @@ def verify():
                     assert win.property('generationOutputTarget') == target
                     assert win.property('useUpscale')
                 click(named('qualityBalancedButton'))
+                assert win.property('generationOutputTarget') == 3840
+                assert win.property('useUpscale')
+                click(named('qualityNativeButton'))
                 assert win.property('generationOutputTarget') == 0
+                assert not win.property('useUpscale')
                 click(named('generateButton'))
                 assert captures[-1][0][7:9] == (source_arg, pose.toString())
                 assert not named('generateButton').property('enabled')
