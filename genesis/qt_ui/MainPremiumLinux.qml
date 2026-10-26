@@ -1594,6 +1594,25 @@ ApplicationWindow {
                                             onClicked: appRoot.clearPose()
                                         }
                                     }
+                                    // G2 stays an independent runtime until its workflows
+                                    // pass G1's safety and image-quality gates.
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "GENESIS 2 native studio · separate job queue; G1 stays open"
+                                            color: appRoot.textDim
+                                            font.pixelSize: 11
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        GButton {
+                                            objectName: "openGenesis2StudioButton"
+                                            text: "OPEN G2 STUDIO"
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: "Open your installed GENESIS 2 studio without changing this G1 generation profile."
+                                            onClicked: moduleBridge.triggerAction("genesis 2 studio")
+                                        }
+                                    }
                                     RowLayout {
                                         Layout.fillWidth: true
                                         GButton {
