@@ -1580,6 +1580,20 @@ class ModuleBridge(QObject):
         ok = QDesktopServices.openUrl(url)
         self._set_status(f"{label} opened" if ok else f"Could not open {label}")
 
+    def _open_genesis_2_studio(self) -> None:
+        """Launch optional G2 from G1 without replacing this cockpit's queue."""
+        running = getattr(self, "_g2_studio_process", None)
+        if running is not None and running.poll() is None:
+            self._set_status("GENESIS 2 Studio is already open")
+            return
+        from genesis.g2_studio import G2StudioUnavailable, launch_studio
+        try:
+            self._g2_studio_process = launch_studio()
+        except (G2StudioUnavailable, OSError) as exc:
+            self._set_status(f"GENESIS 2 Studio unavailable: {exc}")
+        else:
+            self._set_status("GENESIS 2 Studio opened in its own window · G1 remains active")
+
     def _legacy(self, action: str) -> None:
         if integrations.process_running(r"Genesis-c0ckpit/main.py"):
             self._set_status(f"{action} · full GENESIS workspace is already running")
@@ -1736,6 +1750,8 @@ class ModuleBridge(QObject):
             self._service(integrations.QWEN_URL, "/health", integrations.QWEN_SERVICE, "GENESIS AI")
         elif "grok imagine" in key or "mungbean" in key:
             self._open_grok_runpod()
+        elif key in {"genesis 2", "genesis 2 studio", "g2 studio"}:
+            self._open_genesis_2_studio()
         elif "monitor" in key:
             try:
                 subprocess.Popen(["gnome-system-monitor"], start_new_session=True)
