@@ -60,3 +60,12 @@ def test_unexecutable_interpreter_rejected():
         python.chmod(stat.S_IRUSR | stat.S_IWUSR)
         with pytest.raises(G2StudioUnavailable, match="not executable"):
             studio_command(root)
+
+def test_cockpit_exposes_g2_without_replacing_generate():
+    root = Path(__file__).resolve().parents[1]
+    qml = (root / "genesis" / "qt_ui" / "MainPremiumLinux.qml").read_text()
+    cockpit = (root / "qt_cockpit.py").read_text()
+    assert qml.count('objectName: "openGenesis2StudioButton"') == 1
+    assert qml.count('objectName: "generateButton"') == 1
+    assert 'moduleBridge.triggerAction("genesis 2 studio")' in qml
+    assert 'self._open_genesis_2_studio()' in cockpit
