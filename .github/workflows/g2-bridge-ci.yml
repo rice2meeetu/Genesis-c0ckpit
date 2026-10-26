@@ -27,4 +27,4 @@ jobs:
       - name: Compile G1 bridge modules
         run: python -m py_compile genesis/g2_studio.py qt_cockpit.py
       - name: Test isolated launch and UI coexistence
-        run: python -m pytest tests/test_g2_studio_integration.py -q
+        run: python -m pytest --noconftest tests/test_g2_studio_integration.py -q
