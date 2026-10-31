@@ -29,6 +29,7 @@ from PyQt6.QtGui import QDesktopServices
 import qt_cockpit
 import qt_cockpit_linux_premium as premium
 from genesis import integrations
+from windows.nvidia_preflight import cuda_preflight
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -64,7 +65,9 @@ def _windows_process_running(pattern: str) -> bool:
 
 
 def _windows_gpu_preflight():
-    return False, "Local Windows GPU execution is blocked pending runtime verification. Select RunPod."
+    # Evaluate the real ComfyUI process, not the lightweight desktop UI venv.
+    # Never advertise Windows LOCAL as ready solely because nvidia-smi works.
+    return cuda_preflight(integrations.COMFYUI_URL)
 
 
 def _windows_service_state(_name: str) -> str:
