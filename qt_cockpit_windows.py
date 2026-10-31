@@ -23,6 +23,14 @@ os.environ.setdefault("XDG_RUNTIME_DIR", tempfile.gettempdir())
 # than the native Windows style plugin, which requires additional system DLLs.
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
+# Windows NVIDIA migration: disable every remote route in this process.
+# This does not erase saved RunPod endpoints, pods, volumes or Linux settings.
+os.environ["GENESIS_LOCAL_ONLY"] = "1"
+os.environ["GENESIS_BACKEND_MODE"] = "LOCAL"
+os.environ["GENESIS_RUNPOD_AUTOCONNECT"] = "0"
+os.environ["GENESIS_RUNPOD_URL"] = ""
+os.environ["GENESIS_COMFY_URL"] = ""
+
 from PyQt6.QtCore import QUrl, pyqtSlot, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices
 
@@ -127,6 +135,9 @@ def _windows_pose_maker(self) -> None:
 
 
 def _windows_open_grok_runpod(self) -> None:
+    if os.environ.get("GENESIS_LOCAL_ONLY") == "1":
+        self._set_status("RunPod is disabled in the Windows NVIDIA build. LOCAL only.")
+        return
     from genesis.backend_routing import normalize_endpoint
 
     router = self.backend_router
