@@ -1180,7 +1180,7 @@ ApplicationWindow {
                 Text {
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    text: "LOCAL  /  PRIVATE  /  LINUX"
+                    text: backendBridge.localOnly ? "LOCAL  /  PRIVATE  /  WINDOWS" : "LOCAL  /  PRIVATE  /  LINUX"
                     color: appRoot.gold
                     font.pixelSize: 10
                     font.bold: true
@@ -1306,7 +1306,7 @@ ApplicationWindow {
                             }
                         }
                     }
-                    Text { Layout.fillWidth: true; text: "LOCAL · PRIVATE · LINUX"; color: appRoot.textDim; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; font.letterSpacing: 0.8 }
+                    Text { Layout.fillWidth: true; text: backendBridge.localOnly ? "LOCAL · PRIVATE · WINDOWS" : "LOCAL · PRIVATE · LINUX"; color: appRoot.textDim; font.pixelSize: 9; horizontalAlignment: Text.AlignHCenter; font.letterSpacing: 0.8 }
                 }
             }
 
@@ -1770,7 +1770,7 @@ ApplicationWindow {
                                     SectionLabel { text: "3 · MODEL / WORKFLOW" }
                                     ComboBox { implicitHeight: 44;
                                         Layout.fillWidth: true
-                                        model: ["AUTO", "LOCAL", "RUNPOD"]
+                                        model: backendBridge.localOnly ? ["LOCAL"] : ["AUTO", "LOCAL", "RUNPOD"]
                                         currentIndex: model.indexOf(backendBridge.mode)
                                         enabled: !genesisBridge.busy
                                         onActivated: backendBridge.setMode(currentText)
@@ -1778,6 +1778,7 @@ ApplicationWindow {
                                     Text { Layout.fillWidth: true; text: backendBridge.message; color: appRoot.textDim; wrapMode: Text.Wrap; font.pixelSize: 14 }
                                     TextField {
                                         id: runpodEndpoint
+                                        visible: !backendBridge.localOnly
                                         Layout.fillWidth: true
                                         text: backendBridge.endpoint
                                         placeholderText: "RunPod ComfyUI URL or pod ID"
@@ -1787,6 +1788,7 @@ ApplicationWindow {
                                     GridLayout {
                                         Layout.fillWidth: true
                                         columns: generationSettings.availableWidth < 290 ? 1 : 2
+                                        visible: !backendBridge.localOnly
                                         columnSpacing: 6
                                         rowSpacing: 6
                                         GButton { text: "Save endpoint"; enabled: !genesisBridge.busy; onClicked: backendBridge.setEndpoint(runpodEndpoint.text) }
@@ -1808,6 +1810,7 @@ ApplicationWindow {
                                     }
                                     Text {
                                         Layout.fillWidth: true
+                                        visible: !backendBridge.localOnly
                                         text: backendBridge.connected
                                             ? "RunPod connection active. Disconnect stops GENESIS remote polling."
                                             : "RunPod disconnected by default. GENESIS will not contact the saved endpoint until Connect RunPod is pressed."

@@ -48,15 +48,19 @@ class BackendBridge(QObject):
         super().__init__(parent)
         self.generation = generation
         self.settings = QSettings('GENESIS', 'c0ckpit')
+        # Opt-in Windows-only local mode; retain saved RunPod preferences for later.
+        self._local_only = os.environ.get('GENESIS_LOCAL_ONLY', '').lower() in {'1', 'true', 'yes'}
         requested = os.environ.get('GENESIS_BACKEND_MODE', '')
         legacy = os.environ.get('GENESIS_COMFY_URL', '')
         self._mode = requested or ('RUNPOD' if legacy else str(self.settings.value('backend/mode', 'AUTO')))
         if self._mode not in {'AUTO', 'LOCAL', 'RUNPOD'}:
             self._mode = 'AUTO'
+        if self._local_only:
+            self._mode = 'LOCAL'
         raw = os.environ.get('GENESIS_RUNPOD_URL', legacy or str(self.settings.value('backend/runpod_url', '')))
         self._message = 'Checking available backends…'
         try:
-            self._endpoint = normalize_endpoint(raw)
+            self._endpoint = '' if self._local_only else normalize_endpoint(raw)
         except ValueError as exc:
             self._endpoint = ''
             self._message = str(exc)
@@ -76,6 +80,9 @@ class BackendBridge(QObject):
         self.timer.timeout.connect(self.refresh)
         generation.busyChanged.connect(self._publish)
 
+    @pyqtProperty(bool, notify=changed)
+    def localOnly(self): return self._local_only
+
     @pyqtProperty(str, notify=changed)
     def mode(self): return self._mode
 
@@ -93,7 +100,7 @@ class BackendBridge(QObject):
 
     @pyqtSlot(str)
     def setMode(self, mode):
-        if self.generation.busy or mode not in {'AUTO', 'LOCAL', 'RUNPOD'}:
+        if self._local_only or self.generation.busy or mode not in {'AUTO', 'LOCAL', 'RUNPOD'}:
             return
         self._mode = mode
         self.settings.setValue('backend/mode', mode)
@@ -106,7 +113,7 @@ class BackendBridge(QObject):
         This never starts RunPod or changes a route during an active job.
         A selected verified local model can use AUTO when RunPod is offline.
         """
-        if self.generation.busy or not model:
+        if self._local_only or self.generation.busy or not model:
             return
         local_runnable = {p['model'] for p in self._local if p.get('runnable')}
         if model in local_runnable:
@@ -133,7 +140,7 @@ class BackendBridge(QObject):
 
     @pyqtSlot(str)
     def setEndpoint(self, value):
-        if self.generation.busy:
+        if self._local_only or self.generation.busy:
             return
         try:
             endpoint = normalize_endpoint(value)
@@ -152,7 +159,7 @@ class BackendBridge(QObject):
 
     @pyqtSlot()
     def connectRemote(self):
-        if self.generation.busy or self._connected:
+        if self._local_only or self.generation.busy or self._connected:
             return
         if not self._endpoint:
             self._message = 'RunPod endpoint is not configured.'
@@ -181,7 +188,7 @@ class BackendBridge(QObject):
 
     def start(self):
         requested = os.environ.get('GENESIS_RUNPOD_AUTOCONNECT', '').lower() in {'1', 'true', 'yes'}
-        if requested and self._mode == 'RUNPOD' and self._endpoint:
+        if not self._local_only and requested and self._mode == 'RUNPOD' and self._endpoint:
             self.connectRemote()
         else:
             self.refresh()
@@ -192,7 +199,7 @@ class BackendBridge(QObject):
             return
         self._running = True
         self.changed.emit()
-        endpoint = self._endpoint if self._connected else ''
+        endpoint = self._endpoint if self._connected and not self._local_only else ''
         threading.Thread(target=self._probe, args=(self._revision, endpoint), daemon=True).start()
 
     def _probe(self, revision, endpoint):
@@ -281,7 +288,7 @@ class BackendBridge(QObject):
             raise ValueError('Face swapping is local-only; connect a safe local ComfyUI with ReActor.')
         if self._mode != 'RUNPOD' and self._local_safe and self._local_status.get('ready'):
             return Route('LOCAL', '')
-        if self._mode != 'LOCAL' and self._connected and self._endpoint and self._remote_status.get('ready'):
+        if not self._local_only and self._mode != 'LOCAL' and self._connected and self._endpoint and self._remote_status.get('ready'):
             return Route('RUNPOD', self._endpoint)
         raise ValueError(f'{self._mode}: no ready safe backend for {operation}. Refresh backends in Create.')
 
@@ -290,7 +297,7 @@ class BackendBridge(QObject):
         return self._local_safe and model in cockpit.LOCAL_SAFE_CREATE_MODELS
 
     def resolve(self, model):
-        return choose_route(self._mode, model,
+        return choose_route('LOCAL' if self._local_only else self._mode, model,
             {p['model'] for p in self._local if p.get('runnable')},
             {p['model'] for p in self._remote if p.get('runnable')},
             self._local_status.get('ready', False), self._remote_status.get('ready', False),
@@ -305,7 +312,8 @@ class BackendBridge(QObject):
         sources = ([row for row in self._local if row.get('ready')]
                    if self._mode == 'LOCAL' else self._local + self._remote)
         import qt_cockpit as cockpit
-        configured_rows = {row['model']: row for row in cockpit.configured_stage_one_profiles()}
+        configured_rows = ({} if self._local_only else
+                           {row['model']: row for row in cockpit.configured_stage_one_profiles()})
         merged_sources = []
         for source in list(sources):
             configured = configured_rows.get(source['model'])
@@ -371,7 +379,8 @@ class BackendBridge(QObject):
         self.profilesReady.emit(rows)
         local = ('ready' if self._local_safe else 'safety blocked') if self._local_status.get('ready') else 'offline'
         remote = ('ready' if self._remote_status.get('ready') else 'offline') if self._connected else ('disconnected' if self._endpoint else 'not configured')
-        self._message = f'Local {local} · RunPod {remote}'
+        self._message = (f'Local CUDA {local} · RunPod disabled' if self._local_only
+                         else f'Local {local} · RunPod {remote}')
         status = dict(self._remote_status if self._mode == 'RUNPOD' else self._local_status)
         # Only local ReActor is eligible for Stage 3. Preserve the generator's
         # catalog separately so selecting RunPod cannot advertise its swap

@@ -23,12 +23,21 @@ os.environ.setdefault("XDG_RUNTIME_DIR", tempfile.gettempdir())
 # than the native Windows style plugin, which requires additional system DLLs.
 os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
 
+# Windows NVIDIA migration: disable every remote route in this process.
+# This does not erase saved RunPod endpoints, pods, volumes or Linux settings.
+os.environ["GENESIS_LOCAL_ONLY"] = "1"
+os.environ["GENESIS_BACKEND_MODE"] = "LOCAL"
+os.environ["GENESIS_RUNPOD_AUTOCONNECT"] = "0"
+os.environ["GENESIS_RUNPOD_URL"] = ""
+os.environ["GENESIS_COMFY_URL"] = ""
+
 from PyQt6.QtCore import QUrl, pyqtSlot, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices
 
 import qt_cockpit
 import qt_cockpit_linux_premium as premium
 from genesis import integrations
+from windows.nvidia_preflight import cuda_preflight
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -64,7 +73,9 @@ def _windows_process_running(pattern: str) -> bool:
 
 
 def _windows_gpu_preflight():
-    return False, "Local Windows GPU execution is blocked pending runtime verification. Select RunPod."
+    # Evaluate the real ComfyUI process, not the lightweight desktop UI venv.
+    # Never advertise Windows LOCAL as ready solely because nvidia-smi works.
+    return cuda_preflight(integrations.COMFYUI_URL)
 
 
 def _windows_service_state(_name: str) -> str:
@@ -124,6 +135,9 @@ def _windows_pose_maker(self) -> None:
 
 
 def _windows_open_grok_runpod(self) -> None:
+    if os.environ.get("GENESIS_LOCAL_ONLY") == "1":
+        self._set_status("RunPod is disabled in the Windows NVIDIA build. LOCAL only.")
+        return
     from genesis.backend_routing import normalize_endpoint
 
     router = self.backend_router
